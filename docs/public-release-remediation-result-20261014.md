@@ -1,6 +1,6 @@
 # 공개 전 수정 작업의 최종 산출물
 
-2026-10-14 검증, 2026-10-15 저장소 분리 반영. [수정 내역](public-release-remediation-20261014.md)의 후속 결과다. 소스·실행 파일의 수정, 배포 조립과 세 플랫폼 CI 검증을 완료했다. 기존 이력은 비공개 `ARTEX-Desktop-History`에 보존했고 새 `ARTEX-Desktop`도 비공개다.
+2026-10-14 검증, 2026-10-15 저장소 분리 반영. [수정 내역](public-release-remediation-20261014.md)의 후속 결과다. 소스·실행 파일의 수정, 배포 조립과 세 플랫폼 CI 검증을 완료했다. 저장소 분리 후 사용자의 후속 요청에 따라 기존 `ARTEX-Desktop-History`는 GitHub에서 삭제했고, 현재 `ARTEX-Desktop`만 비공개로 유지한다. 기존 이력·릴리스의 검증된 로컬 복구 백업은 남겼다.
 
 ## 반영 결과
 
@@ -58,7 +58,7 @@ Windows는 전체 공유 회귀·서비스·host·UI 시험, 통합 자체 시�
 
 새 저장소의 첫 Windows 실패 `38592745002`는 PowerMonitor 시작 전 초기 작업 공간 Create 시험의 10초 대기에서 발생했다. 두 lifecycle 시험의 초기 Create에만 기존 durable Create 시험과 같은 60초 예산을 적용하고, 일치하는 오류 응답을 즉시 표시하도록 고쳤다. 전원 이벤트·종료·재개 시험의 대기와 제품 동작은 유지했다. `84098a0…`은 `ce1f75e…`와 Rust 소스가 같고, 수동 CI의 Intel Mac 선택 항목 및 플랫폼 문서만 추가한 commit이다.
 
-새 main의 추적 파일 301개에서 미검토 개인정보·자격 증명 탐지 0건을 확인했다. 고정 소스 ZIP은 root commit의 297개 Git blob과 정확히 일치한다. 두 저장소의 비공개 상태, History의 refs·릴리스·asset ID/크기/해시 보존, preview.2의 GitHub asset 해시와 로컬 원본 일치도 다시 확인했다.
+새 main의 추적 파일 301개에서 미검토 개인정보·자격 증명 탐지 0건을 확인했다. 고정 소스 ZIP은 root commit의 297개 Git blob과 정확히 일치한다. 분리 직후 두 저장소의 비공개 상태, History의 refs·릴리스·asset ID/크기/해시 보존, preview.2의 GitHub asset 해시와 로컬 원본 일치도 확인했다. 이후 History 삭제와 현재 저장소 보존 결과는 아래에 기록한다.
 
 이전 Windows 실행 `38512194823`에서는 CI의 OpenGL 환경 부족으로 창이 종료됐다. 고정·검증한 소프트웨어 OpenGL을 격리된 시험 폴더에 제공하고 실제 로드 경로·SHA256까지 확인하도록 보완했다. 후속 실행 `38521823069`에서는 Bash의 정상 비동기 `running` 반환을 시험이 즉시 `completed`로 단정한 별도 실패를 확인했다. 동일 실행의 최종 상태·종료 코드·실제 파일 출력을 확인하도록 시험을 수정했다. 모니터 배치·클릭 시험의 1초 렌더 가정도 실제 pending 조회를 이용해 제거했다. 진단이 없었던 첫 UI 실패의 원인은 확정하지 않는다. 구체적인 범위와 대기 예산은 [CI 보완 기록](windows-ci-graphics.md)에 있다.
 
@@ -66,8 +66,8 @@ Windows는 전체 공유 회귀·서비스·host·UI 시험, 통합 자체 시�
 
 ## 저장소 분리와 남은 조치
 
-- 사용자의 승인에 따라 기존 저장소를 비공개 `ARTEX-Desktop-History`로 변경했다. 저장소 ID·브랜치·태그·릴리스 및 asset ID/크기를 대조해 보존을 확인했다. 강제 push나 과거 태그 삭제는 수행하지 않았다.
-- 새 비공개 `ARTEX-Desktop`에 정리한 배포 기준 root commit과 `preview.2` 다운로드 릴리스를 등록했다. 기존 `preview.1`은 History에 원본 그대로 보존했다. 분리 방법은 [이력 보관 안내](repository-history.md)에 있다. 공개 전환은 별도 승인 전까지 수행하지 않는다.
+- 최초 분리 시 기존 저장소를 비공개 `ARTEX-Desktop-History`로 변경하고 refs·릴리스 보존을 확인했다. 이후 사용자의 명시적 삭제 요청에 따라 해당 저장소(ID `1417875247`)를 GitHub에서 삭제했고 404 응답으로 확인했다. 삭제 전 전체 Git bundle에 원격 브랜치·태그가 포함되는 것을 검증하고 `preview.1` 릴리스 파일 3개의 크기·SHA256을 대조해 로컬 복구 백업을 남겼다. 이전 GitHub CI 기록·링크는 삭제된 저장소에서 제공되지 않으며 당시 로그는 로컬에 보존한다.
+- 새 비공개 `ARTEX-Desktop`에 정리한 배포 기준 root commit과 `preview.2` 다운로드 릴리스를 등록했다. 현재 저장소(ID `1419301831`)의 refs·릴리스·asset ID/크기/해시가 History 삭제 직후 그대로 유지되는 것을 확인했다. 기존 `preview.1`은 로컬 복구 백업으로만 보존한다. 분리와 삭제 범위는 [저장소 이력 안내](repository-history.md)에 있다. 공개 전환은 별도 승인 전까지 수행하지 않는다.
 - macOS/Arch 실기기의 DPI·입력·절전/복구·키 저장·외부 프로세스 정리와 해당 OS 배포 패키지는 별도 수락 범위다. [플랫폼 점검](desktop-platform-audit.md)의 잔여 사항을 유지한다. 코드 서명·설치 프로그램·자동 업데이트는 포함하지 않는다.
 
 사용자의 실제 작업 공간·LLM 키·최근 작업 공간 설정과 원본 소스는 수정하지 않았다. 이 기록은 모든 저작권 관계의 법률적 보증이 아니다. 정확한 로컬 증거 색인은 `D:/Artex/.organization/public-remediation-final-result.json`에 보관한다. 이 후속 기록은 빌드 후 생성했으며 고정 소스 ZIP을 변경하지 않는다.

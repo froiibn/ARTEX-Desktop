@@ -2,7 +2,7 @@
 
 **한국어** · [English](README.en.md) · [简体中文](README.zh-CN.md)
 
-GitHub: [froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop). 현재는 **비공개 개발·검토 단계**다. Windows `v0.2.0-preview.2` 시험 빌드와 대응 소스를 비공개 Releases에서 제공하며 로그인과 접근 권한이 필요하다. 원본 README의 별도 사용 제한은 [처리 방침](docs/license-policy.md)에 따라 파생 프로젝트의 추가 라이선스 조건으로 채택하지 않는다. 저장소 공개 전환은 아직 수행하지 않았다. 이전 개발 이력과 `preview.1`은 비공개 [ARTEX-Desktop-History](https://github.com/froiibn/ARTEX-Desktop-History)에 보존한다. 원본 ARTEX의 저자는 **Autumn-27**이다. [원작자·출처와 수정 사항](ARTEX_NOTICE.md)을 참고한다.
+GitHub: [froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop). 현재는 **비공개 개발·검토 단계**다. Windows `v0.2.0-preview.2` 시험 빌드와 대응 소스를 비공개 Releases에서 제공하며 로그인과 접근 권한이 필요하다. 원본 README의 별도 사용 제한은 [처리 방침](docs/license-policy.md)에 따라 파생 프로젝트의 추가 라이선스 조건으로 채택하지 않는다. 저장소 공개 전환은 아직 수행하지 않았다. 이전 개발 이력과 `preview.1`의 GitHub 저장소는 제거했으며, 현재 소스와 `preview.2`만 GitHub에서 제공한다. [저장소 이력 안내](docs/repository-history.md)를 참고한다. 원본 ARTEX의 저자는 **Autumn-27**이다. [원작자·출처와 수정 사항](ARTEX_NOTICE.md)을 참고한다.
 
 현재 개발 대상은 단일 Rust 프로세스의 네이티브 데스크톱 앱이다. Rust 네이티브 UI와 객체·파일 저장, LLM·도구 실행 서비스가 같은 앱 안에서 동작한다. 기본 UI 실행에 Go, Node/npm, WebView, PostgreSQL 서버는 필요하지 않다. Python/Nmap 등 개별 외부 도구는 해당 기능을 사용할 때 별도로 필요하다.
 
