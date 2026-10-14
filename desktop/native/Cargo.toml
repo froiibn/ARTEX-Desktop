@@ -1,6 +1,6 @@
 [package]
 name = "artex-native"
-version = "0.2.0"
+version = "0.2.0-preview.3"
 edition = "2024"
 license = "AGPL-3.0-only"
 description = "Integrated Rust desktop application for ARTEX"

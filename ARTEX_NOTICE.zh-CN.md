@@ -20,4 +20,4 @@
 
 原版 README 中禁止在线及实际使用的表述，根据[基于 AGPL 第7条和第10条的处理方针](docs/license-policy.md)处理，不采纳为本派生项目的附加许可证条件。保留原作者、来源、无担保、修改及 AGPL 声明，以及实际法律和独立合同下的义务。这不保证所有法律争议或第三方权利问题已解决。
 
-仓库已于 2026-10-15 转为公开。Windows `v0.2.0-preview.2` 及其对应源码已通过 Releases 提供。声明、源码与验证范围参见[最终产物与验证记录](docs/public-release-remediation-result-20261014.md)。
+仓库已于 2026-10-15 转为公开。Windows `v0.2.0-preview.3` 及其对应源码已通过 Releases 提供。声明、源码与验证范围参见[最终产物与验证记录](docs/public-release-remediation-result-20261014.md)。

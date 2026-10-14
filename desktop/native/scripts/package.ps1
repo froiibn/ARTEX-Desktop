@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$VerificationResult,
-    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$')][string]$Version = '0.2.0-preview.2',
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$')][string]$Version = '0.2.0-preview.3',
     [string]$LicenseCache
 )
 $ErrorActionPreference = 'Stop'
@@ -65,6 +65,8 @@ try {
     Confirm-PackageProcess $build 'Native release build'
     $binary = Join-Path $package 'ARTEX.exe'
     Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR 'release/artex-native.exe') -Destination $binary
+    $binaryVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($binary)
+    if ($binaryVersion.ProductVersion -ne $Version -or $binaryVersion.FileDescription -ne 'ARTEX Desktop') { throw 'Windows executable version metadata does not match the release' }
 } finally {
     $env:CARGO_TARGET_DIR = $oldTarget
     $env:RUSTFLAGS = $oldFlags
@@ -89,7 +91,18 @@ if (-not $self.WaitForExit(60000)) { throw "Packaged self-test exceeded deadline
 Confirm-PackageProcess $self 'Packaged self-test'
 $profile = Join-Path $audit 'verification-profile'
 $capture = Join-Path $audit 'native-window.png'
-$gui = Start-PackageProcess $binary @('--workspace',$workspace,'--read-only','--profile',$profile,'--smoke','--smoke-dialog','about','--screenshot',$capture) 'window'
+$smokeRelease = Join-Path $audit 'icon-window-release.ready'
+$gui = Start-PackageProcess $binary @('--workspace',$workspace,'--read-only','--profile',$profile,'--smoke','--smoke-dialog','about','--smoke-hold-until',$smokeRelease,'--screenshot',$capture) 'window'
+$iconPath = Join-Path $audit 'icon-verification.json'
+try {
+    $iconCheck = Start-PackageProcess $python @((Join-Path $PSScriptRoot 'verify-icon-resources.py'),'--binary',$binary,'--source-ico',(Join-Path $repoRoot 'desktop/native/assets/branding/artex-app-icon.ico'),'--window-pid',([string]$gui.Id),'--output',$iconPath) 'icons'
+    if (-not $iconCheck.WaitForExit(30000)) { throw "Packaged icon verification exceeded deadline; PID $($iconCheck.Id) retained for inspection" }
+    Confirm-PackageProcess $iconCheck 'Packaged executable/window icons'
+    $iconVerification = Get-Content -LiteralPath $iconPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $iconVerification.passed -or -not $iconVerification.window) { throw 'Packaged icon evidence incomplete' }
+} finally {
+    [IO.File]::WriteAllText($smokeRelease, 'release')
+}
 $children = @()
 $modules = @()
 $deadline = [DateTime]::UtcNow.AddSeconds(110)
@@ -109,5 +122,7 @@ $children = @($children | Sort-Object ProcessId -Unique)
 $modules = @($modules | Sort-Object -Unique)
 if (@($children | Where-Object { $_.Name -match 'artex-engine|msedgewebview2' }).Count -gt 0 -or @($modules | Where-Object { $_ -match 'WebView2Loader|wry' }).Count -gt 0) { throw 'Packaged app launched legacy GUI components' }
 $report = @{passed=$true;completed_utc=[DateTime]::UtcNow.ToString('o');version=$Version;source_commit=$sourceCommit;bundle=$package;artifact_root=$artifactRoot;executable=$binary;executable_sha256=(Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant();executable_bytes=(Get-Item -LiteralPath $binary).Length;verification_result=$verificationPath;verification_sha256=(Get-FileHash -LiteralPath $verificationPath -Algorithm SHA256).Hash.ToLowerInvariant();rust_version=$rustVersion;compiler_path_remapping=$true;legal_notice_window_verified=$true;license_collection=$licenseCollection;native_link_map_sha256=(Get-FileHash -LiteralPath $linkMap -Algorithm SHA256).Hash.ToLowerInvariant();platform='Windows x86_64';workspace=$workspace;capture=$capture;self_test_exit_code=$self.ExitCode;window_exit_code=$gui.ExitCode;orderly_shutdown=$window.orderly_shutdown;rendered_sections=$window.rendered_sections;observed_children=$children;observed_modules=$modules;physical_macos_arch_qualification=$false;source_management_actions=$window.source_management_actions}
-$report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $artifactRoot 'package-result.json') -Encoding UTF8
+$report.icon_verification = $iconVerification
+$report.icon_verification_sha256 = (Get-FileHash -LiteralPath $iconPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $artifactRoot 'package-result.json') -Encoding UTF8
 Write-Output "Packaged native application PASS: $artifactRoot"

@@ -167,7 +167,7 @@ def verify_package(repo: Path, result_path: Path):
     version = report.get("version", "")
     require(isinstance(version, str) and SEMVER.fullmatch(version), "Package version is not a supported SemVer")
     manifest = tomllib.loads((repo / "desktop/native/Cargo.toml").read_text(encoding="utf-8"))
-    require(version.split("-", 1)[0] == manifest["package"]["version"], "Package and native source versions differ")
+    require(version == manifest["package"]["version"], "Package and native source versions differ")
     commit = git_text(repo, "rev-parse", "HEAD")
     require(report.get("source_commit") == commit, "Package source commit differs from Git HEAD")
     require(report.get("compiler_path_remapping") is True, "Compiler path remapping evidence is required")
@@ -198,6 +198,19 @@ def verify_package(repo: Path, result_path: Path):
     require(Path(report.get("executable", "")).resolve() == binary, "Package executable reference differs from bundle")
     require(file_sha(binary) == report["executable_sha256"] and binary.stat().st_size == report.get("executable_bytes"),
             "Verified executable bytes changed")
+    icon_path = result_path.parent / "audit/icon-verification.json"
+    require(icon_path.is_file() and file_sha(icon_path) == report.get("icon_verification_sha256"),
+            "Packaged icon acceptance evidence changed or is absent")
+    icon = read_json(icon_path)
+    require(icon == report.get("icon_verification") and icon.get("passed") is True
+            and icon.get("binary_sha256") == report["executable_sha256"]
+            and icon.get("source_ico_sha256") == file_sha(repo / "desktop/native/assets/branding/artex-app-icon.ico"),
+            "Packaged icon evidence does not identify the executable and approved ICO")
+    require(icon.get("resources", {}).get("exact_source_match") is True
+            and [frame.get("size") for frame in icon.get("resources", {}).get("frames", [])]
+            == [16, 24, 32, 48, 64, 128, 256]
+            and bool(icon.get("window", {}).get("windows")),
+            "Seven approved executable frames and a real native-window icon are required")
     with binary.open("rb") as stream:
         header = stream.read(64)
         require(len(header) == 64 and header[:2] == b"MZ", "Executable lacks a PE header")
@@ -366,10 +379,15 @@ def make_payload(repo: Path, commit: str, version: str, report: dict, bundle: Pa
              "license_index_sha256": file_sha(payload / "licenses/INDEX.json"),
              "license_collector_sha256": report["license_collection"]["collector_sha256"],
              "license_input_policy_sha256": report["license_collection"]["input_policy_sha256"],
+             "application_icon": {"source_ico_sha256": report["icon_verification"]["source_ico_sha256"],
+                                  "executable_frame_sizes": [16, 24, 32, 48, 64, 128, 256],
+                                  "window_png_size": 256, "tray_png_size": 32,
+                                  "provenance": "licenses/runtime/first-party-icon-resource.json"},
              "checks": {"full_native_regression": True, "packaged_self_test_exit_code": 0,
                         "packaged_gui_exit_code": 0, "orderly_shutdown": True, "rendered_section_count": 23,
                         "source_archive_exact_git_blobs": source_proof["blob_count"], "native_children": 0,
                         "packaged_legal_notice_window_verified": True,
+                        "packaged_executable_and_live_window_icons_verified": True,
                         "distribution_input_notices_verified": True},
              "limits": {"code_signed": False, "installer": False, "automatic_updates": False,
                         "macos_arch_physical_qualification": False, "legal_certification": False,

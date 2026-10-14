@@ -1,0 +1,8 @@
+ARTEX app icon design candidate v1
+Created: 2026-10-15
+Generation mode: built-in image_gen, transparent background
+Purpose: approved desktop artwork used for the window, tray and Windows executable resource.
+Palette reference: desktop/native/src/theme.rs (panel #21262E, accent #84B8F6)
+
+Final prompt:
+Create one polished desktop application icon for ARTEX, a native Rust defensive security workspace. Use its existing UI colors: dark slate #21262E and pale blue #84B8F6. A rounded-square slate tile contains one bold integrated symbol: a stylized letter A subtly forming a protective shield. Friendly GNOME/Linux desktop styling, restrained material depth, generous padding, centered front view, strong silhouette readable at 24 pixels. Square canvas, icon alone. No wordmark, caption, tiny details, lock, skull, hooded figure, terminal text, red warning imagery, mockup, watermark or existing brand imitation. Preserve a genuinely transparent background outside the rounded tile.

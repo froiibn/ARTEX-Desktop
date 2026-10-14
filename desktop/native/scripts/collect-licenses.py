@@ -13,7 +13,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import shutil
 import struct
@@ -46,6 +46,33 @@ def sha(data: bytes) -> str:
 def file_sha(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def windows_build_path(value):
+    """Accept ordinary absolute drive/UNC paths, including Rust's verbatim spelling."""
+    def normalize(text):
+        if not isinstance(text, str) or any(character in text for character in "\0\r\n"):
+            raise RuntimeError("Invalid Windows build-record path")
+        text = text.replace("/", "\\")
+        if text.lower().startswith("\\\\?\\unc\\"):
+            text = "\\\\" + text[8:]
+        elif text.startswith("\\\\?\\"):
+            if not re.match(r"^[A-Za-z]:\\", text[4:]):
+                raise RuntimeError("Windows build-record device namespace is not permitted")
+            text = text[4:]
+        parsed = PureWindowsPath(text)
+        if not parsed.is_absolute() or text.startswith(("\\\\.\\", "\\??\\")):
+            raise RuntimeError("Windows build-record path must be an absolute drive or UNC path")
+        if parsed.drive.startswith("\\\\"):
+            pieces = parsed.drive[2:].split("\\")
+            if len(pieces) != 2 or any(part in ("", ".", "?", "..") or ":" in part for part in pieces):
+                raise RuntimeError("Invalid Windows UNC build-record path")
+        elif not re.fullmatch(r"[A-Za-z]:", parsed.drive):
+            raise RuntimeError("Unsupported Windows build-record namespace")
+        if ":" in text[len(parsed.drive):]:
+            raise RuntimeError("Windows build-record alternate streams are not permitted")
+        return Path(text)
+    return normalize(str(normalize(value).resolve()))
 
 
 def command(*args: str) -> str:
@@ -379,6 +406,11 @@ class Collector:
                  "desktop/native/assets/fonts/PROVENANCE.md", "desktop/crates/domain/resources/psl/LICENSE",
                  "desktop/crates/domain/resources/psl/MPL-2.0.txt", "desktop/crates/domain/resources/psl/PROVENANCE.md",
                  "desktop/crates/domain/resources/psl/public_suffix_list.dat"]
+        branding = ["artex-app-icon-v1.png", "artex-app-icon-32.png", "artex-app-icon-256.png",
+                    "artex-app-icon.ico", "artex-app-icon-v1-prompt.txt", "README.md"]
+        branding_paths = ["desktop/native/assets/branding/" + name for name in branding]
+        branding_paths += ["desktop/native/build.rs", "desktop/native/examples/export-app-icons.rs"]
+        paths += branding_paths
         policy = json.loads((ROOT / "desktop/native/scripts/license-inputs.json").read_text())
         for record in policy["standard_terms_supplements"]:
             if file_sha(ROOT / record["path"]) != record["sha256"]:
@@ -390,6 +422,25 @@ class Collector:
             if relative in policy["source_material_sha256"] and file_sha(path) != policy["source_material_sha256"][relative]:
                 raise RuntimeError(f"Pinned native source material changed: {relative}")
             self.write("source/" + relative, path.read_bytes(), "repository:" + relative, "retained source/resource notice")
+        frames = icon_frames((ROOT / "desktop/native/assets/branding/artex-app-icon.ico").read_bytes())
+        approved = (ROOT / "desktop/native/assets/branding/artex-app-icon-v1.png").read_bytes()
+        if len(approved) < 33 or approved[:16] != b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR":
+            raise RuntimeError("Approved icon source is not a PNG image")
+        width, height = struct.unpack_from(">II", approved, 16)
+        if width != height or width < 256:
+            raise RuntimeError("Approved icon source must be square and at least 256 pixels")
+        for dimension in (32, 256):
+            frame = next(data for entry, data in frames if (entry[0] or 256) == dimension)
+            if frame != (ROOT / f"desktop/native/assets/branding/artex-app-icon-{dimension}.png").read_bytes():
+                raise RuntimeError("ICO frame differs from the retained application PNG")
+        self.json("source/resources.json", {
+            "provider": "ARTEX Desktop first-party artwork and resource build code",
+            "scope": "Approved generated artwork and derived platform icons; no additional third-party library",
+            "license_context": "Application AGPL-3.0-only; artwork provenance/attribution retained in branding README",
+            "files": [{"path": relative, "sha256": file_sha(ROOT / relative),
+                       "size": (ROOT / relative).stat().st_size} for relative in branding_paths],
+            "ico_png_sizes": [entry[0] or 256 for entry, _ in frames],
+            "ico_32_256_match_retained_png": True})
         brevduva = json.loads((ROOT / "docs/licenses/brevduva-provenance.json").read_text())
         for record in brevduva["source_files"]:
             if file_sha(ROOT / record["local_path"]) != record["sha256"]:
@@ -510,6 +561,12 @@ class Collector:
                                      "provider": "locked Cargo source archive native import library", "origin": original})
                 elif path.is_relative_to(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "desktop/target")).resolve()):
                     relative = path.relative_to(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "desktop/target")).resolve()).as_posix()
+                    if re.fullmatch(r"(?:x86_64-pc-windows-gnu/)?release/build/artex-native-[0-9a-f]{16}/out/artex-icon-resource\.o", relative):
+                        resource_proof = self.icon_resource(path, binary, archive, root)
+                        evidence.append({"file": relative, "sha256": digest,
+                                         "provider": "ARTEX Desktop first-party Windows icon/version resource",
+                                         "origin": resource_proof})
+                        continue
                     if "/build/" in "/" + relative and "/out/" in relative:
                         directory = relative.split("/build/", 1)[1].split("/", 1)[0]
                         candidates = [p for p in self.packages if directory.startswith(p["name"] + "-")]
@@ -527,6 +584,8 @@ class Collector:
                     raise RuntimeError(f"Unreviewed native library outside compiler/Rust/Cargo provenance: {path.name}")
             if sha(archive.read("mingw64/bin/gcc.exe")) != file_sha(compiler):
                 raise RuntimeError("Compiler executable differs from verified vendor archive")
+        if sum(record["provider"] == "ARTEX Desktop first-party Windows icon/version resource" for record in evidence) != 1:
+            raise RuntimeError("Linker map must load exactly one verified first-party icon/version object")
         for record in policy["runtime_notice_files"]:
             path = ROOT / record["path"]
             if not path.is_file() or file_sha(path) != record["sha256"]:
@@ -552,6 +611,189 @@ class Collector:
                   "removed_compiler_transient_inputs": transient_inputs,
                   "gcc_exception": "GCC Runtime Library Exception 3.1 permits combined Target Code from eligible compilation, subject to independent modules' licenses. Toolchain use alone does not relicense ARTEX. No non-GPL-compatible GCC intermediate-code optimizer is introduced by this Cargo build.",
                   "limit": "Linker LOAD provenance is conservative; import archives are not Microsoft DLL redistribution. This verifies technical inputs/notices, not legal certification."})
+
+    def icon_resource(self, path, binary, archive, compiler_root):
+        """Qualify only the root application's exact icon object, never other native outputs."""
+        package = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["package"]
+        if package["name"] != "artex-native" or package["license"] != "AGPL-3.0-only":
+            raise RuntimeError("First-party icon resource owner changed")
+        icon = ROOT / "desktop/native/assets/branding/artex-app-icon.ico"
+        resource = path.with_suffix(".rc")
+        source = resource.read_text(encoding="utf-8")
+        match = re.findall(r'(?m)^1 ICON "([^"\r\n]+)"$', source)
+        if len(match) != 1 or Path(match[0]).resolve() != icon.resolve():
+            raise RuntimeError("Root icon RC does not reference the retained ICO exactly")
+        version = package["version"]
+        core, _, pre = version.partition("-")
+        revision = pre.rsplit(".", 1)[-1]
+        revision = int(revision) if revision.isdigit() and int(revision) <= 65535 else 0
+        numbers = core.replace(".", ",") + f",{revision}"
+        for expected in ("1 VERSIONINFO", f" FILEVERSION {numbers}", f" PRODUCTVERSION {numbers}",
+                         f'   VALUE "FileVersion", "{version}\\0"',
+                         f'   VALUE "ProductVersion", "{version}\\0"'):
+            if source.splitlines().count(expected) != 1:
+                raise RuntimeError("Root icon RC version contract differs from Cargo manifest")
+        frames = icon_frames(icon.read_bytes())
+        object_resources = windows_resources(path.read_bytes(), coff=True)
+        binary_resources = windows_resources(binary.read_bytes(), coff=False)
+        verify_icon_resources(object_resources, frames, version)
+        verify_icon_resources(binary_resources, frames, version)
+        if object_resources != binary_resources:
+            raise RuntimeError("Linked executable resource bytes differ from the first-party object")
+        build_record = path.with_name("artex-icon-resource-build.json")
+        build = json.loads(build_record.read_text(encoding="utf-8"))
+        if not isinstance(build, dict) or set(build) != {"target", "target_env", "compiler_path", "resource_source", "linked_resource", "icon"}:
+            raise RuntimeError("Icon build record has an unexpected schema")
+        if build.get("target") != self.args.target or build.get("target_env") != "gnu":
+            raise RuntimeError("Icon build record target differs from the qualified GNU target")
+        for key, expected in (("resource_source", resource), ("linked_resource", path), ("icon", icon)):
+            value = build.get(key)
+            if windows_build_path(value) != windows_build_path(str(expected.resolve())):
+                raise RuntimeError("Icon build record does not match the actual resource inputs/output")
+        compiler_path = build.get("compiler_path")
+        windres = windows_build_path(compiler_path)
+        if not windres.is_file() or not windres.is_relative_to(compiler_root):
+            raise RuntimeError("Icon resource compiler is outside the verified GNU distribution")
+        member = "mingw64/" + windres.relative_to(compiler_root).as_posix()
+        if sha(archive.read(member)) != file_sha(windres):
+            raise RuntimeError("Icon resource compiler differs from the verified vendor archive")
+        proof = {"owner": "artex-native", "license_context": "AGPL-3.0-only application resource",
+                 "ico_sha256": file_sha(icon), "object_sha256": file_sha(path),
+                 "version": version, "object_and_executable_resource_bytes_match": True,
+                 "ico_frames_match_object_and_executable": True,
+                 "resource_compiler": {"member": member, "sha256": file_sha(windres),
+                                       "recorded_build_time_selection": True,
+                                       "scope": "Verified build tool, not a redistributed dependency"},
+                 "source_index": "source/resources.json",
+                 "build_record_sha256": file_sha(build_record),
+                 "build_record_paths_match": True,
+                 "build_record_limit": "Recorded build-time paths are verified locally; only the digest/result is distributed",
+                 "rc_sha256": file_sha(resource),
+                 "rc_path_limit": "Generated RC contains a local absolute icon path; only its digest is distributed",
+                 "limit": "Icon pixel derivation is recorded by retained exporter/provenance, not independently rerendered"}
+        self.json("runtime/first-party-icon-resource.json", proof)
+        return proof
+
+
+def icon_frames(data):
+    """Strictly validate the seven PNG frames exported by the retained Rust example."""
+    if len(data) < 6 or struct.unpack_from("<HHH", data) != (0, 1, 7):
+        raise RuntimeError("Application ICO header does not match the seven-frame export contract")
+    frames = []
+    expected_offset = 6 + 7 * 16
+    for index, size in enumerate((16, 24, 32, 48, 64, 128, 256)):
+        entry = data[6 + index * 16:22 + index * 16]
+        width, height, colors, reserved, planes, bits, length, offset = struct.unpack("<BBBBHHII", entry)
+        if (width or 256, height or 256, colors, reserved, planes, bits, offset) != (size, size, 0, 0, 1, 32, expected_offset):
+            raise RuntimeError("Application ICO directory differs from the retained exporter contract")
+        frame = data[offset:offset + length]
+        if len(frame) != length or len(frame) < 33 or frame[:16] != b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR" or struct.unpack_from(">II", frame, 16) != (size, size):
+            raise RuntimeError("Application ICO contains a missing or unexpected PNG frame")
+        frames.append((entry, frame))
+        expected_offset += length
+    if expected_offset != len(data):
+        raise RuntimeError("Application ICO contains unaccounted trailing bytes")
+    return frames
+
+
+def windows_resources(data, *, coff):
+    """Read numeric resource trees, checking COFF relocation ownership and PE RVA bounds."""
+    def take(start, length):
+        if start < 0 or length < 0 or start + length > len(data):
+            raise RuntimeError("Windows resource structure exceeds file bounds")
+        return data[start:start + length]
+    header = 0 if coff else struct.unpack("<I", take(0x3c, 4))[0] + 4
+    if not coff and (data[:2] != b"MZ" or take(header - 4, 4) != b"PE\0\0"):
+        raise RuntimeError("Resource proof requires a Windows PE executable")
+    machine, count, _, symbol_table, symbol_count, optional_size, _ = struct.unpack("<HHIIIHH", take(header, 20))
+    if machine != 0x8664 or not 1 <= count <= 96 or (coff and optional_size != 0):
+        raise RuntimeError("Resource proof requires ordinary x64 COFF/PE")
+    sections = []
+    for index in range(count):
+        name, virtual_size, address, size, offset, relocations, _, relocation_count, _, flags = struct.unpack(
+            "<8sIIIIIIHHI", take(header + 20 + optional_size + 40 * index, 40))
+        sections.append((name.rstrip(b"\0"), address, size, offset, relocations, relocation_count, flags, index + 1))
+    matches = [section for section in sections if section[0] == b".rsrc"]
+    if len(matches) != 1:
+        raise RuntimeError("Windows file has no unique .rsrc section")
+    _, address, size, offset, relocation_start, relocation_count, flags, section_number = matches[0]
+    resource = take(offset, size)
+    if flags & (0x20 | 0x20000000) or (coff and any(s[2] for s in sections if s[0] != b".rsrc")):
+        raise RuntimeError("First-party resource object contains unexpected executable/native content")
+    def record(start, length):
+        if start < 0 or start + length > len(resource):
+            raise RuntimeError("Resource directory exceeds .rsrc bounds")
+        return resource[start:start + length]
+    if coff:
+        relocation_offsets = set()
+        for index in range(relocation_count):
+            field, symbol, kind = struct.unpack("<IIH", take(relocation_start + index * 10, 10))
+            if symbol >= symbol_count or kind != 3 or field in relocation_offsets:
+                raise RuntimeError("Icon COFF has an unexpected relocation")
+            symbol_record = take(symbol_table + symbol * 18, 18)
+            symbol_value, owner = struct.unpack_from("<Ih", symbol_record, 8)
+            if owner != section_number or symbol_value != 0:
+                raise RuntimeError("Icon COFF relocation references content outside .rsrc")
+            relocation_offsets.add(field)
+        base = 0
+    else:
+        optional = take(header + 20, optional_size)
+        if len(optional) < 136 or struct.unpack_from("<H", optional)[0] != 0x20b:
+            raise RuntimeError("Icon PE resource directory requires PE32+")
+        resource_rva, resource_size = struct.unpack_from("<II", optional, 128)
+        if resource_rva != address or resource_size > size or not resource_size:
+            raise RuntimeError("PE resource data directory does not match .rsrc")
+        base = address
+        relocation_offsets = None
+    result = {}
+    visited = set()
+    fields = set()
+    def walk(directory, ids):
+        if directory in visited or len(ids) >= 3:
+            raise RuntimeError("Unexpected recursive/deep Windows resource tree")
+        visited.add(directory)
+        named, numeric = struct.unpack_from("<HH", record(directory, 16), 12)
+        if named or numeric > 64:
+            raise RuntimeError("First-party icon resource has unexpected named/excess entries")
+        for index in range(numeric):
+            identifier, pointer = struct.unpack("<II", record(directory + 16 + index * 8, 8))
+            if identifier & 0x80000000:
+                raise RuntimeError("Unexpected named resource identifier")
+            key = ids + (identifier,)
+            if pointer & 0x80000000:
+                walk(pointer & 0x7fffffff, key)
+            else:
+                if len(key) != 3 or key in result:
+                    raise RuntimeError("Malformed/duplicate Windows resource leaf")
+                rva, length, _, reserved = struct.unpack("<IIII", record(pointer, 16))
+                if reserved:
+                    raise RuntimeError("Unexpected resource data entry")
+                fields.add(pointer)
+                result[key] = record(rva - base, length)
+    walk(0, ())
+    if relocation_offsets is not None and fields != relocation_offsets:
+        raise RuntimeError("COFF relocation coverage does not match resource leaves")
+    return result
+
+
+def verify_icon_resources(resources, frames, version):
+    groups = [(key, value) for key, value in resources.items() if key[0] == 14]
+    versions = [(key, value) for key, value in resources.items() if key[0] == 16]
+    if len(groups) != 1 or groups[0][0][1] != 1 or len(versions) != 1 or versions[0][0][1] != 1 or groups[0][0][2] != versions[0][0][2]:
+        raise RuntimeError("Icon resource requires exactly the app icon/version group")
+    group_key, group = groups[0]
+    if len(group) != 6 + 14 * len(frames) or struct.unpack_from("<HHH", group) != (0, 1, len(frames)):
+        raise RuntimeError("Icon resource group does not match the retained ICO")
+    expected = {group_key, versions[0][0]}
+    for index, (entry, frame) in enumerate(frames):
+        resource_entry = group[6 + index * 14:20 + index * 14]
+        identifier = struct.unpack_from("<H", resource_entry, 12)[0]
+        key = (3, identifier, group_key[2])
+        if resource_entry[:12] != entry[:12] or key in expected or resources.get(key) != frame:
+            raise RuntimeError("Compiled icon PNG differs from the retained ICO bytes")
+        expected.add(key)
+    if set(resources) != expected or (version + "\0").encode("utf-16-le") not in versions[0][1]:
+        raise RuntimeError("Windows resource contains unaccounted content or mismatched version")
 
 
 def font_names(data: bytes):

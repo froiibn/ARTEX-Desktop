@@ -204,21 +204,9 @@ fn build(shared: Arc<Shared>) -> Result<tray_icon::TrayIcon, String> {
             shared.action(TrayAction::Show);
         }
     }));
-    let mut pixels = vec![0u8; 32 * 32 * 4];
-    for y in 4usize..28 {
-        for x in 4usize..28 {
-            let i = (y * 32 + x) * 4;
-            let ink = x >= 10
-                && x <= 21
-                && ((x == 10 || x == 21) && y >= 9 && y <= 24 || y == 9 || y == 17);
-            pixels[i..i + 4].copy_from_slice(if ink {
-                &[240, 252, 248, 255]
-            } else {
-                &[39, 153, 125, 255]
-            });
-        }
-    }
-    let icon = tray_icon::Icon::from_rgba(pixels, 32, 32).map_err(|e| e.to_string())?;
+    let artwork = crate::app_icon::tray()?;
+    let icon = tray_icon::Icon::from_rgba(artwork.rgba, artwork.width, artwork.height)
+        .map_err(|e| e.to_string())?;
     TrayIconBuilder::new()
         .with_id("artex-native-tray")
         .with_icon(icon)

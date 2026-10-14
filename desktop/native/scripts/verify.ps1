@@ -185,6 +185,10 @@ $handoff | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $result
 # Normal smoke may otherwise finish before the first post-release observation.
 $children += @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Select-Object ProcessId,Name,ExecutablePath)
 $modules += @(Read-WindowModules $process)
+$iconVerificationPath = Join-Path $resultRoot 'icon-verification.json'
+Invoke-NativeCheck 'icon-resource-window' (Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1 -ExpandProperty Source) @((Join-Path $PSScriptRoot 'verify-icon-resources.py'),'--binary',$executable,'--source-ico',(Join-Path $repoRoot 'desktop/native/assets/branding/artex-app-icon.ico'),'--window-pid',([string]$process.Id),'--output',$iconVerificationPath)
+$iconVerification = Get-Content -LiteralPath $iconVerificationPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if (-not $iconVerification.passed -or $iconVerification.binary_sha256 -ne $testedSha -or -not $iconVerification.window) { throw 'Live native window or executable icon verification failed' }
 # Release only after the real BUSY handoff returned 0, its same-session queue
 # drained, and the primary is still the sole live profile owner. Capture/close
 # modes without this diagnostic flag keep their existing automatic behavior.
@@ -228,21 +232,23 @@ if ($softwareOpenGl) {
 if (@($children | Where-Object { $_.Name -match 'artex-engine|msedgewebview2' }).Count -gt 0 -or @($modules | Where-Object { $_ -match 'WebView2Loader|wry' }).Count -gt 0) { throw 'Native window launched a legacy sidecar/WebView' }
 if ((Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant() -ne $testedSha) { throw 'Executable changed during verification' }
 $sourcePaths = [System.Collections.Generic.List[string]]::new()
-foreach ($directory in @('desktop/native/src','desktop/native-core/src','desktop/crates')) {
+foreach ($directory in @('desktop/native/src','desktop/native/examples','desktop/native-core/src','desktop/crates')) {
     Get-ChildItem -LiteralPath (Join-Path $repoRoot $directory) -Recurse -File | Where-Object { $_.Extension -in @('.rs','.json','.txt','.dat','.pem','.png','.svg') -or $_.Name -in @('Cargo.toml','Cargo.lock') } | ForEach-Object { [void]$sourcePaths.Add($_.FullName) }
 }
 foreach ($manifest in @('desktop/Cargo.toml','desktop/Cargo.lock','desktop/native/Cargo.toml','desktop/native/Cargo.lock','desktop/native-core/Cargo.toml','desktop/native-core/Cargo.lock')) {
     $path = Join-Path $repoRoot $manifest
     if (Test-Path -LiteralPath $path) { [void]$sourcePaths.Add($path) }
 }
-foreach ($directory in @('desktop/contracts','desktop/native/assets/fonts','desktop/native/scripts')) {
+foreach ($directory in @('desktop/contracts','desktop/native/assets/fonts','desktop/native/assets/branding','desktop/native/scripts')) {
     Get-ChildItem -LiteralPath (Join-Path $repoRoot $directory) -Recurse -File | Where-Object { $_.FullName -notmatch '[\\/]__pycache__[\\/]' } | ForEach-Object { [void]$sourcePaths.Add($_.FullName) }
 }
 # The About dialog embeds the root AGPL text. Bind it to the verified source.
 [void]$sourcePaths.Add((Join-Path $repoRoot 'LICENSE'))
+[void]$sourcePaths.Add((Join-Path $repoRoot 'desktop/native/build.rs'))
 $sourceFiles = @($sourcePaths | Sort-Object -Unique | ForEach-Object { @{path=$_;sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()} })
 $report = @{passed=$true;completed_utc=[DateTime]::UtcNow.ToString('o');executable=$executable;executable_sha256=$testedSha;workspace=$workspace;capture=$capture;rendered_sections=$window.rendered_sections;source_management_actions=$window.source_management_actions;orderly_shutdown=$window.orderly_shutdown;window_exit_code=$windowExit;second_launch=$handoff;observed_child_processes=$children;observed_modules=$modules;source_files=$sourceFiles;steps=$steps.ToArray();full_regression=([bool]$FullRegression -or $null -ne $sharedParent);shared_regression_parent=$sharedParent;software_opengl=$softwareOpenGl;platform='Windows x86_64'}
-$report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $resultRoot 'verification-result.json') -Encoding UTF8
+$report.icon_verification = $iconVerification
+$report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $resultRoot 'verification-result.json') -Encoding UTF8
 Write-Output "Native verification PASS: $resultRoot"
 } catch {
     # Only these isolated validation logs are printed. Never upload a profile,

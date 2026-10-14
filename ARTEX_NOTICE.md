@@ -20,4 +20,4 @@
 
 원본 README의 온라인·실무 사용 금지 문구는 AGPL 제7·10조에 따른 [처리 방침](docs/license-policy.md)으로 다루며, 파생 프로젝트의 추가 라이선스 조건으로 채택하지 않는다. 원작자·출처·무보증·수정·AGPL 고지를 유지하고 실제 법률과 별도 계약에 따른 의무는 보존한다. 이는 모든 법적 분쟁이나 제3자 권리가 해결되었다는 보증이 아니다.
 
-2026-10-15에 저장소를 공개로 전환했다. Windows `v0.2.0-preview.2`와 대응 소스를 Releases에서 제공하며, 고지·소스·검증 범위는 [최종 산출물 기록](docs/public-release-remediation-result-20261014.md)을 따른다.
+2026-10-15에 저장소를 공개로 전환했다. Windows `v0.2.0-preview.3`와 대응 소스를 Releases에서 제공하며, 고지·소스·검증 범위는 [최종 산출물 기록](docs/public-release-remediation-result-20261014.md)을 따른다.

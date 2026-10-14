@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod app;
+mod app_icon;
 mod forms;
 mod graph;
 mod model;

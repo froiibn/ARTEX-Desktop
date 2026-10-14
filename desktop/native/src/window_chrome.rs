@@ -29,6 +29,7 @@ impl Platform {
 pub(crate) fn viewport(platform: Platform, narrow: bool) -> egui::ViewportBuilder {
     let builder = egui::ViewportBuilder::default()
         .with_title("ARTEX")
+        .with_icon(crate::app_icon::window().expect("Approved embedded ARTEX window icon"))
         .with_inner_size(if narrow {
             [900.0, 620.0]
         } else {
@@ -261,8 +262,19 @@ pub(crate) fn show_titlebar(
                     ui.id().with("title-drag"),
                     egui::Sense::click_and_drag(),
                 );
+                let icon = crate::app_icon::title_texture(ctx);
+                let icon_rect = Rect::from_center_size(
+                    drag_rect.left_center() + egui::vec2(20.0, 0.0),
+                    egui::Vec2::splat(24.0),
+                );
+                ui.painter().image(
+                    icon.id(),
+                    icon_rect,
+                    Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
                 ui.painter().text(
-                    drag_rect.left_center() + egui::vec2(10.0, 0.0),
+                    drag_rect.left_center() + egui::vec2(40.0, 0.0),
                     egui::Align2::LEFT_CENTER,
                     "ARTEX",
                     egui::FontId::proportional(14.0),
@@ -463,6 +475,13 @@ mod tests {
             assert_eq!(view.min_inner_size, Some(egui::vec2(900.0, 620.0)));
             assert_eq!(view.inner_size, Some(egui::vec2(900.0, 620.0)));
             assert_eq!(view.resizable, Some(true));
+            let icon = view
+                .icon
+                .as_ref()
+                .expect("The native viewport needs its app icon");
+            let approved = crate::app_icon::window().unwrap();
+            assert_eq!((icon.width, icon.height), (approved.width, approved.height));
+            assert_eq!(icon.rgba, approved.rgba);
             assert_eq!(view.decorations, Some(platform == Platform::Mac));
             if platform == Platform::Mac {
                 assert_eq!(view.fullsize_content_view, Some(true));
@@ -481,6 +500,19 @@ mod tests {
             let (bar, output) = frame(&ctx, platform, vec![], 0.0, false);
             assert!(bar.rect.height() <= 40.0 + 1.0 && bar.rect.width() >= 899.0);
             assert!(!bar.menu_rect.intersects(bar.drag_rect));
+            let icon_id = crate::app_icon::title_texture(&ctx).id();
+            let icon_bounds = output
+                .shapes
+                .iter()
+                .find_map(|shape| match &shape.shape {
+                    egui::Shape::Mesh(mesh) if mesh.texture_id == icon_id => {
+                        Some(mesh.calc_bounds())
+                    }
+                    _ => None,
+                })
+                .expect("The titlebar must paint the approved app icon");
+            assert_eq!(icon_bounds.size(), egui::Vec2::splat(24.0));
+            assert!(bar.drag_rect.contains_rect(icon_bounds));
             for control in bar.controls {
                 assert!(bar.rect.contains_rect(control));
                 assert!(!control.intersects(bar.drag_rect));
