@@ -61,3 +61,5 @@ GUI 실행은 X11/Wayland·libxkbcommon(X11에서는 libxkbcommon-x11 포함)·O
 2026-10-14 CI 갱신: Arch X11의 실제 실행에서 `libxkbcommon-x11.so`가 필요함을 확인했다. 빌드 성공만으로 이 동적 실행 의존성이 설치되었다고 볼 수 없다. Arch에서는 [공식 libxkbcommon-x11 패키지](https://archlinux.org/packages/extra/x86_64/libxkbcommon-x11/)를 설치한다.
 
 Windows hosted CI의 실제 창 실행에는 OpenGL 2.0+ 지원이 필요하다. 기본 환경이 이를 충족하지 못한 실패는 [고정 소프트웨어 렌더러 절차](windows-ci-graphics.md)로 검증한다. CI 소프트웨어 렌더러 결과와 사용자 PC의 실제 드라이버 검증은 구분한다.
+
+2026-10-15 CI 갱신: Apple Silicon hosted 실행이 단계 시작 전 머신 배정 실패로 종료된 경우를 확인했다. 수동 workflow의 `macos_runner` 기본값은 `macos-latest`(Apple Silicon)이며, `macos-15-intel` 표준 Intel Mac도 선택할 수 있다. 플랫폼별 동일 시험·빌드·자체시험을 실행하고, 결과에 선택한 아키텍처와 소스 commit을 명시한다. [GitHub 표준 실행 머신](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).

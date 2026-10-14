@@ -8,6 +8,11 @@ on:
         type: choice
         options: [all, windows, macos, arch]
         default: all
+      macos_runner:
+        description: macOS architecture (Intel is available for hosted ARM capacity delays)
+        type: choice
+        options: [macos-latest, macos-15-intel]
+        default: macos-latest
 permissions:
   contents: read
 env:
@@ -22,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.platform == 'macos' && '["macos-latest"]' || inputs.platform == 'windows' && '["windows-latest"]' || '["windows-latest","macos-latest"]') }}
+        os: ${{ fromJSON(inputs.platform == 'macos' && (inputs.macos_runner == 'macos-15-intel' && '["macos-15-intel"]' || '["macos-latest"]') || inputs.platform == 'windows' && '["windows-latest"]' || (inputs.macos_runner == 'macos-15-intel' && '["windows-latest","macos-15-intel"]' || '["windows-latest","macos-latest"]')) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
