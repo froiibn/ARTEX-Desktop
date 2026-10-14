@@ -104,6 +104,11 @@ class BITMAPINFOHEADER(ctypes.Structure):
                 ("biClrImportant", ctypes.c_uint32)]
 
 
+class RECT(ctypes.Structure):
+    _fields_ = [("left", ctypes.c_int32), ("top", ctypes.c_int32),
+                ("right", ctypes.c_int32), ("bottom", ctypes.c_int32)]
+
+
 class WinAPI:
     def __init__(self):
         require(os.name == "nt", "Icon resources and HICON inspection require Windows")
@@ -134,6 +139,8 @@ class WinAPI:
         self.bind(self.user, "GetWindowThreadProcessId", [ptr, ctypes.POINTER(uint)], uint)
         self.bind(self.user, "IsWindowVisible", [ptr], boolean)
         self.bind(self.user, "GetWindow", [ptr, uint], ptr)
+        self.bind(self.user, "GetClientRect", [ptr, ctypes.POINTER(RECT)], boolean)
+        self.bind(self.user, "GetClassNameW", [ptr, wintypes.LPWSTR, ctypes.c_int32], ctypes.c_int32)
         self.bind(self.user, "SendMessageTimeoutW",
                   [ptr, uint, ctypes.c_size_t, ctypes.c_ssize_t, uint, uint,
                    ctypes.POINTER(ctypes.c_size_t)], ctypes.c_ssize_t)
@@ -287,11 +294,22 @@ class WinAPI:
         finally:
             self.kernel.CloseHandle(process)
         windows = []
+        excluded = {}
 
         def collect(hwnd, _):
             owner = ctypes.c_uint32()
             self.user.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
             if owner.value == pid and self.user.IsWindowVisible(hwnd) and not self.user.GetWindow(hwnd, 4):
+                rect = RECT()
+                measured = self.user.GetClientRect(hwnd, ctypes.byref(rect))
+                width, height = rect.right - rect.left, rect.bottom - rect.top
+                if not measured or width <= 0 or height <= 0:
+                    class_name = ctypes.create_unicode_buffer(256)
+                    self.user.GetClassNameW(hwnd, class_name, len(class_name))
+                    excluded[hwnd] = {"hwnd": hex(hwnd), "class": class_name.value,
+                                      "client_width": width, "client_height": height,
+                                      "reason": "client_rect_unavailable" if not measured else "no_drawable_client_area"}
+                    return True
                 windows.append(hwnd)
             return True
 
@@ -304,7 +322,7 @@ class WinAPI:
                 break
             remaining = deadline - time.monotonic()
             require(remaining > 0,
-                    f"Window appearance deadline: PID {pid} had no visible unowned top-level window within 15 seconds")
+                    f"Window appearance deadline: PID {pid} had no visible unowned top-level drawable window within 15 seconds; excluded={list(excluded.values())}")
             time.sleep(min(0.05, remaining))
         result = []
         for hwnd in windows:
@@ -324,7 +342,9 @@ class WinAPI:
                 icons[label] = self.inspect_icon(icon.value, f"Window {label}")
                 icons[label]["source"] = source
             result.append({"hwnd": hex(hwnd), "icons": icons})
-        return {"pid": pid, "windows": result, "read_only_messages": ["WM_GETICON"],
+        return {"pid": pid, "windows": result, "excluded_windows": list(excluded.values()),
+                "window_selection": "Visible unowned top-level windows belonging to the verified binary, with positive client width and height",
+                "read_only_messages": ["WM_GETICON"],
                 "native_supplied_png_size": {"width": 256, "height": 256},
                 "actual_dimensions_basis": "Observed HICON bitmaps: Windows/eframe scales the supplied PNG to OS/DPI-specific square icon sizes (16..256px)"}
 
