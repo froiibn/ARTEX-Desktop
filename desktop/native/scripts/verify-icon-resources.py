@@ -254,9 +254,22 @@ class WinAPI:
     def verify_shell(self, binary):
         large, small = ctypes.c_void_p(), ctypes.c_void_p()
         try:
-            count = self.shell.ExtractIconExW(str(binary), 0, ctypes.byref(large), ctypes.byref(small), 1)
-            require(count == 1 and large.value and small.value, "ExtractIconExW did not extract both large/small icons")
-            return {"large": self.inspect_icon(large, "Shell large"),
+            # The documented result counts extracted icons, not icon groups.
+            # Extract each output separately to avoid the PE/ICO dual-output
+            # count difference (PE returns two handles while ICO reports one).
+            large_count = self.shell.ExtractIconExW(str(binary), 0, ctypes.byref(large), None, 1)
+            if large_count == 0xFFFFFFFF:
+                self.checked(0, "ExtractIconExW large")
+            require(large_count == 1 and large.value,
+                    f"ExtractIconExW large-only: expected one valid HICON, count={large_count}, present={bool(large.value)}")
+            small_count = self.shell.ExtractIconExW(str(binary), 0, None, ctypes.byref(small), 1)
+            if small_count == 0xFFFFFFFF:
+                self.checked(0, "ExtractIconExW small")
+            require(small_count == 1 and small.value,
+                    f"ExtractIconExW small-only: expected one valid HICON, count={small_count}, present={bool(small.value)}")
+            return {"extraction_counts": {"large": large_count, "small": small_count},
+                    "extraction_mode": "Separate large-only/small-only calls, nIcons=1",
+                    "large": self.inspect_icon(large, "Shell large"),
                     "small": self.inspect_icon(small, "Shell small")}
         finally:
             # ExtractIconEx transfers ownership, unlike WM_GETICON/class handles.
