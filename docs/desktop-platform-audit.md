@@ -59,3 +59,5 @@ GUI 실행은 X11/Wayland·libxkbcommon(X11에서는 libxkbcommon-x11 포함)·O
 최종 수락시험은 실제 Intel/Apple Silicon과 Arch X11/Wayland에서 창 이동·크기 변경·확대/복원·DPI·한국어 입력·키보드·파일 선택·키 저장·트레이 없음/소실·절전/복구·두 번째 실행·종료·외부 도구/PTY 정리를 포함한다. 현재 Windows 검증과 의존성 해석만으로 이 항목을 완료 처리하지 않는다.
 
 2026-10-14 CI 갱신: Arch X11의 실제 실행에서 `libxkbcommon-x11.so`가 필요함을 확인했다. 빌드 성공만으로 이 동적 실행 의존성이 설치되었다고 볼 수 없다. Arch에서는 [공식 libxkbcommon-x11 패키지](https://archlinux.org/packages/extra/x86_64/libxkbcommon-x11/)를 설치한다.
+
+Windows hosted CI의 실제 창 실행에는 OpenGL 2.0+ 지원이 필요하다. 기본 환경이 이를 충족하지 못한 실패는 [고정 소프트웨어 렌더러 절차](windows-ci-graphics.md)로 검증한다. CI 소프트웨어 렌더러 결과와 사용자 PC의 실제 드라이버 검증은 구분한다.

@@ -720,11 +720,30 @@ mod tests {
             format!("cat '{file}'")
         };
         let bash = call(
-            "tool.execute", json!({"name":"Bash","input":{"directory_capability":exec,"command":command,"timeout_ms":10000}}), &context,
+            "tool.execute", json!({"name":"Bash","input":{"directory_capability":exec,"command":command,"timeout_ms":10000,"execution_timeout_ms":60000}}), &context,
         ).unwrap();
-        assert_eq!(bash["state"], "completed");
+        // Foreground expiry may legitimately return a running execution on a
+        // cold machine. Observe that same owned execution instead of assuming
+        // that PowerShell startup and output capture finish within ten seconds.
+        let execution_id = bash["execution_id"].as_str().unwrap();
+        let completed = call(
+            "tool.execute",
+            json!({"name":"TaskOutput","input":{"task_id":execution_id,"block":true,"timeout_ms":65000}}),
+            &context,
+        ).unwrap();
+        if completed["state"] == "running" {
+            let _ = call(
+                "tool.execute",
+                json!({"name":"TaskStop","input":{"task_id":execution_id}}),
+                &context,
+            );
+        }
+        assert_eq!(completed["execution_id"], execution_id);
+        assert_eq!(completed["state"], "completed", "{completed}");
+        assert_eq!(completed["exit_code"], 0, "{completed}");
+        assert!(completed["capture_error"].is_null(), "{completed}");
         assert!(
-            bash["output"]
+            completed["output"]
                 .as_str()
                 .unwrap()
                 .contains("REAL-SCOPED-SKILL-FILE")

@@ -7831,8 +7831,27 @@ mod monitor_widget_tests {
         let mut panes = Panes::default();
         panes.set_context(Section::Sessions, Some(&run.header.id));
         panes.management.monitor = Some(json!({"runs":[row],"total":1,"has_more":false}));
+        let prime_monitor_read = |panes: &mut Panes| {
+            panes.request_agent_monitor(true);
+            let queued = panes.drain_effects();
+            assert_eq!(queued.len(), 1, "Fixture setup may only request one monitor read");
+            let Effect::AgentMonitor {
+                target: MonitorTarget::All,
+                token,
+            } = &queued[0]
+            else {
+                panic!("Fixture setup may not mutate the selected run");
+            };
+            assert_eq!(panes.management.monitor_latest.as_deref(), Some(token.as_str()));
+            assert!(matches!(
+                panes.management.requests.get(token),
+                Some(ManagementRequest::Monitor(page)) if page == "page:0"
+            ));
+        };
+        // A real pending read fences periodic polling independently of how long
+        // a font/layout frame takes. Click effects remain checked separately.
+        prime_monitor_read(&mut panes);
         let render = |panes: &mut Panes, events: Vec<egui::Event>| {
-            panes.management.monitor_last_poll = Some(std::time::Instant::now());
             let mut effects = vec![];
             let output = ctx.run(
                 egui::RawInput {
@@ -7909,6 +7928,7 @@ mod monitor_widget_tests {
         click(&mut panes, "실행 중지");
         assert!(panes.drain_effects().is_empty());
         panes.set_native_result(&token, &json!({"accepted":true,"cleanup_confirmed":false}));
+        prime_monitor_read(&mut panes);
         panes.set_read_only(true);
         click(&mut panes, "실행 중지");
         assert!(panes.drain_effects().is_empty());
@@ -7989,7 +8009,9 @@ mod monitor_widget_tests {
             panes.set_context(Section::Sessions, Some(&run_a.header.id));
             panes.draft_message = "Unrelated unsent draft".into();
             panes.management.monitor = Some(json!({"runs":rows,"total":2,"has_more":false}));
-            panes.management.monitor_last_poll = Some(std::time::Instant::now());
+            // Start one pending read query deterministically. Layout correctness
+            // must not depend on both font/layout frames finishing within 1s.
+            panes.management.monitor_last_poll = None;
             let mut output = None;
             for _ in 0..2 {
                 let mut effects = vec![];
@@ -8075,7 +8097,24 @@ mod monitor_widget_tests {
                 "Selected detail must remain accessible"
             );
             assert_eq!(panes.draft_message, "Unrelated unsent draft");
-            assert!(panes.drain_effects().is_empty());
+            let queued = panes.drain_effects();
+            assert_eq!(queued.len(), 1, "Only the initial monitor read is allowed");
+            let Effect::AgentMonitor {
+                target: MonitorTarget::All,
+                token,
+            } = &queued[0]
+            else {
+                panic!("Layout rendering must not request a mutation or detail query");
+            };
+            assert!(!token.is_empty());
+            assert_eq!(
+                panes.management.monitor_latest.as_deref(),
+                Some(token.as_str())
+            );
+            assert!(matches!(
+                panes.management.requests.get(token),
+                Some(ManagementRequest::Monitor(page)) if page == "page:0"
+            ));
             assert_eq!(s, original);
         }
     }

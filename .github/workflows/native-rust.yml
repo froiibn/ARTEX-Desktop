@@ -29,23 +29,33 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.98.0
+      # Windows verify.ps1 -FullRegression runs all four suites below plus the
+      # complete shared workspace suite and actual GUI/process audit.
       - name: Native service tests
+        if: runner.os != 'Windows'
         run: cargo test --locked --manifest-path desktop/native-core/Cargo.toml
       - name: Durable storage and path-security regression
+        if: runner.os != 'Windows'
         run: cargo test --locked --manifest-path desktop/Cargo.toml -p artex-store
       - name: Native host tests
+        if: runner.os != 'Windows'
         run: cargo test --locked --manifest-path desktop/Cargo.toml -p artex-host --no-default-features
       - name: Rust UI tests
+        if: runner.os != 'Windows'
         run: cargo test --locked --manifest-path desktop/native/Cargo.toml
+      - name: Verified software OpenGL fixture (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: desktop/native/scripts/setup-ci-opengl.ps1 -Destination (Join-Path $env:RUNNER_TEMP 'artex-ci-opengl')
+      - name: Native window and process audit (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: desktop/native/scripts/verify.ps1 -FullRegression -SoftwareOpenGlDirectory (Join-Path $env:RUNNER_TEMP 'artex-ci-opengl')
       - name: Build native application
         run: cargo build --locked --release --manifest-path desktop/native/Cargo.toml
       - name: Actual service and LLM fixture (macOS)
         if: runner.os == 'macOS'
         run: desktop/target/release/artex-native --self-test --workspace "$RUNNER_TEMP/artex-native-$GITHUB_RUN_ID"
-      - name: Native window and process audit (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: desktop/native/scripts/verify.ps1 -FullRegression
       - name: Isolated window failure logs (Windows)
         if: failure() && runner.os == 'Windows'
         shell: pwsh

@@ -1,4 +1,4 @@
-param([switch]$FullRegression, [string]$SharedRegressionReport)
+param([switch]$FullRegression, [string]$SharedRegressionReport, [string]$SoftwareOpenGlDirectory)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 Set-Location -LiteralPath $repoRoot
@@ -37,11 +37,17 @@ function Invoke-NativeCheck([string]$name, [string]$file, [string[]]$nativeArgum
     # Windows PowerShell can otherwise treat benign warnings as ErrorRecords.
     @('--- stdout ---') + @(Get-Content -LiteralPath (Join-Path $resultRoot "$name.stdout.log")) + @('--- stderr ---') + @(Get-Content -LiteralPath (Join-Path $resultRoot "$name.stderr.log")) | Set-Content -LiteralPath $log -Encoding UTF8
     [void]$steps.Add(@{name=$name;started_utc=$started;finished_utc=[DateTime]::UtcNow.ToString('o');exit_code=$exit;log=$log})
-    if ($exit -ne 0) { throw "$name failed with exit $exit. See $log" }
+    if ($exit -ne 0) {
+        foreach ($stream in @('stdout','stderr')) {
+            Write-Host "Failed $name $stream tail:"
+            Get-Content -LiteralPath (Join-Path $resultRoot "$name.$stream.log") -Tail 180 | ForEach-Object { Write-Host $_ }
+        }
+        throw "$name failed with exit $exit. See $log"
+    }
     Write-Host "$name PASS: $log"
 }
 function Invoke-CargoCheck([string]$name, [string[]]$cargoArguments) {
-    Invoke-NativeCheck $name (Get-Command cargo -CommandType Application -ErrorAction Stop).Source $cargoArguments
+    Invoke-NativeCheck $name (Get-Command cargo -CommandType Application -ErrorAction Stop | Select-Object -First 1 -ExpandProperty Source) $cargoArguments
 }
 $sharedParent = $null
 if ($SharedRegressionReport) {
@@ -87,6 +93,40 @@ $features = Get-Content -LiteralPath $featureLog -Raw
 if ($features -match '(?m)^.*\b(tauri|wry|artex-engine) v' -or $features -match 'artex-host feature "legacy-client"') { throw 'Native application includes a legacy GUI/sidecar dependency' }
 $executable = Join-Path $env:CARGO_TARGET_DIR 'debug/artex-native.exe'
 $testedSha = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
+$softwareOpenGl = $null
+$softwareObserved = @{}
+if ($SoftwareOpenGlDirectory) {
+    $fixtureRoot = (Resolve-Path -LiteralPath $SoftwareOpenGlDirectory).Path
+    $expectedDlls = @{
+        'opengl32.dll' = '75b295fc80df0eaa8f1264c28663f6932c8b72d36513eb092556608858b7f5e0'
+        'libgallium_wgl.dll' = '53e49adf87590d5b0cab8553b1e98084812040cc1fca8c487695b17b7af3702e'
+    }
+    $provider = Get-Content -LiteralPath (Join-Path $fixtureRoot 'mesa-provenance.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($provider.version -ne '26.2.4' -or $provider.architecture -ne 'x64' -or $provider.archive_sha256 -ne '351fc8c8b695878ffb3eaa044b3ead08672a48b1a045e3c3e3975811df0f6695') { throw 'CI OpenGL provider identity differs from the pinned publisher archive' }
+    $guiRoot = Join-Path $resultRoot 'software-opengl'
+    New-Item -ItemType Directory -Path $guiRoot | Out-Null
+    Copy-Item -LiteralPath $executable -Destination (Join-Path $guiRoot 'artex-native.exe')
+    foreach ($name in $expectedDlls.Keys) {
+        $dll = Get-Item -LiteralPath (Join-Path $fixtureRoot $name)
+        if ($dll.PSIsContainer -or ($dll.Attributes -band [IO.FileAttributes]::ReparsePoint) -or (Get-FileHash -LiteralPath $dll.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedDlls[$name]) { throw "Unverified CI OpenGL file: $name" }
+        Copy-Item -LiteralPath $dll.FullName -Destination (Join-Path $guiRoot $name)
+    }
+    $executable = Join-Path $guiRoot 'artex-native.exe'
+    if ((Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant() -ne $testedSha) { throw 'Relocated CI executable changed' }
+    $env:GALLIUM_DRIVER = 'llvmpipe'
+    $env:LIBGL_ALWAYS_SOFTWARE = '1'
+    $env:MESA_SHADER_CACHE_DISABLE = 'true'
+    $softwareOpenGl = @{version=$provider.version;archive_sha256=$provider.archive_sha256;renderer='llvmpipe';expected_files=$expectedDlls;loaded_files=@{};scope='CI-only app-local software renderer; not hardware-driver qualification'}
+}
+function Read-WindowModules($primary) {
+    try {
+        foreach ($module in (Get-Process -Id $primary.Id -ErrorAction Stop).Modules) {
+            if ($softwareOpenGl -and $softwareOpenGl.expected_files.ContainsKey($module.ModuleName)) { $softwareObserved[$module.ModuleName] = $module.FileName }
+            $module.ModuleName
+        }
+    } catch {} # A just-closed process can race module enumeration.
+}
+
 $workspace = Join-Path $repoRoot "desktop/.test-workspaces/native-$runId"
 Invoke-NativeCheck 'integrated-self-test' $executable @('--self-test','--workspace',$workspace)
 $profile = Join-Path $resultRoot 'profile'
@@ -144,7 +184,7 @@ $handoff | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $result
 # Collect a live sample while the smoke hold guarantees the window is alive.
 # Normal smoke may otherwise finish before the first post-release observation.
 $children += @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Select-Object ProcessId,Name,ExecutablePath)
-try { $modules += @((Get-Process -Id $process.Id -ErrorAction Stop).Modules | ForEach-Object { $_.ModuleName }) } catch {}
+$modules += @(Read-WindowModules $process)
 # Release only after the real BUSY handoff returned 0, its same-session queue
 # drained, and the primary is still the sole live profile owner. Capture/close
 # modes without this diagnostic flag keep their existing automatic behavior.
@@ -154,7 +194,7 @@ Move-Item -LiteralPath $releaseTemp -Destination $smokeRelease
 $deadline = [DateTime]::UtcNow.AddSeconds(110)
 while (-not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
     $children += @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Select-Object ProcessId,Name,ExecutablePath)
-    try { $modules += @((Get-Process -Id $process.Id -ErrorAction Stop).Modules | ForEach-Object { $_.ModuleName }) } catch {}
+    $modules += @(Read-WindowModules $process)
     Start-Sleep -Milliseconds 250
     $process.Refresh()
 }
@@ -176,6 +216,15 @@ $handoff | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $result
 if (-not (Test-Path -LiteralPath $capture)) { throw 'Native screenshot missing' }
 $children = @($children | Sort-Object ProcessId -Unique)
 $modules = @($modules | Sort-Object -Unique)
+if ($softwareOpenGl) {
+    foreach ($name in $softwareOpenGl.expected_files.Keys) {
+        if (-not $softwareObserved.ContainsKey($name) -or -not [StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetFullPath($softwareObserved[$name]), [IO.Path]::GetFullPath((Join-Path $guiRoot $name)))) { throw "CI window did not load its verified app-local OpenGL file: $name" }
+        $loadedSha = (Get-FileHash -LiteralPath $softwareObserved[$name] -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($loadedSha -ne $softwareOpenGl.expected_files[$name]) { throw "Loaded CI OpenGL file changed: $name" }
+        $softwareOpenGl.loaded_files[$name] = @{path=$softwareObserved[$name];sha256=$loadedSha}
+    }
+    $softwareOpenGl.loaded_files_verified = $true
+}
 if (@($children | Where-Object { $_.Name -match 'artex-engine|msedgewebview2' }).Count -gt 0 -or @($modules | Where-Object { $_ -match 'WebView2Loader|wry' }).Count -gt 0) { throw 'Native window launched a legacy sidecar/WebView' }
 if ((Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant() -ne $testedSha) { throw 'Executable changed during verification' }
 $sourcePaths = [System.Collections.Generic.List[string]]::new()
@@ -192,7 +241,7 @@ foreach ($directory in @('desktop/contracts','desktop/native/assets/fonts','desk
 # The About dialog embeds the root AGPL text. Bind it to the verified source.
 [void]$sourcePaths.Add((Join-Path $repoRoot 'LICENSE'))
 $sourceFiles = @($sourcePaths | Sort-Object -Unique | ForEach-Object { @{path=$_;sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()} })
-$report = @{passed=$true;completed_utc=[DateTime]::UtcNow.ToString('o');executable=$executable;executable_sha256=$testedSha;workspace=$workspace;capture=$capture;rendered_sections=$window.rendered_sections;source_management_actions=$window.source_management_actions;orderly_shutdown=$window.orderly_shutdown;window_exit_code=$windowExit;second_launch=$handoff;observed_child_processes=$children;observed_modules=$modules;source_files=$sourceFiles;steps=$steps.ToArray();full_regression=([bool]$FullRegression -or $null -ne $sharedParent);shared_regression_parent=$sharedParent;platform='Windows x86_64'}
+$report = @{passed=$true;completed_utc=[DateTime]::UtcNow.ToString('o');executable=$executable;executable_sha256=$testedSha;workspace=$workspace;capture=$capture;rendered_sections=$window.rendered_sections;source_management_actions=$window.source_management_actions;orderly_shutdown=$window.orderly_shutdown;window_exit_code=$windowExit;second_launch=$handoff;observed_child_processes=$children;observed_modules=$modules;source_files=$sourceFiles;steps=$steps.ToArray();full_regression=([bool]$FullRegression -or $null -ne $sharedParent);shared_regression_parent=$sharedParent;software_opengl=$softwareOpenGl;platform='Windows x86_64'}
 $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $resultRoot 'verification-result.json') -Encoding UTF8
 Write-Output "Native verification PASS: $resultRoot"
 } catch {
