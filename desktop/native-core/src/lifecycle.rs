@@ -349,7 +349,16 @@ mod tests {
         lifecycle: &Lifecycle,
         ticket: &NativeTicket,
     ) -> LifecycleNotice {
-        let end = Instant::now() + Duration::from_secs(10);
+        complete_with_budget(service, lifecycle, ticket, Duration::from_secs(10))
+    }
+    fn complete_with_budget(
+        service: &ServiceHandle,
+        lifecycle: &Lifecycle,
+        ticket: &NativeTicket,
+        budget: Duration,
+    ) -> LifecycleNotice {
+        let started = Instant::now();
+        let end = started + budget;
         loop {
             for completion in service.drain_completions() {
                 let notice = lifecycle.observe(&completion);
@@ -357,7 +366,12 @@ mod tests {
                     return notice;
                 }
             }
-            assert!(Instant::now() < end);
+            assert!(
+                Instant::now() < end,
+                "Lifecycle ticket {ticket:?} timed out after {:?}; status={:?}",
+                started.elapsed(),
+                service.status()
+            );
             thread::sleep(Duration::from_millis(5));
         }
     }
@@ -377,7 +391,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            complete(&handle, &lifecycle, &opened),
+            complete_with_budget(&handle, &lifecycle, &opened, Duration::from_secs(60)),
             LifecycleNotice::Opened
         );
         let path = lifecycle.recovery_path().unwrap();
@@ -436,16 +450,27 @@ mod tests {
                 read_only: false,
             }))
             .unwrap();
-        let end = Instant::now() + Duration::from_secs(10);
+        // Durable creation writes all initial collection snapshots. Its setup
+        // budget is separate from the registration and suspend bounds below.
+        let started = Instant::now();
+        let end = started + Duration::from_secs(60);
         loop {
-            if handle
+            if let Some(completion) = handle
                 .drain_completions()
-                .iter()
-                .any(|c| c.ticket == ticket && c.result.is_ok())
+                .into_iter()
+                .find(|c| c.ticket == ticket)
             {
+                completion.result.unwrap_or_else(|error| {
+                    panic!("Workspace creation failed: {error:?}; status={:?}", handle.status())
+                });
                 break;
             }
-            assert!(Instant::now() < end);
+            assert!(
+                Instant::now() < end,
+                "Workspace creation ticket {ticket:?} timed out after {:?}; status={:?}",
+                started.elapsed(),
+                handle.status()
+            );
             thread::sleep(Duration::from_millis(5));
         }
         let manifests = path.join("store/manifests");
