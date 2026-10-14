@@ -1,0 +1,976 @@
+{
+  "scope": "Cargo tree --locked --offline --edges normal,build --target; development edges excluded. Includes proc-macro and build-time packages which are not necessarily embedded. Does not include native OS/system libraries or GCC runtimes. Metadata-only conservative graph preserved separately.",
+  "targets": {
+    "windows-x86_64-gnu": {
+      "total": 412,
+      "first_party": 12,
+      "third_party": 400,
+      "license_expressions": {
+        "Apache-2.0": 11,
+        "0BSD OR MIT OR Apache-2.0": 1,
+        "MIT OR Apache-2.0": 187,
+        "Unlicense OR MIT": 6,
+        "BSD-3-Clause": 7,
+        "MIT/Apache-2.0": 22,
+        "Apache-2.0 OR MIT": 25,
+        "ISC AND (Apache-2.0 OR ISC)": 1,
+        "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)": 1,
+        "MIT-0": 1,
+        "BSD-3-Clause AND MIT": 1,
+        "BSD-3-Clause/MIT": 1,
+        "Apache-2.0/MIT": 3,
+        "Zlib OR Apache-2.0 OR MIT": 3,
+        "MIT": 71,
+        "BSL-1.0": 2,
+        "MPL-2.0": 5,
+        "MIT OR Apache-2.0 OR Zlib": 3,
+        "Apache-2.0 AND MIT": 1,
+        "CC0-1.0 OR MIT-0 OR Apache-2.0": 1,
+        "ISC": 5,
+        "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0": 1,
+        "Apache-2.0 / MIT": 1,
+        "Zlib": 2,
+        "MIT / Apache-2.0": 1,
+        "Apache-2.0 OR ISC OR MIT": 2,
+        "BSD-2-Clause": 1,
+        "Unicode-3.0": 18,
+        "MIT OR Zlib OR Apache-2.0": 2,
+        "(MIT OR Apache-2.0) AND Apache-2.0": 1,
+        "BSD-3-Clause OR Apache-2.0": 2,
+        "0BSD": 1,
+        "Apache-2.0 AND ISC": 1,
+        "Apache-2.0 OR BSL-1.0": 1,
+        "Unlicense/MIT": 2,
+        "BSD-2-Clause OR Apache-2.0": 1,
+        "(MIT OR Apache-2.0) AND Unicode-3.0": 1,
+        "CDLA-Permissive-2.0": 2,
+        "Apache-2.0 OR BSL-1.0 OR MIT": 1,
+        "BSD-2-Clause OR Apache-2.0 OR MIT": 1
+      },
+      "special_license_packages": [
+        {
+          "name": "aws-lc-rs",
+          "version": "1.18.2",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC)"
+        },
+        {
+          "name": "aws-lc-sys",
+          "version": "0.46.0",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)"
+        },
+        {
+          "name": "cssparser",
+          "version": "0.35.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "cssparser-macros",
+          "version": "0.6.1",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "dtoa-short",
+          "version": "0.3.5",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "ego-tree",
+          "version": "0.10.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "epaint_default_fonts",
+          "version": "0.33.3",
+          "declared_license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0"
+        },
+        {
+          "name": "hyper-rustls",
+          "version": "0.27.10",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "icu_collections",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_locale_core",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_provider",
+          "version": "2.3.1",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "libloading",
+          "version": "0.8.9",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "litemap",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "option-ext",
+          "version": "0.2.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "potential_utf",
+          "version": "0.1.6",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "ring",
+          "version": "0.17.14",
+          "declared_license": "Apache-2.0 AND ISC"
+        },
+        {
+          "name": "rustls",
+          "version": "0.23.45",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "rustls-webpki",
+          "version": "0.103.15",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "scraper",
+          "version": "0.24.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "selectors",
+          "version": "0.31.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "tinystr",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "unicode-ident",
+          "version": "1.0.27",
+          "declared_license": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        },
+        {
+          "name": "untrusted",
+          "version": "0.9.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "0.26.11",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "1.0.9",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "writeable",
+          "version": "0.6.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke-derive",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom-derive",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerotrie",
+          "version": "0.2.5",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec",
+          "version": "0.11.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec-derive",
+          "version": "0.11.6",
+          "declared_license": "Unicode-3.0"
+        }
+      ],
+      "missing_declared_license": []
+    },
+    "macos-x86_64": {
+      "total": 430,
+      "first_party": 12,
+      "third_party": 418,
+      "license_expressions": {
+        "Apache-2.0": 7,
+        "0BSD OR MIT OR Apache-2.0": 1,
+        "MIT OR Apache-2.0": 191,
+        "Unlicense OR MIT": 5,
+        "BSD-3-Clause": 7,
+        "MIT/Apache-2.0": 24,
+        "Apache-2.0 OR MIT": 25,
+        "ISC AND (Apache-2.0 OR ISC)": 1,
+        "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)": 1,
+        "MIT": 81,
+        "MIT-0": 1,
+        "BSD-3-Clause AND MIT": 1,
+        "BSD-3-Clause/MIT": 1,
+        "Apache-2.0/MIT": 2,
+        "Zlib OR Apache-2.0 OR MIT": 8,
+        "MIT / Apache-2.0": 2,
+        "MPL-2.0": 5,
+        "MIT OR Apache-2.0 OR Zlib": 5,
+        "Apache-2.0 AND MIT": 1,
+        "CC0-1.0 OR MIT-0 OR Apache-2.0": 1,
+        "ISC": 5,
+        "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0": 1,
+        "Apache-2.0 / MIT": 1,
+        "Zlib": 2,
+        "Apache-2.0 OR ISC OR MIT": 2,
+        "BSD-2-Clause": 1,
+        "Unicode-3.0": 18,
+        "MIT OR Zlib OR Apache-2.0": 2,
+        "(MIT OR Apache-2.0) AND Apache-2.0": 1,
+        "BSD-3-Clause OR Apache-2.0": 2,
+        "0BSD": 1,
+        "Apache-2.0 AND ISC": 1,
+        "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT": 1,
+        "Apache-2.0 OR BSL-1.0": 1,
+        "Unlicense/MIT": 2,
+        "BSD-2-Clause OR Apache-2.0": 1,
+        "(MIT OR Apache-2.0) AND Unicode-3.0": 1,
+        "CDLA-Permissive-2.0": 2,
+        "Apache-2.0 OR BSL-1.0 OR MIT": 1,
+        "BSD-2-Clause OR Apache-2.0 OR MIT": 2
+      },
+      "special_license_packages": [
+        {
+          "name": "aws-lc-rs",
+          "version": "1.18.2",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC)"
+        },
+        {
+          "name": "aws-lc-sys",
+          "version": "0.46.0",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)"
+        },
+        {
+          "name": "cssparser",
+          "version": "0.35.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "cssparser-macros",
+          "version": "0.6.1",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "dtoa-short",
+          "version": "0.3.5",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "ego-tree",
+          "version": "0.10.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "epaint_default_fonts",
+          "version": "0.33.3",
+          "declared_license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0"
+        },
+        {
+          "name": "hyper-rustls",
+          "version": "0.27.10",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "icu_collections",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_locale_core",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_provider",
+          "version": "2.3.1",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "libloading",
+          "version": "0.8.9",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "litemap",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "option-ext",
+          "version": "0.2.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "potential_utf",
+          "version": "0.1.6",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "ring",
+          "version": "0.17.14",
+          "declared_license": "Apache-2.0 AND ISC"
+        },
+        {
+          "name": "rustix",
+          "version": "1.1.5",
+          "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+        },
+        {
+          "name": "rustls",
+          "version": "0.23.45",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "rustls-webpki",
+          "version": "0.103.15",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "scraper",
+          "version": "0.24.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "selectors",
+          "version": "0.31.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "tinystr",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "unicode-ident",
+          "version": "1.0.27",
+          "declared_license": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        },
+        {
+          "name": "untrusted",
+          "version": "0.9.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "0.26.11",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "1.0.9",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "writeable",
+          "version": "0.6.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke-derive",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom-derive",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerotrie",
+          "version": "0.2.5",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec",
+          "version": "0.11.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec-derive",
+          "version": "0.11.6",
+          "declared_license": "Unicode-3.0"
+        }
+      ],
+      "missing_declared_license": []
+    },
+    "macos-aarch64": {
+      "total": 430,
+      "first_party": 12,
+      "third_party": 418,
+      "license_expressions": {
+        "Apache-2.0": 7,
+        "0BSD OR MIT OR Apache-2.0": 1,
+        "MIT OR Apache-2.0": 191,
+        "Unlicense OR MIT": 5,
+        "BSD-3-Clause": 7,
+        "MIT/Apache-2.0": 24,
+        "Apache-2.0 OR MIT": 25,
+        "ISC AND (Apache-2.0 OR ISC)": 1,
+        "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)": 1,
+        "MIT": 81,
+        "MIT-0": 1,
+        "BSD-3-Clause AND MIT": 1,
+        "BSD-3-Clause/MIT": 1,
+        "Apache-2.0/MIT": 2,
+        "Zlib OR Apache-2.0 OR MIT": 8,
+        "MIT / Apache-2.0": 2,
+        "MPL-2.0": 5,
+        "MIT OR Apache-2.0 OR Zlib": 5,
+        "Apache-2.0 AND MIT": 1,
+        "CC0-1.0 OR MIT-0 OR Apache-2.0": 1,
+        "ISC": 5,
+        "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0": 1,
+        "Apache-2.0 / MIT": 1,
+        "Zlib": 2,
+        "Apache-2.0 OR ISC OR MIT": 2,
+        "BSD-2-Clause": 1,
+        "Unicode-3.0": 18,
+        "MIT OR Zlib OR Apache-2.0": 2,
+        "(MIT OR Apache-2.0) AND Apache-2.0": 1,
+        "BSD-3-Clause OR Apache-2.0": 2,
+        "0BSD": 1,
+        "Apache-2.0 AND ISC": 1,
+        "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT": 1,
+        "Apache-2.0 OR BSL-1.0": 1,
+        "Unlicense/MIT": 2,
+        "BSD-2-Clause OR Apache-2.0": 1,
+        "(MIT OR Apache-2.0) AND Unicode-3.0": 1,
+        "CDLA-Permissive-2.0": 2,
+        "Apache-2.0 OR BSL-1.0 OR MIT": 1,
+        "BSD-2-Clause OR Apache-2.0 OR MIT": 2
+      },
+      "special_license_packages": [
+        {
+          "name": "aws-lc-rs",
+          "version": "1.18.2",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC)"
+        },
+        {
+          "name": "aws-lc-sys",
+          "version": "0.46.0",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)"
+        },
+        {
+          "name": "cssparser",
+          "version": "0.35.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "cssparser-macros",
+          "version": "0.6.1",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "dtoa-short",
+          "version": "0.3.5",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "ego-tree",
+          "version": "0.10.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "epaint_default_fonts",
+          "version": "0.33.3",
+          "declared_license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0"
+        },
+        {
+          "name": "hyper-rustls",
+          "version": "0.27.10",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "icu_collections",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_locale_core",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_provider",
+          "version": "2.3.1",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "libloading",
+          "version": "0.8.9",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "litemap",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "option-ext",
+          "version": "0.2.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "potential_utf",
+          "version": "0.1.6",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "ring",
+          "version": "0.17.14",
+          "declared_license": "Apache-2.0 AND ISC"
+        },
+        {
+          "name": "rustix",
+          "version": "1.1.5",
+          "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+        },
+        {
+          "name": "rustls",
+          "version": "0.23.45",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "rustls-webpki",
+          "version": "0.103.15",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "scraper",
+          "version": "0.24.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "selectors",
+          "version": "0.31.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "tinystr",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "unicode-ident",
+          "version": "1.0.27",
+          "declared_license": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        },
+        {
+          "name": "untrusted",
+          "version": "0.9.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "0.26.11",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "1.0.9",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "writeable",
+          "version": "0.6.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke-derive",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom-derive",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerotrie",
+          "version": "0.2.5",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec",
+          "version": "0.11.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec-derive",
+          "version": "0.11.6",
+          "declared_license": "Unicode-3.0"
+        }
+      ],
+      "missing_declared_license": []
+    },
+    "linux-x86_64-gnu": {
+      "total": 495,
+      "first_party": 12,
+      "third_party": 483,
+      "license_expressions": {
+        "Apache-2.0": 12,
+        "0BSD OR MIT OR Apache-2.0": 1,
+        "MIT OR Apache-2.0": 212,
+        "Unlicense OR MIT": 5,
+        "BSD-3-Clause": 7,
+        "MIT": 112,
+        "MIT/Apache-2.0": 20,
+        "Apache-2.0 OR MIT": 38,
+        "ISC AND (Apache-2.0 OR ISC)": 1,
+        "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)": 1,
+        "MIT-0": 1,
+        "BSD-3-Clause AND MIT": 1,
+        "BSD-3-Clause/MIT": 1,
+        "Apache-2.0/MIT": 5,
+        "Zlib OR Apache-2.0 OR MIT": 3,
+        "MPL-2.0": 5,
+        "MIT OR Apache-2.0 OR Zlib": 4,
+        "Apache-2.0 AND MIT": 1,
+        "CC0-1.0 OR MIT-0 OR Apache-2.0": 1,
+        "ISC": 5,
+        "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0": 1,
+        "Apache-2.0 / MIT": 1,
+        "Zlib": 2,
+        "MIT / Apache-2.0": 1,
+        "Apache-2.0 OR ISC OR MIT": 2,
+        "BSD-2-Clause": 1,
+        "Unicode-3.0": 18,
+        "Unlicense": 1,
+        "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT": 4,
+        "MIT OR Zlib OR Apache-2.0": 2,
+        "(MIT OR Apache-2.0) AND Apache-2.0": 1,
+        "BSD-3-Clause OR Apache-2.0": 2,
+        "0BSD": 1,
+        "Apache-2.0 AND ISC": 1,
+        "Apache-2.0 OR BSL-1.0": 1,
+        "Unlicense/MIT": 2,
+        "BSD-2-Clause OR Apache-2.0": 1,
+        "(MIT OR Apache-2.0) AND Unicode-3.0": 1,
+        "CDLA-Permissive-2.0": 2,
+        "Apache-2.0 OR BSL-1.0 OR MIT": 1,
+        "BSD-2-Clause OR Apache-2.0 OR MIT": 1
+      },
+      "special_license_packages": [
+        {
+          "name": "aws-lc-rs",
+          "version": "1.18.2",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC)"
+        },
+        {
+          "name": "aws-lc-sys",
+          "version": "0.46.0",
+          "declared_license": "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)"
+        },
+        {
+          "name": "cssparser",
+          "version": "0.35.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "cssparser-macros",
+          "version": "0.6.1",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "dtoa-short",
+          "version": "0.3.5",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "ego-tree",
+          "version": "0.10.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "epaint_default_fonts",
+          "version": "0.33.3",
+          "declared_license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0"
+        },
+        {
+          "name": "hyper-rustls",
+          "version": "0.27.10",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "icu_collections",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_locale_core",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_normalizer_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_properties_data",
+          "version": "2.3.0",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "icu_provider",
+          "version": "2.3.1",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "libloading",
+          "version": "0.8.9",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "linux-raw-sys",
+          "version": "0.4.15",
+          "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+        },
+        {
+          "name": "linux-raw-sys",
+          "version": "0.12.1",
+          "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+        },
+        {
+          "name": "litemap",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "option-ext",
+          "version": "0.2.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "potential_utf",
+          "version": "0.1.6",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "ring",
+          "version": "0.17.14",
+          "declared_license": "Apache-2.0 AND ISC"
+        },
+        {
+          "name": "rustix",
+          "version": "0.38.44",
+          "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+        },
+        {
+          "name": "rustix",
+          "version": "1.1.5",
+          "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+        },
+        {
+          "name": "rustls",
+          "version": "0.23.45",
+          "declared_license": "Apache-2.0 OR ISC OR MIT"
+        },
+        {
+          "name": "rustls-webpki",
+          "version": "0.103.15",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "scraper",
+          "version": "0.24.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "selectors",
+          "version": "0.31.0",
+          "declared_license": "MPL-2.0"
+        },
+        {
+          "name": "tinystr",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "unicode-ident",
+          "version": "1.0.27",
+          "declared_license": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        },
+        {
+          "name": "untrusted",
+          "version": "0.9.0",
+          "declared_license": "ISC"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "0.26.11",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "webpki-roots",
+          "version": "1.0.9",
+          "declared_license": "CDLA-Permissive-2.0"
+        },
+        {
+          "name": "writeable",
+          "version": "0.6.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke",
+          "version": "0.8.3",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "yoke-derive",
+          "version": "0.8.4",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerofrom-derive",
+          "version": "0.1.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerotrie",
+          "version": "0.2.5",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec",
+          "version": "0.11.8",
+          "declared_license": "Unicode-3.0"
+        },
+        {
+          "name": "zerovec-derive",
+          "version": "0.11.6",
+          "declared_license": "Unicode-3.0"
+        }
+      ],
+      "missing_declared_license": []
+    }
+  }
+}

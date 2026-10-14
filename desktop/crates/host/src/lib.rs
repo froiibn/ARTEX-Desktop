@@ -1,0 +1,27 @@
+//! Native host boundary. No HTTP listener, JWT, database or plaintext secret files.
+pub mod bridge;
+pub mod capability;
+pub mod custom;
+pub mod execution;
+pub mod instance;
+pub mod logs;
+pub mod mcp;
+mod native_editor;
+pub mod native_files;
+pub mod network;
+pub mod notifications;
+pub mod power;
+pub mod pty;
+mod scope;
+pub mod search;
+pub mod secrets;
+pub mod skills;
+pub mod tools;
+pub mod traffic;
+pub mod ui;
+pub use bridge::HostBridge;
+pub use capability::CapabilityRegistry;
+pub use execution::{ExecutionRequest, ExecutionStatus, ExecutionSupervisor};
+pub use instance::{LaunchListener, LaunchRequest, ProfileInstanceLock};
+pub use secrets::SecretVault;
+pub use tools::HostRuntime;

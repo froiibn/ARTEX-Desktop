@@ -1,0 +1,15 @@
+[package]
+name = "artex-migrate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+artex-core.workspace = true
+artex-importer.workspace = true
+artex-host.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+artex-store.workspace = true
+tempfile.workspace = true

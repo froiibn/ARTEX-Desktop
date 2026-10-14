@@ -1,0 +1,14 @@
+{
+  "proxy_files": 210,
+  "original_norma_files": 210,
+  "licensed_files": 211,
+  "proxy_license_files": [],
+  "original_vs_proxy_changed": [],
+  "original_extra": [],
+  "original_missing": [],
+  "licensed_vs_original_changed": [],
+  "licensed_extra": [
+    "LICENSE"
+  ],
+  "licensed_missing": []
+}

@@ -1,0 +1,1700 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:artex:agent-message:1",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "const": "artex-agent/1.0"
+    },
+    "message_id": {
+      "type": "string",
+      "pattern": "^message_[0-9a-f]{32}$"
+    },
+    "command_id": {
+      "type": "string",
+      "pattern": "^command_[0-9a-f]{32}$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^workspace_[0-9a-f]{32}$"
+    },
+    "kind": {
+      "enum": [
+        "send",
+        "request",
+        "reply",
+        "report",
+        "receipt",
+        "broadcast"
+      ]
+    },
+    "sender": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "agent"
+        },
+        "agent_id": {
+          "type": "string",
+          "pattern": "^agent_[0-9a-f]{32}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^run_[0-9a-f]{32}$"
+        },
+        "engine_epoch": {
+          "type": "string",
+          "pattern": "^epoch_[0-9a-f]{32}$"
+        }
+      },
+      "required": [
+        "kind",
+        "agent_id",
+        "run_id",
+        "engine_epoch"
+      ],
+      "additionalProperties": false
+    },
+    "recipients": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^agent_[0-9a-f]{32}$"
+      },
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "channel": {
+      "type": "string"
+    },
+    "topic": {
+      "type": "string"
+    },
+    "correlation_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^message_[0-9a-f]{32}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "deadline_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "body": {
+      "$ref": "#/$defs/Body"
+    },
+    "object_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$",
+            "x-max": "18446744073709551615"
+          },
+          "access": {
+            "const": "read"
+          }
+        },
+        "required": [
+          "collection",
+          "id",
+          "version",
+          "access"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "final": {
+      "type": "boolean"
+    },
+    "outcome": {
+      "enum": [
+        "none",
+        "ok",
+        "error",
+        "cancelled"
+      ]
+    },
+    "hop_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 16
+    }
+  },
+  "required": [
+    "protocol",
+    "message_id",
+    "command_id",
+    "workspace_id",
+    "kind",
+    "sender",
+    "recipients",
+    "channel",
+    "topic",
+    "correlation_id",
+    "created_at",
+    "deadline_at",
+    "body",
+    "object_refs",
+    "final",
+    "outcome",
+    "hop_count"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "UInt64": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "x-max": "18446744073709551615"
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "BlobRef": {
+      "type": "object",
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "length": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "media_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "length",
+        "media_type"
+      ],
+      "additionalProperties": false
+    },
+    "SecretRef": {
+      "type": "object",
+      "properties": {
+        "secret_ref": {
+          "type": "string",
+          "pattern": "^secret_[0-9a-f]{32}$"
+        },
+        "hint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "secret_ref",
+        "hint"
+      ],
+      "additionalProperties": false
+    },
+    "Expected": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        }
+      },
+      "required": [
+        "collection",
+        "id",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "recovery_required": {
+              "type": "boolean"
+            },
+            "details": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "code",
+            "retryable",
+            "recovery_required"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "EntityHeader": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "collection": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "commit_seq": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "legacy_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "collection",
+        "version",
+        "commit_seq",
+        "created_at",
+        "updated_at",
+        "legacy_key"
+      ],
+      "additionalProperties": false
+    },
+    "Body": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blob": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlobRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "text",
+        "blob"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "blob": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "text",
+            "blob"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "null"
+            },
+            "blob": {
+              "$ref": "#/$defs/BlobRef"
+            }
+          },
+          "required": [
+            "text",
+            "blob"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Actor": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "user",
+            "engine",
+            "agent"
+          ]
+        },
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^agent_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^run_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engine_epoch": {
+          "type": "string",
+          "pattern": "^epoch_[0-9a-f]{32}$"
+        }
+      },
+      "required": [
+        "kind",
+        "agent_id",
+        "run_id",
+        "engine_epoch"
+      ],
+      "additionalProperties": false
+    },
+    "Run": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^run_[0-9a-f]{32}$"
+        },
+        "agent_id": {
+          "type": "string",
+          "pattern": "^agent_[0-9a-f]{32}$"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^task_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intent_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^node_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conversation_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^conversation_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engine_epoch": {
+          "type": "string",
+          "pattern": "^epoch_[0-9a-f]{32}$"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting",
+            "paused",
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "recovery_required"
+          ]
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deadline_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "next_tool_ordinal": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "permission_mode": {
+          "enum": [
+            "default",
+            "acceptEdits",
+            "bypassPermissions",
+            "plan",
+            "dontAsk",
+            "auto"
+          ]
+        },
+        "pre_plan_mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "default",
+                "acceptEdits",
+                "bypassPermissions",
+                "plan",
+                "dontAsk",
+                "auto"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approved_target_mode": {
+          "enum": [
+            "default",
+            "acceptEdits",
+            "bypassPermissions",
+            "plan",
+            "dontAsk",
+            "auto"
+          ]
+        },
+        "todos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "pending",
+                  "in_progress",
+                  "completed"
+                ]
+              }
+            },
+            "required": [
+              "content",
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "purpose": {
+          "enum": [
+            "normal",
+            "run_wrapup",
+            "task_timeout_wrapup"
+          ]
+        },
+        "parent_run_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^run_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "turn_count": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        }
+      },
+      "required": [
+        "id",
+        "agent_id",
+        "task_id",
+        "intent_id",
+        "conversation_id",
+        "engine_epoch",
+        "state",
+        "started_at",
+        "finished_at",
+        "deadline_at",
+        "next_tool_ordinal",
+        "permission_mode",
+        "pre_plan_mode",
+        "approved_target_mode",
+        "todos"
+      ],
+      "additionalProperties": false
+    },
+    "DomainEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^event_[0-9a-f]{32}$"
+        },
+        "seq": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^task_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject_collection": {
+          "type": "string"
+        },
+        "subject_id": {
+          "type": "string"
+        },
+        "subject_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "actor": {
+          "$ref": "#/$defs/Actor"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "capture": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "request_captured_bytes": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$",
+              "x-max": "18446744073709551615"
+            },
+            "response_captured_bytes": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$",
+              "x-max": "18446744073709551615"
+            }
+          },
+          "required": [
+            "state",
+            "error",
+            "request_captured_bytes",
+            "response_captured_bytes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "seq",
+        "kind",
+        "task_id",
+        "subject_collection",
+        "subject_id",
+        "subject_version",
+        "actor",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "AgentDelivery": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^delivery_[0-9a-f]{32}$"
+        },
+        "event_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^event_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^message_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recipient_id": {
+          "type": "string",
+          "pattern": "^agent_[0-9a-f]{32}$"
+        },
+        "activation_key": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "claimed",
+            "observed",
+            "completed",
+            "expired",
+            "cancelled",
+            "interrupted"
+          ]
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Actor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "claim_deadline": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "event_id",
+        "message_id",
+        "recipient_id",
+        "activation_key",
+        "state",
+        "owner",
+        "claim_deadline",
+        "attempts",
+        "observed_at",
+        "completed_at"
+      ],
+      "additionalProperties": false
+    },
+    "SteeringMessage": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^steering_[0-9a-f]{32}$"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^task_[0-9a-f]{32}$"
+        },
+        "intent_id": {
+          "type": "string",
+          "pattern": "^node_[0-9a-f]{32}$"
+        },
+        "target_run_id": {
+          "type": "string",
+          "pattern": "^run_[0-9a-f]{32}$"
+        },
+        "text": {
+          "type": "string"
+        },
+        "ordinal": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "consumed",
+            "dropped"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "required": [
+        "id",
+        "task_id",
+        "intent_id",
+        "target_run_id",
+        "text",
+        "ordinal",
+        "state",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "MemoryRecord": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^memory_[0-9a-f]{32}$"
+        },
+        "agent_id": {
+          "type": "string",
+          "pattern": "^agent_[0-9a-f]{32}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "user",
+            "feedback",
+            "project",
+            "reference"
+          ]
+        },
+        "content": {
+          "$ref": "#/$defs/Body"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "required": [
+        "id",
+        "agent_id",
+        "name",
+        "description",
+        "type",
+        "content",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "ToolInvocation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^invocation_[0-9a-f]{32}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^run_[0-9a-f]{32}$"
+        },
+        "tool_use_id": {
+          "type": "string"
+        },
+        "ordinal": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "name": {
+          "type": "string"
+        },
+        "input": {},
+        "raw_input": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "prepared",
+            "awaiting_approval",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "recovery_required"
+          ]
+        },
+        "execution_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^exec_[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "input_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlobRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlobRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "tool_use_id",
+        "ordinal",
+        "name",
+        "input",
+        "raw_input",
+        "state",
+        "execution_id",
+        "input_ref",
+        "result_ref",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "CommandReceipt": {
+      "type": "object",
+      "properties": {
+        "command_id": {
+          "type": "string",
+          "pattern": "^command_[0-9a-f]{32}$"
+        },
+        "method": {
+          "type": "string"
+        },
+        "normalized_params": {},
+        "expected": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Expected"
+          }
+        },
+        "commit_seq": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "result": {},
+        "result_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlobRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "command_id",
+        "method",
+        "normalized_params",
+        "expected",
+        "commit_seq",
+        "result",
+        "result_ref"
+      ],
+      "additionalProperties": false
+    },
+    "UserQuestion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^question_[0-9a-f]{32}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^run_[0-9a-f]{32}$"
+        },
+        "kind": {
+          "enum": [
+            "question",
+            "plan_approval"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "answered",
+            "cancelled",
+            "expired"
+          ]
+        },
+        "answer": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deadline_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "kind",
+        "payload",
+        "state",
+        "answer",
+        "deadline_at",
+        "generation"
+      ],
+      "additionalProperties": false
+    },
+    "ResourceFile": {
+      "type": "object",
+      "properties": {
+        "resource_kind": {
+          "enum": [
+            "skill",
+            "mcp_resource"
+          ]
+        },
+        "resource_key": {
+          "type": "string"
+        },
+        "relative_path": {
+          "type": "string"
+        },
+        "blob": {
+          "$ref": "#/$defs/BlobRef"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        }
+      },
+      "required": [
+        "resource_kind",
+        "resource_key",
+        "relative_path",
+        "blob",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "Execution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^exec_[0-9a-f]{32}$"
+        },
+        "invocation_id": {
+          "type": "string",
+          "pattern": "^invocation_[0-9a-f]{32}$"
+        },
+        "owner": {
+          "$ref": "#/$defs/Actor"
+        },
+        "state": {
+          "enum": [
+            "prepared",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "program_capability": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd_capability": {
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlobRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_cursor": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        }
+      },
+      "required": [
+        "id",
+        "invocation_id",
+        "owner",
+        "state",
+        "program_capability",
+        "args",
+        "cwd_capability",
+        "started_at",
+        "finished_at",
+        "exit_code",
+        "output_ref",
+        "last_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "ShellSession": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^shell_[0-9a-f]{32}$"
+        },
+        "execution_id": {
+          "type": "string",
+          "pattern": "^exec_[0-9a-f]{32}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^run_[0-9a-f]{32}$"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "closed",
+            "interrupted"
+          ]
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "execution_id",
+        "run_id",
+        "state",
+        "cursor",
+        "rows",
+        "cols"
+      ],
+      "additionalProperties": false
+    },
+    "Tombstone": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "commit_seq": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "deleted_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "legacy_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "collection",
+        "id",
+        "version",
+        "commit_seq",
+        "deleted_at",
+        "legacy_key"
+      ],
+      "additionalProperties": false
+    },
+    "AgentFeatures": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "pattern": "^agent_[0-9a-f]{32}$"
+        },
+        "questions": {
+          "type": "boolean"
+        },
+        "plan_mode": {
+          "type": "boolean"
+        },
+        "memory": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agent_id",
+        "questions",
+        "plan_mode",
+        "memory"
+      ],
+      "additionalProperties": false
+    },
+    "TaskRuntime": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^task_[0-9a-f]{32}$"
+        },
+        "timeout_policy": {
+          "enum": [
+            "active_elapsed",
+            "legacy_absolute"
+          ]
+        },
+        "active_elapsed_ms": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "x-max": "18446744073709551615"
+        },
+        "remaining_timeout_ms": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$",
+              "x-max": "18446744073709551615"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_active_clock": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$",
+              "x-max": "18446744073709551615"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "legacy_deadline_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accounting_state": {
+          "enum": [
+            "known",
+            "recovery_required"
+          ]
+        }
+      },
+      "required": [
+        "task_id",
+        "timeout_policy",
+        "active_elapsed_ms",
+        "remaining_timeout_ms",
+        "last_active_clock",
+        "legacy_deadline_at",
+        "accounting_state"
+      ],
+      "additionalProperties": false
+    },
+    "ContentBlock": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "text": {
+              "$ref": "#/$defs/Body"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "thinking"
+            },
+            "thinking": {
+              "$ref": "#/$defs/Body"
+            },
+            "signature": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "thinking",
+            "signature"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "tool_use"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "input": {}
+          },
+          "required": [
+            "type",
+            "id",
+            "name",
+            "input"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "tool_result"
+            },
+            "tool_use_id": {
+              "type": "string"
+            },
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentBlock"
+              }
+            },
+            "is_error": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "tool_use_id",
+            "content",
+            "is_error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ConversationMessage": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentBlock"
+          }
+        }
+      },
+      "required": [
+        "role",
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "ToolResult": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentBlock"
+          }
+        },
+        "is_error": {
+          "type": "boolean"
+        },
+        "extra": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConversationMessage"
+          }
+        }
+      },
+      "required": [
+        "content",
+        "is_error",
+        "extra"
+      ],
+      "additionalProperties": false
+    },
+    "ConversationRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^message_[0-9a-f]{32}$"
+        },
+        "sender_id": {
+          "type": "string",
+          "pattern": "^agent_[0-9a-f]{32}$"
+        },
+        "recipients": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^agent_[0-9a-f]{32}$"
+          }
+        },
+        "expected_reports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^agent_[0-9a-f]{32}$"
+          }
+        },
+        "state": {
+          "enum": [
+            "open",
+            "claimed",
+            "waiting",
+            "completed",
+            "failed",
+            "cancelled",
+            "expired",
+            "interrupted"
+          ]
+        },
+        "terminal_reports": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^message_[0-9a-f]{32}$"
+          }
+        },
+        "deadline_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "completion_mode": {
+          "enum": [
+            "one",
+            "all"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "sender_id",
+        "recipients",
+        "expected_reports",
+        "state",
+        "terminal_reports",
+        "deadline_at",
+        "completion_mode"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

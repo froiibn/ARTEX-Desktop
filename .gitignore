@@ -1,0 +1,14 @@
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.env
+.env.local
+/node_modules/
+/desktop/tests/prompt-comparison-audit.json
+/desktop/tests/verification-result.json
+/desktop/tests/engine-smoke-result.json
+/desktop/app/gen/
+**/__pycache__/
+*.pyc
+*.pyo

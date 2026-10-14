@@ -1,0 +1,1694 @@
+{
+  "classification_rule": "implemented means an executable domain/native/engine handler exists; parity and evidence are separate and never imply exhaustive source equivalence",
+  "source_count": 81,
+  "tools": [
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::assets::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::assets::add_company_scope",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "add_company_scope",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::company_natural_key_scope_precedence_and_explicit_owner_are_sticky",
+        "domain/tests/invariants.rs::company_scope_add_is_partial_replace_is_atomic_and_delete_reattributes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::exploration::add_hint",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "add_hint",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::goal_and_constraint_batches_follow_source_defaults_lineage_and_partial_success",
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source",
+        "domain/tests/invariants.rs::live_shared_sources_are_one_level_and_read_only"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::exploration::add_intent",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "add_intent",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::goal_and_constraint_batches_follow_source_defaults_lineage_and_partial_success",
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source",
+        "domain/tests/invariants.rs::live_shared_sources_are_one_level_and_read_only"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::tasks::add_task_hint",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "add_task_hint",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::goal_and_constraint_batches_follow_source_defaults_lineage_and_partial_success",
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source",
+        "domain/tests/invariants.rs::live_shared_sources_are_one_level_and_read_only"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::assets::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::assets::add_task_scope",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "add_task_scope",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::task_scope_normalization_is_idempotent_and_sources_remain_read_only",
+        "domain/tests/invariants.rs::coverage_uses_direct_source_fact_anchors_and_tree_deduplicates_ancestor_findings"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::findings::plan -> artex_domain::findings_ui::query on projected state",
+      "contract_handler": "domain::findings::bind_finding_traffic",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "bind_finding_traffic",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::finding_report_requires_node_identity_and_evidence_cas",
+        "domain/tests/invariants.rs::immutable_evidence_deduplicates_verified_capture_without_note_overwrite"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::configuration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::configuration::create_custom_tool",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "create_custom_tool",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_spawn_delete_host_custom_config_and_fact_page_match_source_operations",
+        "domain/tests/invariants.rs::custom_tool_header_credentials_reject_plaintext_journal_and_preserve_valid_references"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::configuration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::configuration::create_mcp",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "create_mcp",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_mcp_create_update_preserve_secret_refs_and_reject_invalid_configuration",
+        "domain/tests/invariants.rs::ui_mcp_sealed_environment_preflight_commit_query_and_restart_roundtrip"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "domain::configuration::create_skill",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "create_skill",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/skills.rs::tests::skill_yaml_and_paths"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::assets::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::assets::delete_assets_by_host",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "delete_assets_by_host",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_spawn_delete_host_custom_config_and_fact_page_match_source_operations"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::exploration::expand_digest",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "expand_digest",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::source_graph_summaries_keep_live_lineage_cold_digests_terminal_results_scope_and_text_budgets"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::retests::get_finding_retest_context",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "get_finding_retest_context",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::retest_is_conversation_bound_and_fixed_disposition_is_atomic"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::traffic_ui::tool_query",
+      "contract_handler": "domain::findings::get_finding_traffic",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "get_finding_traffic",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_traffic_search_ranges_and_evidence_export_zip_use_actual_bytes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::tasks::get_task_graph",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "get_task_graph",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::source_graph_summaries_keep_live_lineage_cold_digests_terminal_results_scope_and_text_budgets"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::tasks::get_task_node_detail",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "get_task_node_detail",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "engine::workers::get_task_worker_trace",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "get_task_worker_trace",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "engine::workers::get_worker_output",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "get_worker_output",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "engine::workers::get_worker_trace",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "get_worker_trace",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_unbound_default",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::exploration::goal_met",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "goal_met",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::exploration::graph_overview",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "graph_overview",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::source_graph_summaries_keep_live_lineage_cold_digests_terminal_results_scope_and_text_budgets"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::assets::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::assets::insert_assets",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "insert_assets",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::primary_asset_registration_auto_scopes_anchors_and_gates_without_derivative_scope_expansion",
+        "domain/tests/invariants.rs::source_asset_derivations_merge_hosts_ips_ports_without_returning_extra_ids"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "engine::workers::kill_work",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "kill_work",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_kill_and_steer_persist_active_run_state_without_touching_other_tasks"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::assets::list_assets",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_assets",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::primary_asset_registration_auto_scopes_anchors_and_gates_without_derivative_scope_expansion",
+        "domain/tests/invariants.rs::source_asset_derivations_merge_hosts_ips_ports_without_returning_extra_ids"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::exploration::list_companies",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_companies",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::company_natural_key_scope_precedence_and_explicit_owner_are_sticky",
+        "domain/tests/invariants.rs::company_scope_add_is_partial_replace_is_atomic_and_delete_reattributes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::exploration::list_facts",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_facts",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_spawn_delete_host_custom_config_and_fact_page_match_source_operations"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::findings::list_findings",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_findings",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::exploration::list_goals",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_goals",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::tasks::list_llm_profiles",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_llm_profiles",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_task_profile_and_worker_lists_match_source_nonempty_privacy_shapes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::findings::list_task_findings",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_task_findings",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "engine::workers::list_task_worker_traces",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_task_worker_traces",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_task_profile_and_worker_lists_match_source_nonempty_privacy_shapes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::tasks::list_tasks",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_tasks",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_task_profile_and_worker_lists_match_source_nonempty_privacy_shapes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::assets::list_untested_assets",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "list_untested_assets",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::task_scope_normalization_is_idempotent_and_sources_remain_read_only",
+        "domain/tests/invariants.rs::coverage_uses_direct_source_fact_anchors_and_tree_deduplicates_ancestor_findings"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "domain::exploration::node_detail",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "node_detail",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::tasks::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::tasks::pause_task",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "pause_task",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::explicit_resume_retires_interrupted_runs_without_replaying_uncertain_host_effects"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::exploration::prove_goal",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "prove_goal",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::exploration::record_fact",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "record_fact",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::goal_and_constraint_batches_follow_source_defaults_lineage_and_partial_success",
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source",
+        "domain/tests/invariants.rs::live_shared_sources_are_one_level_and_read_only"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::findings::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::retests::record_finding_retest_result",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "record_finding_retest_result",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::retest_is_conversation_bound_and_fixed_disposition_is_atomic"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::findings::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::findings::report_finding",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "report_finding",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::finding_report_requires_node_identity_and_evidence_cas",
+        "domain/tests/invariants.rs::immutable_evidence_deduplicates_verified_capture_without_note_overwrite"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "engine::workers::search_all_worker_traces",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "search_all_worker_traces",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::tool_projection::query",
+      "contract_handler": "engine::workers::search_task_worker_traces",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "search_task_worker_traces",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_tool_nonempty_views_match_source_ids_goals_trace_output_and_overview",
+        "domain/tests/invariants.rs::inherited_trace_excludes_running_intents_thinking_and_usage"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::exploration::set_constraints",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "set_constraints",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::goal_and_constraint_batches_follow_source_defaults_lineage_and_partial_success",
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source",
+        "domain/tests/invariants.rs::live_shared_sources_are_one_level_and_read_only"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::exploration::set_goals",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "set_goals",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::goal_and_constraint_batches_follow_source_defaults_lineage_and_partial_success",
+        "domain/tests/invariants.rs::partial_node_batches_and_last_goal_auto_completion_match_source",
+        "domain/tests/invariants.rs::live_shared_sources_are_one_level_and_read_only"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::tasks::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::tasks::spawn_task",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "spawn_task",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_spawn_delete_host_custom_config_and_fact_page_match_source_operations"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::exploration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "engine::workers::steer_work",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "steer_work",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_kill_and_steer_persist_active_run_state_without_touching_other_tasks"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_rpc::Router::invoke_plan -> Router::traffic_blob_text -> Router::traffic_blob (rpc/src/runtime_tools.rs)",
+      "contract_handler": "domain::traffic::traffic_blob",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "traffic_blob",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "rpc/src/runtime_tool_tests.rs::traffic_blob_actual_tool_uses_decimal_offset_8k_pages_and_source_text_result",
+        "rpc/src/runtime_tool_tests.rs::traffic_blob_utf8_binary_and_legacy_negative_offset_are_bounded",
+        "rpc/src/runtime_tool_tests.rs::traffic_blob_requires_a_recorded_hash_and_reads_evidence_reference_without_exchange"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::traffic_ui::tool_query",
+      "contract_handler": "domain::traffic::traffic_get",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "traffic_get",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_traffic_search_ranges_and_evidence_export_zip_use_actual_bytes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch_with_blob_reader -> artex_domain::traffic_ui::tool_query",
+      "contract_handler": "domain::traffic::traffic_search",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "traffic_search",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_traffic_search_ranges_and_evidence_export_zip_use_actual_bytes"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::configuration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::configuration::update_custom_tool",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "update_custom_tool",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_spawn_delete_host_custom_config_and_fact_page_match_source_operations",
+        "domain/tests/invariants.rs::custom_tool_header_credentials_reject_plaintext_journal_and_preserve_valid_references"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::findings::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::findings::update_finding_report",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "update_finding_report",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::finding_report_requires_node_identity_and_evidence_cas",
+        "domain/tests/invariants.rs::immutable_evidence_deduplicates_verified_capture_without_note_overwrite"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::configuration::plan -> artex_domain::tool_projection::mutation_result",
+      "contract_handler": "domain::configuration::update_mcp",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "update_mcp",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::canonical_mcp_create_update_preserve_secret_refs_and_reject_invalid_configuration",
+        "domain/tests/invariants.rs::ui_mcp_sealed_environment_preflight_commit_query_and_restart_roundtrip"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "domain::configuration::update_skill_file",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "update_skill_file",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/skills.rs::tests::skill_yaml_and_paths"
+      ]
+    },
+    {
+      "activation": "implement_opt_in_default_off",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::sdk::plan",
+      "contract_handler": "tools::interaction::ask_user_question",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "AskUserQuestion",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::sdk_memory_unicode_names_and_plan_approval_require_user",
+        "tools/src/lib.rs::tests::optional_five_are_implemented_but_default_off"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::process::bash",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Bash",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_rpc::Router::invoke_plan -> Router::compress_plan (rpc/src/compression.rs)",
+      "contract_handler": "engine::context::compress",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Compress",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "rpc/src/regression.rs::compression_archives_originals_and_reopens_with_stable_references",
+        "rpc/src/compression_policy.rs::tests::compression_excludes_protected_pairs_skips_overlap_and_preserves_archive_bytes",
+        "rpc/src/compression_policy.rs::tests::mode_is_captured_once_and_disabled_compress_never_produces_archives"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::files::edit",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Edit",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_opt_in_default_off",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::sdk::plan",
+      "contract_handler": "tools::interaction::enter_plan_mode",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "EnterPlanMode",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::sdk_memory_unicode_names_and_plan_approval_require_user",
+        "tools/src/lib.rs::tests::optional_five_are_implemented_but_default_off"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_rpc::Router::trusted_tool_input -> artex_host::bridge::HostBridge::execute_direct -> artex_host::custom::execute or artex_host::mcp::call",
+      "contract_handler": "tools::deferred::execute_extra_tool",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "ExecuteExtraTool",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_custom_command_python_and_http_execution",
+        "host/tests/native_boundary.rs::actual_mcp_stdio_roundtrip_and_cancel",
+        "host/tests/native_boundary.rs::actual_mcp_http_sse_and_network_cancellation",
+        "rpc/src/runtime_tool_tests.rs::execute_extra_requires_real_completed_same_run_discovery_and_preserves_secretref",
+        "rpc/src/runtime_tool_tests.rs::execute_extra_rechecks_current_schema_version_binding_and_enabled_after_discovery",
+        "rpc/src/runtime_tool_tests.rs::execute_extra_mcp_rechecks_live_visibility_cache_schema_and_secretref",
+        "rpc/src/runtime_tool_tests.rs::execute_extra_actual_controller_dispatch_carries_current_config_and_prepared_identity"
+      ]
+    },
+    {
+      "activation": "implement_opt_in_default_off",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::sdk::plan",
+      "contract_handler": "tools::interaction::exit_plan_mode",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "ExitPlanMode",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::sdk_memory_unicode_names_and_plan_approval_require_user",
+        "tools/src/lib.rs::tests::optional_five_are_implemented_but_default_off"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::files::glob",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Glob",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/search.rs::tests::search_filters_binary_and_supports_context"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::files::grep",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Grep",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/search.rs::tests::search_filters_binary_and_supports_context"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::files::ls",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "LS",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::process::monitor",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Monitor",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::files::multi_edit",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "MultiEdit",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/tools.rs::tests::multi_edit_failure_leaves_original",
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_rpc::Router::compression_archive_read for blob: paths; artex_host::tools::HostRuntime::execute_tool otherwise",
+      "contract_handler": "tools::files::read",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Read",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_opt_in_default_off",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::sdk::query",
+      "contract_handler": "tools::memory::recall_memory",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "RecallMemory",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::sdk_memory_unicode_names_and_plan_approval_require_user",
+        "tools/src/lib.rs::tests::optional_five_are_implemented_but_default_off"
+      ]
+    },
+    {
+      "activation": "implement_opt_in_default_off",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::sdk::plan",
+      "contract_handler": "tools::memory::record_memory",
+      "effect": "workspace_command",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "RecordMemory",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::sdk_memory_unicode_names_and_plan_approval_require_user",
+        "tools/src/lib.rs::tests::optional_five_are_implemented_but_default_off"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::sdk::query",
+      "contract_handler": "tools::deferred::search_extra_tools",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "SearchExtraTools",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::deferred_discovery_respects_exact_select_binding_enabled_and_mcp_visibility",
+        "rpc/src/runtime_tool_tests.rs::execute_extra_requires_real_completed_same_run_discovery_and_preserves_secretref"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::skills::skill",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Skill",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/skills.rs::tests::skill_yaml_and_paths"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::process::task_list",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "TaskList",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::process::task_output",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "TaskOutput",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::process::task_stop",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "TaskStop",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_tools::dispatch -> artex_domain::sdk::plan",
+      "contract_handler": "tools::todos::todo_write",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Persistent domain handler; named regression fixtures cover listed behavior, not every possible input/state",
+      "name": "TodoWrite",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "domain_executor",
+      "verification_evidence": [
+        "domain/tests/invariants.rs::sdk_memory_unicode_names_and_plan_approval_require_user",
+        "tools/src/lib.rs::tests::optional_five_are_implemented_but_default_off"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::web::web_fetch",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "WebFetch",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_webfetch_receives_local_http_and_rejects_assets"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::files::write",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "Write",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::pty::shell_close",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "shell_close",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/pty.rs::tests::actual_terminal_echo_screen_and_owner_cleanup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::pty::shell_list",
+      "effect": "read",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "shell_list",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/pty.rs::tests::actual_terminal_echo_screen_and_owner_cleanup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::pty::shell_open",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "shell_open",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/pty.rs::tests::actual_terminal_echo_screen_and_owner_cleanup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::pty::shell_read",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "shell_read",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/pty.rs::tests::actual_terminal_echo_screen_and_owner_cleanup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::pty::shell_send",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "shell_send",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/pty.rs::tests::actual_terminal_echo_screen_and_owner_cleanup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::timer::sleep",
+      "effect": "run_state",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Native or engine executor connected; source parity is limited to the named boundary checks and platform matrix",
+      "name": "sleep",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/tests/native_boundary.rs::actual_sdk_files_processes_monitor_and_sleep",
+        "host/src/execution.rs::tests::owned_execution_and_dedup"
+      ]
+    },
+    {
+      "activation": "implement_with_existing_gates",
+      "actual_executor_path": "artex_host::tools::HostRuntime::execute_tool via artex_rpc::Router::next_tool and artex_host::bridge::HostBridge::execute_direct",
+      "contract_handler": "tools::web::web_search",
+      "effect": "external_effect",
+      "executor_present": true,
+      "implementation_state": "implemented",
+      "intentional_desktop_changes": [
+        "Typed IDs and decimal UInt64 values replace numeric database identifiers",
+        "Bodies use verified blob references above inline threshold",
+        "Actor epoch, file capabilities, CAS and uncertain external-effect recovery are enforced"
+      ],
+      "limitations": "Search response normalization tested; real credential-dependent remote providers require configured credentials and connectivity",
+      "name": "web_search",
+      "parity": "named behavior slices verified; source equivalence not exhaustively tested",
+      "status": "host_boundary",
+      "verification_evidence": [
+        "host/src/network.rs::tests::assets_and_search_normalization",
+        "host/tests/native_boundary.rs::actual_search_backends_against_local_http_fixtures",
+        "tools/src/lib.rs::tests::web_search_requires_global_and_agent_flags"
+      ]
+    }
+  ],
+  "verification_notes": {
+    "execute_extra_actual_controller_dispatch_carries_current_config_and_prepared_identity": "The native host deliberately fails in this controller fixture. It verifies prepared identity, current configuration, dispatch payload and persisted failure, not successful native execution. Successful native custom/MCP calls are separately covered by the named host fixtures."
+  }
+}

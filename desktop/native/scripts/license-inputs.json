@@ -1,0 +1,70 @@
+{
+  "source_material_sha256": {
+    "docs/licenses/norma-Apache-2.0.txt": "930307fe92c0cdd524172effd340e5177b4e054d8576735db4e0b08f69ac6ba9",
+    "docs/licenses/brevduva-Apache-2.0.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "docs/licenses/brevduva-NOTICE.txt": "446948cdd1f203783b7ecb3af059ce57103e4b2b8c9a4a91e289fcc624d45f50",
+    "desktop/native/assets/fonts/OFL.txt": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
+    "desktop/native/assets/fonts/PROVENANCE.md": "5db1cac66836f88bbe80bd110f92832d431b4c74369de03da125ace5c295fdc5",
+    "desktop/crates/domain/resources/psl/LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "desktop/crates/domain/resources/psl/MPL-2.0.txt": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "desktop/crates/domain/resources/psl/PROVENANCE.md": "fb16ce07f97b18f74016d110dcc0b67b7e8635b127aef6b49b8bb61ea9297aae",
+    "desktop/crates/domain/resources/psl/public_suffix_list.dat": "a5638281157e8c902b127a5376f9ea2d024bf2ee11524133a6a76cd1d14ee7be",
+    "desktop/native/assets/fonts/NotoSansKR-Regular.ttf": "f4d9a1a362aea79a70ef0ec2da6bbc7cb0cac598650dcc42f848df2b4250cefb"
+  },
+  "windows_gnu_runtime": {
+    "gcc_version": "15.1.0",
+    "mingw_version": "13.0.0",
+    "vendor_build": "gcc-15.1.0-mingw-w64ucrt-13.0.0-r2",
+    "archive_url": "https://github.com/brechtsanders/winlibs_mingw/releases/download/15.1.0posix-13.0.0-ucrt-r2/winlibs-x86_64-posix-seh-gcc-15.1.0-mingw-w64ucrt-13.0.0-r2.zip",
+    "archive_sha256": "d48e7be420828e484346f864eed1c6e537fa9131da2acb834f15aeb254c48d9a",
+    "archive_checksum_origin": "GitHub publisher release asset SHA256 digest, confirmed by actual full ZIP download; vendor signed provenance not claimed",
+    "gcc_exception_path": "docs/licenses/runtime/gcc-15.1.0-COPYING.RUNTIME.txt",
+    "gcc_source_commit": "1b306039ac49f8ad91ca71d3de3150a3c9fa792a",
+    "mingw_source_commit": "de62c283f3383bd825c98518cb0a42ba071d4ac2",
+    "review_scope": "Exact Winlibs binary archive file matching plus fixed source notices; unknown Rust rust-mingw native inputs fail closed"
+  },
+  "runtime_notice_files": [
+    {
+      "path": "docs/licenses/runtime/gcc-15.1.0-COPYING3.txt",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "source_url": "https://raw.githubusercontent.com/gcc-mirror/gcc/1b306039ac49f8ad91ca71d3de3150a3c9fa792a/COPYING3"
+    },
+    {
+      "path": "docs/licenses/runtime/gcc-15.1.0-COPYING.RUNTIME.txt",
+      "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+      "source_url": "https://raw.githubusercontent.com/gcc-mirror/gcc/1b306039ac49f8ad91ca71d3de3150a3c9fa792a/COPYING.RUNTIME"
+    },
+    {
+      "path": "docs/licenses/runtime/gcc-15.1.0-libgcc2-original.c",
+      "sha256": "00bd4be43efbd9f70f6c8918cfaf7453d5bc1516c469ecb38da8777da4850fcc",
+      "source_url": "https://raw.githubusercontent.com/gcc-mirror/gcc/1b306039ac49f8ad91ca71d3de3150a3c9fa792a/libgcc/libgcc2.c"
+    },
+    {
+      "path": "docs/licenses/runtime/mingw-w64-13.0.0-COPYING.txt",
+      "sha256": "99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f",
+      "source_url": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/de62c283f3383bd825c98518cb0a42ba071d4ac2/COPYING"
+    },
+    {
+      "path": "docs/licenses/runtime/mingw-w64-13.0.0-runtime-COPYING.txt",
+      "sha256": "e9b2dc02451ea29092a1f25fa0f3c07207ed421f1807dffb0c4e6dce69dee7bd",
+      "source_url": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/de62c283f3383bd825c98518cb0a42ba071d4ac2/COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt"
+    },
+    {
+      "path": "docs/licenses/runtime/mingw-w64-13.0.0-winpthreads-COPYING.txt",
+      "sha256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177",
+      "source_url": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/de62c283f3383bd825c98518cb0a42ba071d4ac2/mingw-w64-libraries/winpthreads/COPYING"
+    }
+  ],
+  "standard_terms_supplements": [
+    {
+      "path": "docs/licenses/common/CC0-1.0.txt",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+      "source_url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/CC0-1.0.txt"
+    },
+    {
+      "path": "docs/licenses/common/MIT.txt",
+      "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+      "source_url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.28.0/text/MIT.txt"
+    }
+  ]
+}

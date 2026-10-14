@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "header_bytes": 104,
+  "payload_length": 239,
+  "frame_length": 351,
+  "seq": "1",
+  "previous_frame_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "frame_sha256": "cf6b5faf20def7b8adadd7626e58b7a0da731ce29f21af17de19f11123f787a5",
+  "frame_hex": "41525445584a303101000000ef0000000100000000000000222222222222222222222222222222220000000000000000000000000000000000000000000000000000000000000000342ba239cca4f4fb4a9ac3f98c45837c2b9c63cc6c3b772698aa7c163a8b28c37b22666f726d61745f76657273696f6e223a312c22636f6d6d69747465645f6174223a22323032362d31302d31325430303a30303a30305a222c22636f6d6d616e645f6964223a22636f6d6d616e645f3131313131313131313131313131313131313131313131313131313131313131222c226d6574686f64223a22666978747572652e6e6f6f70222c226e6f726d616c697a65645f706172616d73223a7b7d2c226578706563746564223a5b5d2c226d75746174696f6e73223a5b5d2c226576656e7473223a5b5d2c2264656c69766572696573223a5b5d2c22726573756c74223a7b226f6b223a747275657d7d4152544558454e44",
+  "payload": {
+    "format_version": 1,
+    "committed_at": "2026-10-12T00:00:00Z",
+    "command_id": "command_11111111111111111111111111111111",
+    "method": "fixture.noop",
+    "normalized_params": {},
+    "expected": [],
+    "mutations": [],
+    "events": [],
+    "deliveries": [],
+    "result": {
+      "ok": true
+    }
+  },
+  "recovery_cases": [
+    {
+      "name": "complete",
+      "expected": "replay_once"
+    },
+    {
+      "name": "truncate_last_byte",
+      "expected": "uncommitted_tail"
+    },
+    {
+      "name": "flip_payload_byte",
+      "expected": "read_only_corruption"
+    },
+    {
+      "name": "duplicate_command_same_params",
+      "expected": "return_receipt"
+    },
+    {
+      "name": "duplicate_command_changed_params",
+      "expected": "COMMAND_ID_REUSE"
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "checked_at_utc": "2026-10-14T02:01:10.171016+00:00",
+  "source_commit": "318fef3e82ffc3b31b23d35a05099927e1776aa9",
+  "verdict": "Hold public transition with the existing release; source build checks passed, UI and distribution notice requirements remain.",
+  "github_is_private": true,
+  "source_checks": {
+    "previous_full_regression_current_source_matches": 184,
+    "manifests": [
+      {
+        "path": "desktop/Cargo.toml",
+        "license": "AGPL-3.0-only"
+      },
+      {
+        "path": "desktop/crates/agent/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/core/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/domain/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/host/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/importer/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/migrate/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/platform/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/rpc/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/runtime/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/store/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/crates/tools/Cargo.toml",
+        "license": {
+          "workspace": true
+        }
+      },
+      {
+        "path": "desktop/native-core/Cargo.toml",
+        "license": "AGPL-3.0-only"
+      },
+      {
+        "path": "desktop/native/Cargo.toml",
+        "license": "AGPL-3.0-only"
+      }
+    ],
+    "original_agpl_text_identical": true,
+    "original_git_line_endings_only_difference": "CRLF in local originals and rebuild, LF in original Git blob",
+    "multilingual_local_links_valid": 51,
+    "active_workflows": [],
+    "ci_template_present": true,
+    "brevduva_preserved_text_hashes_match": true,
+    "commit": "318fef3e82ffc3b31b23d35a05099927e1776aa9",
+    "fresh_clone_build_exit": 0,
+    "fresh_clone_self_test_exit": 0,
+    "fresh_clone_uses_shared_cargo_build_cache": true,
+    "fresh_clone_build_has_warnings": false,
+    "fresh_clone_worktree_clean": true
+  },
+  "git_history_scan": {
+    "commits": 12,
+    "reachable_blobs": 601,
+    "tracked_files": 280,
+    "all_commit_emails_noreply": true,
+    "sensitive_tracked_filenames": [],
+    "binary_signature_scan_count": 14
+  },
+  "credential_review": {
+    "candidate_count": 10,
+    "all_candidates_reviewed_as_unit_test_fixed_inputs": true,
+    "actual_credentials_identified_by_reviewed_patterns": 0,
+    "binary_signature_hits": 0,
+    "text_user_home_path_reference_files": 0,
+    "scope": "Known patterns and test code context, not an exhaustive proof of absence."
+  },
+  "release": {
+    "tag": "v0.2.0-preview.1",
+    "target_commit": "2a1f5d41c42a9f288052b70d14837e6ad647b853",
+    "assets": [
+      {
+        "name": "ARTEX-Desktop-v0.2.0-preview.1-source.zip",
+        "sha256": "78daf01a670e832fbb8e5834da2f213fb6537632498ff97c5ef0fe8d46182f70",
+        "remote_digest_matches": true,
+        "members": 622,
+        "root_prefix": [
+          "ARTEX-Desktop-v0.2.0-preview.1/",
+          "ARTEX-Desktop-v0.2.0-preview.1/.gitignore",
+          "ARTEX-Desktop-v0.2.0-preview.1/LICENSE"
+        ],
+        "norma_notice_present": false,
+        "brevduva_notice_present": false,
+        "psl_mpl_present": false,
+        "former_web_source_present": true,
+        "former_tauri_source_present": true,
+        "source_tag_blob_matches": 509,
+        "source_tag_missing": [],
+        "source_tag_mismatches": []
+      },
+      {
+        "name": "ARTEX-Desktop-v0.2.0-preview.1-windows-x64.zip",
+        "sha256": "476267ccea67a0d25cf3177c3267b0a4d562273ae858cd9efdcce252153d8bc8",
+        "remote_digest_matches": true,
+        "members": 853,
+        "root_prefix": [
+          "ARTEX-Windows-x64/ARTEX.exe",
+          "ARTEX-Windows-x64/BUILD-INFO.json",
+          "ARTEX-Windows-x64/FILE-SHA256SUMS.txt"
+        ],
+        "norma_notice_present": false,
+        "brevduva_notice_present": false,
+        "psl_mpl_present": false,
+        "former_web_source_present": false,
+        "former_tauri_source_present": false,
+        "executables": [
+          "ARTEX-Windows-x64/ARTEX.exe"
+        ],
+        "font_license_names": [
+          "ARTEX-Windows-x64/licenses/Noto-Sans-KR/OFL.txt",
+          "ARTEX-Windows-x64/licenses/rust/epaint_default_fonts-0.33.3/fonts/OFL.txt",
+          "ARTEX-Windows-x64/licenses/rust-toolchain/licenses/OFL-1.1.txt"
+        ]
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "sha256": "5ea62915022bb91b7ed19f45d645c5d2b9bfbba8bdec68a18db33e40884fbe92",
+        "remote_digest_matches": true
+      }
+    ],
+    "binary_release_signature_scan": {
+      "credential_hits": [],
+      "local_user_path_occurrences": 1626,
+      "scan_scope": "Known token and private key byte signatures in all archive files, including executable; compressed images are not decoded.",
+      "executable_user_home_path_categories": {
+        ".cargo": 1862
+      },
+      "executable_distinct_user_names": 1
+    }
+  },
+  "unresolved": [
+    "Original extra usage restriction handling",
+    "Native author/AGPL legal notice UI",
+    "New distribution license and NOTICE materials",
+    "MPL notice/source mapping and GNU/MinGW runtime linkage provenance",
+    "Existing releases and historical web/Tauri publication scope"
+  ],
+  "verification_artifact_sha256": {
+    "source-verification.private.json": "0561e466b000312b3e29b9120d83d27317eaa23f5ba801acf9cfba1724a5b53b",
+    "history-scan.private.json": "33db4e2f44c2488ca3981b7a167d2b810f6b3472e320563c18c3a77571593390",
+    "release-review.private.json": "203eecbbe74a982d634363f616e4a6f0c563b73fa0f0a3cb237709ee152ff9c7",
+    "fresh-clone-build.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fresh-clone-build.stderr.log": "36844682691dbe2e6d5d52177e6d34b25f1e7ce82fb06dd99867b2521b22ec5c",
+    "fresh-clone-self-test.stdout.log": "1701c24ca3433e22295888852f6dd68f2cd135d607d7092aa05118837b919e42",
+    "fresh-clone-self-test.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

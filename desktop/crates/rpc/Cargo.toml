@@ -1,0 +1,27 @@
+[package]
+name = "artex-rpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+artex-core.workspace = true
+artex-store.workspace = true
+artex-domain.workspace = true
+artex-agent.workspace = true
+artex-tools.workspace = true
+artex-runtime.workspace = true
+artex-importer.workspace = true
+artex-platform.workspace = true
+chrono.workspace = true
+regex = "1"
+url = "2"
+serde.workspace = true
+serde_json.workspace = true
+jsonschema.workspace = true
+base64 = "0.22"
+sha2.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

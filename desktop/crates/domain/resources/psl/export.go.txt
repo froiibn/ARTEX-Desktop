@@ -1,0 +1,28 @@
+// Verification-only fixture exporter, run from the original Go module with -mod=readonly.
+package main
+
+import (
+ "encoding/json"
+ "fmt"
+ "net"
+ "os"
+ "regexp"
+ "strings"
+ "golang.org/x/net/publicsuffix"
+)
+func main() {
+ args:=os.Args[1:]; if len(args)>0 && args[0]=="--" {args=args[1:]}; source, err := os.ReadFile(args[0]); if err != nil { panic(err) }
+ matches := regexp.MustCompile(`"([^"\n]+)"`).FindAllSubmatch(source,-1)
+ rows:=[]map[string]any{}
+ for _,m:=range matches {
+   rule:=string(m[1]); if strings.Contains(rule," "){continue}
+   host:="x.y."+strings.TrimLeft(rule,"!*.")
+   suffix,icann:=publicsuffix.PublicSuffix(host)
+   root:=strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)),".")
+   if net.ParseIP(root)==nil { if v,e:=publicsuffix.EffectiveTLDPlusOne(root);e==nil&&v!="" {root=v} }
+   rows=append(rows,map[string]any{"host":host,"suffix":suffix,"icann":icann,"root":root})
+ }
+ out,_:=json.MarshalIndent(map[string]any{"go_module":"golang.org/x/net v0.58.0","psl_revision":"d6c92f1bbb7433e5db7b8405c25d4035fb8ff376","cases":rows},"","  ")
+ if err=os.WriteFile(args[1],out,0600);err!=nil{panic(err)}
+ fmt.Printf("Generated %d Go PSL differential cases\n",len(rows))
+}

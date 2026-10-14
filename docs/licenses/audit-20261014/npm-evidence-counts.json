@@ -1,0 +1,19 @@
+{
+  "rebuilt-web": {
+    "exact_installed_license_text": 407,
+    "exact_official_registry_declaration_only": 85,
+    "lock_integrity_verified_tarball_license_text": 36,
+    "upstream_license_text_at_registry_gitHead": 5
+  },
+  "original-web": {
+    "exact_installed_license_text": 699,
+    "exact_official_registry_declaration_only": 33,
+    "lock_integrity_verified_tarball_license_text": 34,
+    "upstream_license_text_at_registry_gitHead": 6
+  },
+  "original-api-recon": {
+    "upstream_license_text_at_registry_gitHead": 2,
+    "lock_integrity_verified_tarball_license_text": 82,
+    "lock_integrity_verified_tarball_README_license_text": 1
+  }
+}

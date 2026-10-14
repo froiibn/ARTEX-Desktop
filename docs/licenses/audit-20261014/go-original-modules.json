@@ -1,0 +1,1785 @@
+{
+  "scope": "All module/version pairs explicitly required by original go.mod and norma/go.mod, plus all source archive checksums in their go.sum files. This is not a go list -m all / import reachability result; Go toolchain is absent from PATH. Checksum-only historical versions are conservatively audited but not asserted to be selected runtime dependencies.",
+  "records": [
+    {
+      "module": "github.com/Autumn-27/norma",
+      "version": "v0.4.3",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/!autumn-27/norma/@v/v0.4.3.zip",
+      "status": "Local replacement; separately audited against proxy/upstream by origin audit"
+    },
+    {
+      "module": "github.com/andybalholm/brotli",
+      "version": "v1.2.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/andybalholm/brotli/@v/v1.2.1.zip",
+      "go_sum_expected": "h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=",
+      "go_sum_computed": "h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94",
+          "detected_license": "MIT (text detected)"
+        },
+        {
+          "path": "flate/LICENSE",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 1918453,
+      "archive_sha256": "83d570ec7f189deaf87376ba4f36d2e981a0dc4f706bf4d84cf11cc4efb1a857"
+    },
+    {
+      "module": "github.com/asaskevich/govalidator",
+      "version": "v0.0.0-20230301143203-a9d515a09cc2",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/asaskevich/govalidator/@v/v0.0.0-20230301143203-a9d515a09cc2.zip",
+      "go_sum_expected": "h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=",
+      "go_sum_computed": "h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "e1a36eac3f3109d06869f57127cc32683f70a170dcefe5f143ee378ff313ddfe",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 75967,
+      "archive_sha256": "0f8ec67bbc585d29ec115c0885cef6f2431a422cc1cc10008e466ebe8be5dc37"
+    },
+    {
+      "module": "github.com/aymerick/douceur",
+      "version": "v0.2.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/aymerick/douceur/@v/v0.2.0.zip",
+      "go_sum_expected": "h1:Mv+mAeH1Q+n9Fr+oyamOlAkUNPWPlA8PPGR0QAaYuPk=",
+      "go_sum_computed": "h1:Mv+mAeH1Q+n9Fr+oyamOlAkUNPWPlA8PPGR0QAaYuPk=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "a91ec19456c4efb3d9fc22dc9c1ec60ec3701a9e8f4be511ebcf908c04288ffb",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 25606,
+      "archive_sha256": "dcbf69760cc1a8b32384495438e1086e4c3d669b2ebc0debd92e1865ffd6be60"
+    },
+    {
+      "module": "github.com/creack/pty",
+      "version": "v1.1.24",
+      "required_by": [
+        "go.mod",
+        "norma/go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/creack/pty/@v/v1.1.24.zip",
+      "go_sum_expected": "h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=",
+      "go_sum_computed": "h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "a2a1cea59d9c2d71908082f516f86bb560abf857646ecf69d70c121ead14aef4",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 40880,
+      "archive_sha256": "754e25253e76a5583b80d57d3add3afe68fc4d9f2a490968a9d1eda8c8fd8815"
+    },
+    {
+      "module": "github.com/davecgh/go-spew",
+      "version": "v1.1.2-0.20180830191138-d8f796af33cc",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/davecgh/go-spew/@v/v1.1.2-0.20180830191138-d8f796af33cc.zip",
+      "go_sum_expected": "h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=",
+      "go_sum_computed": "h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1b93a317849ee09d3d7e4f1d20c2b78ddb230b4becb12d7c224c927b9d470251",
+          "detected_license": "ISC-like (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 61763,
+      "archive_sha256": "b4d0923b169b194f0016ec46f3df1ab0c68e27999743e43fe2de59ecb2484128"
+    },
+    {
+      "module": "github.com/dustin/go-humanize",
+      "version": "v1.0.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/dustin/go-humanize/@v/v1.0.1.zip",
+      "go_sum_expected": "h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=",
+      "go_sum_computed": "h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "a973b4498c13eb74baa2a8e5c351426a6826f2fcdd909916dbe53ee2e755fd71",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 27015,
+      "archive_sha256": "319404ea84c8a4e2d3d83f30988b006e7dd04976de3e1a1a90484ad94679fa46"
+    },
+    {
+      "module": "github.com/gaissmai/bart",
+      "version": "v0.26.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/gaissmai/bart/@v/v0.26.0.zip",
+      "go_sum_expected": "h1:xOZ57E9hJLBiQaSyeZa9wgWhGuzfGACgqp4BE77OkO0=",
+      "go_sum_computed": "h1:xOZ57E9hJLBiQaSyeZa9wgWhGuzfGACgqp4BE77OkO0=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "12d27746d111da33969df0ecaa9b799e22c42db7d0b6a5164f383ec934233a41",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 2975997,
+      "archive_sha256": "c5a315028310afcc9b7fdecf16485e230e90f463a01b54b6a7598b6b8582c9c5"
+    },
+    {
+      "module": "github.com/golang-jwt/jwt/v5",
+      "version": "v5.3.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/golang-jwt/jwt/v5/@v/v5.3.1.zip",
+      "go_sum_expected": "h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=",
+      "go_sum_computed": "h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "fe26ca41577b9b2b4448050a24b25e5753af66b5d5945d5d36094e7790bfcb2f",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 91789,
+      "archive_sha256": "5c9a74494e2bc746cee56558b5473252af5767f7ea4044caa9ea0fa2a056fec7"
+    },
+    {
+      "module": "github.com/golang/groupcache",
+      "version": "v0.0.0-20210331224755-41bb18bfe9da",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/golang/groupcache/@v/v0.0.0-20210331224755-41bb18bfe9da.zip",
+      "go_sum_expected": "h1:oI5xCqsCo564l8iNU+DwB5epxmsaqB+rhGL0m5jtYqE=",
+      "go_sum_computed": "h1:oI5xCqsCo564l8iNU+DwB5epxmsaqB+rhGL0m5jtYqE=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68",
+          "detected_license": "Apache-2.0 (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 39744,
+      "archive_sha256": "b27034e8fc013627543e1ad098cfc65329f2896df3da5cf3266cc9166f93f3a5"
+    },
+    {
+      "module": "github.com/google/go-cmp",
+      "version": "v0.6.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/google/go-cmp/@v/v0.6.0.zip",
+      "go_sum_expected": "h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=",
+      "go_sum_computed": "h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "17b5d209ba8f9684257ecfcff87df6ceda6194143a8fbd074f29727cff6f0c40",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 129773,
+      "archive_sha256": "4b4e9bf6c48211080651b491dfb48d68b736c66a305bcf94605606e1ba2eaa4a"
+    },
+    {
+      "module": "github.com/google/pprof",
+      "version": "v0.0.0-20250317173921-a4b03ec1a45e",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/google/pprof/@v/v0.0.0-20250317173921-a4b03ec1a45e.zip",
+      "go_sum_expected": "h1:ijClszYn+mADRFY17kjQEVQ1XRhq2/JR1M3sGqeJoxs=",
+      "go_sum_computed": "h1:ijClszYn+mADRFY17kjQEVQ1XRhq2/JR1M3sGqeJoxs=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "detected_license": "Apache-2.0 (text detected)"
+        },
+        {
+          "path": "third_party/svgpan/LICENSE",
+          "sha256": "154c946c17de61ca71d28e13673d76a5798e6e25995a7397fbae157afc8f62b4",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 4897987,
+      "archive_sha256": "2d0380b1c63361352277152b8766c0af5d68c781c7b38395e5b31707453c9559"
+    },
+    {
+      "module": "github.com/google/uuid",
+      "version": "v1.6.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/google/uuid/@v/v1.6.0.zip",
+      "go_sum_expected": "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
+      "go_sum_computed": "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "0a8d61ed3cbfd5312326e8126c31ce9c627a283adc99131b56896d29ada04b2d",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 31981,
+      "archive_sha256": "d0f02f377217f42702e259684e06441edbf5140dddcc34ba9bea56038b38a6ed"
+    },
+    {
+      "module": "github.com/gorilla/css",
+      "version": "v1.0.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/gorilla/css/@v/v1.0.1.zip",
+      "go_sum_expected": "h1:ntNaBIghp6JmvWnxbZKANoLyuXTPZ4cAMlo6RyhlbO8=",
+      "go_sum_computed": "h1:ntNaBIghp6JmvWnxbZKANoLyuXTPZ4cAMlo6RyhlbO8=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "af11d643d903cb178a641d7512879285287844f7a6c0611e2d0c6b131e50188b",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 10972,
+      "archive_sha256": "870531962ce9787f8dfa2d7a5476be66e08a133c6c75155b20c551e7ac5bc25c"
+    },
+    {
+      "module": "github.com/gorilla/websocket",
+      "version": "v1.5.3",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/gorilla/websocket/@v/v1.5.3.zip",
+      "go_sum_expected": "h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=",
+      "go_sum_computed": "h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "2be1b548b0387ca8948e1bb9434e709126904d15f622cc2d0d8e7f186e4d122d",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 78401,
+      "archive_sha256": "dbbd31dd0f08548c5dc43e4c2f12bbba66abff5252b224b1cd06afbb72783a76"
+    },
+    {
+      "module": "github.com/hashicorp/golang-lru/v2",
+      "version": "v2.0.7",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/hashicorp/golang-lru/v2/@v/v2.0.7.zip",
+      "go_sum_expected": "h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=",
+      "go_sum_computed": "h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "6c7088eb877b5d7e6e0e9d27e822ea25fcda2e83f9eba59bb5f1418a656796e0",
+          "detected_license": "MPL-2.0 (text detected)"
+        },
+        {
+          "path": "simplelru/LICENSE_list",
+          "sha256": "6d462371baa8649492b06f51f154dba9b25d2ac9548369b8b4fdbbbb85f2f75d",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 29453,
+      "archive_sha256": "2eb92ff13970bccd460efae14255bfc03bb51474da0137e477a60f95561acc30"
+    },
+    {
+      "module": "github.com/hinshun/vt10x",
+      "version": "v0.0.0-20220301184237-5011da428d02",
+      "required_by": [
+        "go.mod",
+        "norma/go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/hinshun/vt10x/@v/v0.0.0-20220301184237-5011da428d02.zip",
+      "go_sum_expected": "h1:AgcIVYPa6XJnU3phs104wLj8l5GEththEw6+F79YsIY=",
+      "go_sum_computed": "h1:AgcIVYPa6XJnU3phs104wLj8l5GEththEw6+F79YsIY=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1607f32fc8a4d8c4e86cc570f2f23e7a5fd449a7c4e9c4bb2ad30a42b54e8de9",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 20674,
+      "archive_sha256": "2639b89ac731fb6acae569ec4aa87e0e458445e3db129cb199e47892abfca518"
+    },
+    {
+      "module": "github.com/jackc/pgpassfile",
+      "version": "v1.0.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/jackc/pgpassfile/@v/v1.0.0.zip",
+      "go_sum_expected": "h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=",
+      "go_sum_computed": "h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "adb1663fda031df8f4344aa68f299fd87d80353e31339406742ded21dae65702",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 4375,
+      "archive_sha256": "1cc79fb0b80f54b568afd3f4648dd1c349f746ad7c379df8d7f9e0eb1cac938b"
+    },
+    {
+      "module": "github.com/jackc/pgservicefile",
+      "version": "v0.0.0-20240606120523-5a60cdf6a761",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/jackc/pgservicefile/@v/v0.0.0-20240606120523-5a60cdf6a761.zip",
+      "go_sum_expected": "h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=",
+      "go_sum_computed": "h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "fc505773403fe869ed64cc2235cdd13988a427bb7e3a7e7004a3f4b27420f8fc",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 4880,
+      "archive_sha256": "c9e31c91aebf96eb246bd410d1849cc7666d955a1e20ca2eba1c30b4eb89335f"
+    },
+    {
+      "module": "github.com/jackc/pgx/v5",
+      "version": "v5.10.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/jackc/pgx/v5/@v/v5.10.0.zip",
+      "go_sum_expected": "h1:VhSvgU2jSli8o3AqIEOTJr7rZwAEUVo4E4XhR94Zfr0=",
+      "go_sum_computed": "h1:VhSvgU2jSli8o3AqIEOTJr7rZwAEUVo4E4XhR94Zfr0=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "467f95e074fe23079a5623ed652619682692041b8551da27e3c2ddb9659a1507",
+          "detected_license": "MIT (text detected)"
+        },
+        {
+          "path": "pgproto3/notice_response.go",
+          "sha256": "4b9071daf5f9975eb936c370200709bb7433862c5d4a32d21db65620133f4a8e",
+          "detected_license": "unclassified notice; manual review required"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 602168,
+      "archive_sha256": "bfc29f3326851fb4fc12bfa5678ea804e09ef01810948688e49dae3c62d23359"
+    },
+    {
+      "module": "github.com/jackc/puddle/v2",
+      "version": "v2.2.2",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/jackc/puddle/v2/@v/v2.2.2.zip",
+      "go_sum_expected": "h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo=",
+      "go_sum_computed": "h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "2d50e98a4900b4d6457a38d39c1432fdc156fc2f7b365f2e33ec9344acbb0057",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 24095,
+      "archive_sha256": "f1f0789098a0bcb5ff3c7024f9ee387a6748446e1bc6713b13a63d763a9fb11e"
+    },
+    {
+      "module": "github.com/klauspost/compress",
+      "version": "v1.18.6",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/klauspost/compress/@v/v1.18.6.zip",
+      "go_sum_expected": "h1:2jupLlAwFm95+YDR+NwD2MEfFO9d4z4Prjl1XXDjuao=",
+      "go_sum_computed": "h1:2jupLlAwFm95+YDR+NwD2MEfFO9d4z4Prjl1XXDjuao=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "0d9e582ee4bff57bf1189c9e514e6da7ce277f9cd3bc2d488b22fbb39a6d87cf",
+          "detected_license": "Apache-2.0 (text detected)"
+        },
+        {
+          "path": "gzhttp/LICENSE",
+          "sha256": "2252a5b1e2b1d3663b53ea77051b8ed065cb9270a3d1174d5d6ead8a2de051b6",
+          "detected_license": "Apache-2.0 (text detected)"
+        },
+        {
+          "path": "internal/lz4ref/LICENSE",
+          "sha256": "6a358d2540ca14048f02d366f23787c0a480157e58f058113f0e27168dd4e447",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "internal/snapref/LICENSE",
+          "sha256": "f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "s2/LICENSE",
+          "sha256": "08683b14bda8ae3538abf19e1879e853a39e3b8276a8d673363b529d15a61c1a",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "s2/cmd/internal/filepathx/LICENSE",
+          "sha256": "8582c87d9a6baa28f7827c5205b7d16c3179bc794ebd4c7cc287c49a89b7eaa1",
+          "detected_license": "MIT (text detected)"
+        },
+        {
+          "path": "s2/cmd/internal/readahead/LICENSE",
+          "sha256": "10fa24a602fde465db603cd5d546e37e33642a73cd24ddf5910be81724fec8b2",
+          "detected_license": "MIT (text detected)"
+        },
+        {
+          "path": "snappy/LICENSE",
+          "sha256": "f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "snappy/xerial/LICENSE",
+          "sha256": "d4ff111fa30ac75e28dca3868de957a3b73ff50b76bc4b8fe5c3a1f008d26703",
+          "detected_license": "MIT (text detected)"
+        },
+        {
+          "path": "zstd/internal/xxhash/LICENSE.txt",
+          "sha256": "f566a9f97bacdaf00d9f21dd991e81dc11201c4e016c86b470799429a1c9a79c",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 39201205,
+      "archive_sha256": "61b417d2d3b6b7f5b5f4179f311fb156bd5bcea040353150c41111dc1777f11a"
+    },
+    {
+      "module": "github.com/kr/pretty",
+      "version": "v0.3.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/kr/pretty/@v/v0.3.1.zip",
+      "go_sum_expected": "h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=",
+      "go_sum_computed": "h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "License",
+          "sha256": "283c28b781bc7487bd7bcaf453cbd811f5ee8d7ce625cfcf8dcacae6ba1f4bb5",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 13388,
+      "archive_sha256": "ecf5a4af24826c3ad758ce06410ca08e2d58e4d95053be3b9dde2e14852c0cdc"
+    },
+    {
+      "module": "github.com/kr/text",
+      "version": "v0.2.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/kr/text/@v/v0.2.0.zip",
+      "go_sum_expected": "h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=",
+      "go_sum_computed": "h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "License",
+          "sha256": "283c28b781bc7487bd7bcaf453cbd811f5ee8d7ce625cfcf8dcacae6ba1f4bb5",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 12607,
+      "archive_sha256": "368eb318f91a5b67be905c47032ab5c31a1d49a97848b1011a0d0a2122b30ba4"
+    },
+    {
+      "module": "github.com/lqqyt2423/go-mitmproxy",
+      "version": "v1.9.2",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/lqqyt2423/go-mitmproxy/@v/v1.9.2.zip",
+      "go_sum_expected": "h1:+QTbDyUUaVRmEavPq0/eWzJ2K+K4JdL4ff91s/adnxk=",
+      "go_sum_computed": "h1:+QTbDyUUaVRmEavPq0/eWzJ2K+K4JdL4ff91s/adnxk=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1d5e311691f3108308407de750d28e63799c863af9b4390343bfdecdb1c49796",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 2307179,
+      "archive_sha256": "0abd197455a47fc6045176cb29727959e51686de62d8bcd09be000236c3744d2"
+    },
+    {
+      "module": "github.com/mattn/go-isatty",
+      "version": "v0.0.20",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/mattn/go-isatty/@v/v0.0.20.zip",
+      "go_sum_expected": "h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=",
+      "go_sum_computed": "h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "08eab1118c80885fa1fa6a6dd7303f65a379fcb3733e063d20d1bbc2c76e6fa1",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 8936,
+      "archive_sha256": "f2d5f89ca451577e17464b9bb596dc0d0ecececb5eaa63622c41b57cd0b7b8cc"
+    },
+    {
+      "module": "github.com/microcosm-cc/bluemonday",
+      "version": "v1.0.27",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/microcosm-cc/bluemonday/@v/v1.0.27.zip",
+      "go_sum_expected": "h1:MpEUotklkwCSLeH+Qdx1VJgNqLlpY2KXwXFM08ygZfk=",
+      "go_sum_computed": "h1:MpEUotklkwCSLeH+Qdx1VJgNqLlpY2KXwXFM08ygZfk=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "a8e8489f1168b5f3e0ebb43d7fe1c78a2fd7db9939c1a6cb555940a4b631f8d2",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 182626,
+      "archive_sha256": "dbbc62b06600331e29a4d453b8b3e95b1ba48e50baddfd981a3825f8d0043011"
+    },
+    {
+      "module": "github.com/miekg/dns",
+      "version": "v1.1.72",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/miekg/dns/@v/v1.1.72.zip",
+      "go_sum_expected": "h1:vhmr+TF2A3tuoGNkLDFK9zi36F2LS+hKTRW0Uf8kbzI=",
+      "go_sum_computed": "h1:vhmr+TF2A3tuoGNkLDFK9zi36F2LS+hKTRW0Uf8kbzI=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "COPYRIGHT",
+          "sha256": "66550c0ad5ca7ec1e08683e5f872cc45c741f311eee3b8ee484206ecbf9c740d",
+          "detected_license": "unclassified notice; manual review required"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "f200ff9bad73385db2ed81e23ee2c1fe069eb5776e17fae4ee85ad0a9e1361a5",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 260654,
+      "archive_sha256": "092608d919335ff22154862c59abe8b4d651be3ef0b75d22001a07c03106a3b6"
+    },
+    {
+      "module": "github.com/ncruces/go-strftime",
+      "version": "v1.0.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/ncruces/go-strftime/@v/v1.0.0.zip",
+      "go_sum_expected": "h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=",
+      "go_sum_computed": "h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "38ae43959daf953a393a585b2988672cb65a5a541aca0d0be5e72595a0a16883",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 16160,
+      "archive_sha256": "c1a7e718dbf5f779e9fc98b7354ed4d98de2949b83b65837c429b4b2c8c27686"
+    },
+    {
+      "module": "github.com/pkg/errors",
+      "version": "v0.9.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/pkg/errors/@v/v0.9.1.zip",
+      "go_sum_expected": "h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=",
+      "go_sum_computed": "h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "8d427fd87bc9579ea368fde3d49f9ca22eac857f91a9dec7e3004bdfab7dee86",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 17866,
+      "archive_sha256": "d4c36b8bcd0616290a3913215e0f53b931bd6e00670596f2960df1b44af2bd07"
+    },
+    {
+      "module": "github.com/pmezard/go-difflib",
+      "version": "v1.0.1-0.20181226105442-5d4384ee4fb2",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/pmezard/go-difflib/@v/v1.0.1-0.20181226105442-5d4384ee4fb2.zip",
+      "go_sum_expected": "h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=",
+      "go_sum_computed": "h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "2eb550be6801c1ea434feba53bf6d12e7c71c90253e0a9de4a4f46cf88b56477",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 12506,
+      "archive_sha256": "24ff45e356f638a53bd0c89fff961fbeaecfdb0dc5e482ceed0a2230e0e5f3b7"
+    },
+    {
+      "module": "github.com/projectdiscovery/blackrock",
+      "version": "v0.0.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/projectdiscovery/blackrock/@v/v0.0.1.zip",
+      "go_sum_expected": "h1:lHQqhaaEFjgf5WkuItbpeCZv2DUIE45k0VbGJyft6LQ=",
+      "go_sum_computed": "h1:lHQqhaaEFjgf5WkuItbpeCZv2DUIE45k0VbGJyft6LQ=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "ff44b937d537916a91459c8932f57a8b31b545410f7b0e7f640821523cda7f3f",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 7270,
+      "archive_sha256": "7611b90b7b163c19a4eef6c1ebeb511d13d7fb6dd2d28e41d07326399dcddac4"
+    },
+    {
+      "module": "github.com/projectdiscovery/cdncheck",
+      "version": "v1.2.13",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/projectdiscovery/cdncheck/@v/v1.2.13.zip",
+      "go_sum_expected": "h1:6zs4Mn8JV3yKyMoAr857Hf2NLvyOMpOfqCCT2V2OI1Q=",
+      "go_sum_computed": "h1:6zs4Mn8JV3yKyMoAr857Hf2NLvyOMpOfqCCT2V2OI1Q=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "cbcdaab87df3175107aa28915bd253cebdd618a49c9ac5d6c669c0b1cbebcacb",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 607862,
+      "archive_sha256": "d30a1324aa59dc30eb998dd090a060a7048631519887225f664a8002621efc7f"
+    },
+    {
+      "module": "github.com/projectdiscovery/dnsx",
+      "version": "v1.2.3",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/projectdiscovery/dnsx/@v/v1.2.3.zip",
+      "go_sum_expected": "h1:S87U9kYuuqqvMFyen8mZQy1FMuR5EGCsXHqfHPQAeuc=",
+      "go_sum_computed": "h1:S87U9kYuuqqvMFyen8mZQy1FMuR5EGCsXHqfHPQAeuc=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "cbcdaab87df3175107aa28915bd253cebdd618a49c9ac5d6c669c0b1cbebcacb",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 337141,
+      "archive_sha256": "c7084c067796442d07a52545d1e9c2e849e3fdda57bf75b8ae8a5af71da72bb2"
+    },
+    {
+      "module": "github.com/projectdiscovery/retryabledns",
+      "version": "v1.0.111",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/projectdiscovery/retryabledns/@v/v1.0.111.zip",
+      "go_sum_expected": "h1:iyMdCDgNmaSRJYcGqB+SLlvlw9WijlbJ6Q9OEpRAWsQ=",
+      "go_sum_computed": "h1:iyMdCDgNmaSRJYcGqB+SLlvlw9WijlbJ6Q9OEpRAWsQ=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "cbcdaab87df3175107aa28915bd253cebdd618a49c9ac5d6c669c0b1cbebcacb",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 37499,
+      "archive_sha256": "dc8c859a58d2c9fc4a628f6b6c82540d02ecfe5d658ed2046304005da3cbcb33"
+    },
+    {
+      "module": "github.com/projectdiscovery/utils",
+      "version": "v0.7.3",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/projectdiscovery/utils/@v/v0.7.3.zip",
+      "go_sum_expected": "h1:kX+77AA58yK6EZgkTRJEnK9V/7AZYzlXdcu/o/kJhFs=",
+      "go_sum_computed": "h1:kX+77AA58yK6EZgkTRJEnK9V/7AZYzlXdcu/o/kJhFs=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "cf01ad0ba33613c4264877a365428678451a48135f2e6560a8b1e7ac3b7dd67a",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 325022,
+      "archive_sha256": "55cf73fe046fad3e2c77db5eb0465c25e14b405b0c73faded972e2bcb64c8982"
+    },
+    {
+      "module": "github.com/remyoudompheng/bigfft",
+      "version": "v0.0.0-20230129092748-24d4a6f8daec",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/remyoudompheng/bigfft/@v/v0.0.0-20230129092748-24d4a6f8daec.zip",
+      "go_sum_expected": "h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=",
+      "go_sum_computed": "h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 20779,
+      "archive_sha256": "9be16c32c384d55d0f7bd7b03f1ff1e9a4e4b91b000f0aa87a567a01b9b82398"
+    },
+    {
+      "module": "github.com/rogpeppe/go-internal",
+      "version": "v1.12.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/rogpeppe/go-internal/@v/v1.12.0.zip",
+      "go_sum_expected": "h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=",
+      "go_sum_computed": "h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "4835612df0098ca95f8e7d9e3bffcb02358d435dbb38057c844c99d7f725eb20",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 190596,
+      "archive_sha256": "d4539e716c2b7f2824584e4c4a17f64c508bd6e5359106a406a7e23e77109cde"
+    },
+    {
+      "module": "github.com/saintfish/chardet",
+      "version": "v0.0.0-20230101081208-5e3ef4b5456d",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/saintfish/chardet/@v/v0.0.0-20230101081208-5e3ef4b5456d.zip",
+      "go_sum_expected": "h1:hrujxIzL1woJ7AwssoOcM/tq5JjjG2yYOc8odClEiXA=",
+      "go_sum_computed": "h1:hrujxIzL1woJ7AwssoOcM/tq5JjjG2yYOc8odClEiXA=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "44699611628b82dec802229cd039c401b6df44808eeb5dc873698255a0642d04",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 280424,
+      "archive_sha256": "dcce23e5f3e31bca9fbb5da5f704b55e4bd3c447ecccbc3ba508c5d4ba0e9d74"
+    },
+    {
+      "module": "github.com/satori/go.uuid",
+      "version": "v1.2.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/satori/go.uuid/@v/v1.2.0.zip",
+      "go_sum_expected": "h1:0uYX9dsZ2yD7q2RtLRtPSdGDWzjeM3TbMJP9utgA0ww=",
+      "go_sum_computed": "h1:0uYX9dsZ2yD7q2RtLRtPSdGDWzjeM3TbMJP9utgA0ww=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "92a328e1d5f3269b42e2ce32b4494eafdb3132f204a911c5c95cf3d8465490e4",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 16598,
+      "archive_sha256": "4f741306a0cbe97581e34a638531bcafe3c2848150539a2ec2ba12c5e3e6cbdd"
+    },
+    {
+      "module": "github.com/sirupsen/logrus",
+      "version": "v1.9.4",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/sirupsen/logrus/@v/v1.9.4.zip",
+      "go_sum_expected": "h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w=",
+      "go_sum_computed": "h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "51a0c9ec7f8b7634181b8d4c03e5b5d204ac21d6e72f46c313973424664b2e6b",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 70579,
+      "archive_sha256": "3847d00c5ee6948f1ff0d0120bc343c55ce852becb7720f8f08f53eecfe9e437"
+    },
+    {
+      "module": "github.com/stretchr/testify",
+      "version": "v1.11.1",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/stretchr/testify/@v/v1.11.1.zip",
+      "go_sum_expected": "h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=",
+      "go_sum_computed": "h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "f8e536c1c7b695810427095dc85f5f80d44ff7c10535e8a9486cf393e2599189",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 134860,
+      "archive_sha256": "b7325b561ead5304b72b9f32aebc871ff49b3823667d530a49fd6c8f3adfc96e"
+    },
+    {
+      "module": "github.com/tidwall/gjson",
+      "version": "v1.18.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/tidwall/gjson/@v/v1.18.0.zip",
+      "go_sum_expected": "h1:FIDeeyB800efLX89e5a8Y0BNH+LOngJyGrIWxG2FKQY=",
+      "go_sum_computed": "h1:FIDeeyB800efLX89e5a8Y0BNH+LOngJyGrIWxG2FKQY=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "be83ad53208d03a9fe08c7fac231cabf79422989ef5706bff217bd35104ebf07",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 78914,
+      "archive_sha256": "ab8092b3e42f83f003466757c63ec819a45d1e83caa63c6c131cebbe760f1df2"
+    },
+    {
+      "module": "github.com/tidwall/match",
+      "version": "v1.2.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/tidwall/match/@v/v1.2.0.zip",
+      "go_sum_expected": "h1:0pt8FlkOwjN2fPt4bIl4BoNxb98gGHN2ObFEDkrfZnM=",
+      "go_sum_computed": "h1:0pt8FlkOwjN2fPt4bIl4BoNxb98gGHN2ObFEDkrfZnM=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "be83ad53208d03a9fe08c7fac231cabf79422989ef5706bff217bd35104ebf07",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 7160,
+      "archive_sha256": "f35502f3dd450fa84ddc7b028310f7fecc86c8112f2397fe7ff7941c5afbcbc1"
+    },
+    {
+      "module": "github.com/tidwall/pretty",
+      "version": "v1.2.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/tidwall/pretty/@v/v1.2.1.zip",
+      "go_sum_expected": "h1:qjsOFOWWQl+N3RsoF5/ssm1pHmJJwhjlSbZ51I6wMl4=",
+      "go_sum_computed": "h1:qjsOFOWWQl+N3RsoF5/ssm1pHmJJwhjlSbZ51I6wMl4=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "0ca70311227fe097c662dece3f359e3317fa7f9d41f8d29eb45fc5135e216139",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 12501,
+      "archive_sha256": "9327579bf9e610de753eeb7c35c8cf1e3f56e6e5623cbf65e47bc8076023d1ab"
+    },
+    {
+      "module": "github.com/weppos/publicsuffix-go",
+      "version": "v0.40.3-0.20250408071509-6074bbe7fd39",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/weppos/publicsuffix-go/@v/v0.40.3-0.20250408071509-6074bbe7fd39.zip",
+      "go_sum_expected": "h1:Bz/zVM/LoGZ9IztGBHrq2zlFQQbEG8dBYnxb4hamIHM=",
+      "go_sum_computed": "h1:Bz/zVM/LoGZ9IztGBHrq2zlFQQbEG8dBYnxb4hamIHM=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.txt",
+          "sha256": "bf1b7d630f74209e9cc8cc6eb4136ae6e3f6d22d10ccb6e49d248e17870a4937",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 75788,
+      "archive_sha256": "c56b06f5bc3a2673bc5e56133b23316e6471ef6edadadc7e981c489ef1882a96"
+    },
+    {
+      "module": "github.com/xyproto/randomstring",
+      "version": "v1.0.5",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/github.com/xyproto/randomstring/@v/v1.0.5.zip",
+      "go_sum_expected": "h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZqKjWU=",
+      "go_sum_computed": "h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZqKjWU=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "600fd527a502cc31df79186bf50db4ed680ec5f57e4ac628e54cbfaa4c8140f2",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 4537,
+      "archive_sha256": "58ea0c70496fc698c4597625395b3f35321df09be013ee880a6ce10e94969261"
+    },
+    {
+      "module": "go.uber.org/atomic",
+      "version": "v1.11.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/go.uber.org/atomic/@v/v1.11.0.zip",
+      "go_sum_expected": "h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=",
+      "go_sum_computed": "h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.txt",
+          "sha256": "edbb5a4d165ac69376c765b551c0662ff42bea87e1f1eda85f42ac90c34b09d0",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 77346,
+      "archive_sha256": "8109325abe17488245878b07f3c35b10ba7d1aa3310f792968f5b9deba432e2c"
+    },
+    {
+      "module": "go.uber.org/multierr",
+      "version": "v1.11.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/go.uber.org/multierr/@v/v1.11.0.zip",
+      "go_sum_expected": "h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=",
+      "go_sum_computed": "h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE.txt",
+          "sha256": "dcdabe03bef2382a130640d1c3a4cd5ec42aba1035095c38272fde694eb72405",
+          "detected_license": "MIT (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 25681,
+      "archive_sha256": "2249b5d2fdce61f6ee661a679d8552599af084a761cbbc871da77641bddce0c3"
+    },
+    {
+      "module": "golang.org/x/crypto",
+      "version": "v0.55.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/crypto/@v/v0.55.0.zip",
+      "go_sum_expected": "h1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=",
+      "go_sum_computed": "h1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 2309586,
+      "archive_sha256": "0660bba47b3643fe1beb1b97af93b6a4d2bf2ed069d9e52a2b1bdf6f17cf3e79"
+    },
+    {
+      "module": "golang.org/x/exp",
+      "version": "v0.0.0-20250106191152-7588d65b2ba8",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/exp/@v/v0.0.0-20250106191152-7588d65b2ba8.zip",
+      "go_sum_expected": "h1:yqrTHse8TCMW1M1ZCP+VAR/l0kKxwaAIqN/il7x4voA=",
+      "go_sum_computed": "h1:yqrTHse8TCMW1M1ZCP+VAR/l0kKxwaAIqN/il7x4voA=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 616546,
+      "archive_sha256": "a372f9dac9e54b8c526d9f79f32a282f192b9d492fa46fa05bd4787eb84c2c9b"
+    },
+    {
+      "module": "golang.org/x/mod",
+      "version": "v0.40.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/mod/@v/v0.40.0.zip",
+      "go_sum_expected": "h1:hUv+3cXcdRHz08UmSiOob7sadHig73uo5bkXxQ/tvUs=",
+      "go_sum_computed": "h1:hUv+3cXcdRHz08UmSiOob7sadHig73uo5bkXxQ/tvUs=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 180463,
+      "archive_sha256": "a191080b1494c194059ae71aa1d300741a8e24dfb6e28cd32580dbdcc52a0598"
+    },
+    {
+      "module": "golang.org/x/net",
+      "version": "v0.55.0",
+      "required_by": [
+        "norma/go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/net/@v/v0.55.0.zip",
+      "go_sum_expected": "h1:bcvxaJn3e1U6InsFWt1JUq1aSjnRxLzT2rtD2KfkDF8=",
+      "go_sum_computed": "h1:bcvxaJn3e1U6InsFWt1JUq1aSjnRxLzT2rtD2KfkDF8=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 1759943,
+      "archive_sha256": "21c29cd58b7a02de60a3cb5122d8f59bc3c96d4750f9c1bb77a270a64eb42e61"
+    },
+    {
+      "module": "golang.org/x/net",
+      "version": "v0.58.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/net/@v/v0.58.0.zip",
+      "go_sum_expected": "h1:ynWG7rqYi4ccpTEuPZ2QGWHktVEM9DMCj9yzDE0Q7To=",
+      "go_sum_computed": "h1:ynWG7rqYi4ccpTEuPZ2QGWHktVEM9DMCj9yzDE0Q7To=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 1927911,
+      "archive_sha256": "aa78bbf8d55db3e6995630165e2bcd7dce6d0b8831c166fa03b80ac94fb650e7"
+    },
+    {
+      "module": "golang.org/x/sync",
+      "version": "v0.22.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/sync/@v/v0.22.0.zip",
+      "go_sum_expected": "h1:SZjpbeLmrCk4xhRSZFNZW5gFUeCeFgjekvI/+gfScek=",
+      "go_sum_computed": "h1:SZjpbeLmrCk4xhRSZFNZW5gFUeCeFgjekvI/+gfScek=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 25790,
+      "archive_sha256": "4bc67d258ce7867cfc1a43765c43d98b4c49b90c46dd0b86f896a5a4909fade0"
+    },
+    {
+      "module": "golang.org/x/sys",
+      "version": "v0.47.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/sys/@v/v0.47.0.zip",
+      "go_sum_expected": "h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=",
+      "go_sum_computed": "h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 2022425,
+      "archive_sha256": "cdac013ddced0262926ec29ffcda645da39670e61c7e5b761e572b6b1809bb1b"
+    },
+    {
+      "module": "golang.org/x/text",
+      "version": "v0.41.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/text/@v/v0.41.0.zip",
+      "go_sum_expected": "h1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=",
+      "go_sum_computed": "h1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 7336337,
+      "archive_sha256": "e63f35daaae749d0ffff97a295ad8f4837a662938a46b7a87f18a88e85a5cbf9"
+    },
+    {
+      "module": "golang.org/x/tools",
+      "version": "v0.49.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/golang.org/x/tools/@v/v0.49.0.zip",
+      "go_sum_expected": "h1:3NI7VXzL9+1WZD52Dx2ttoPwD5DWrFGpl9mFZDlmisI=",
+      "go_sum_computed": "h1:3NI7VXzL9+1WZD52Dx2ttoPwD5DWrFGpl9mFZDlmisI=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "copyright/copyright.go",
+          "sha256": "baba6d0b0c166373f5691e3982176d15519c6150bc9ead641b89366670618bf0",
+          "detected_license": "unclassified notice; manual review required"
+        },
+        {
+          "path": "copyright/copyright_test.go",
+          "sha256": "4496ed3ad571fb90f8abd650c6973565c834d650cff2d2c57cb970ff462dc4bf",
+          "detected_license": "unclassified notice; manual review required"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 2836351,
+      "archive_sha256": "babd2d5a0ccf4eac49b6c9785be2b9e39b261097ad8b8a6b92578b9f248703d5"
+    },
+    {
+      "module": "gopkg.in/check.v1",
+      "version": "v0.0.0-20161208181325-20d25e280405",
+      "required_by": [
+        "checksum-only:norma/go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/gopkg.in/check.v1/@v/v0.0.0-20161208181325-20d25e280405.zip",
+      "go_sum_expected": "h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=",
+      "go_sum_computed": "h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "69ce77f2b1c9c608d27f2d749b0e7d0c13960ed3b0dc07b973ac940e362e5d9c",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 39844,
+      "archive_sha256": "4e1817f964ca34e545b81afda0325a5e89cf58de2e413d8207c0afddd0fdc15c"
+    },
+    {
+      "module": "gopkg.in/check.v1",
+      "version": "v1.0.0-20201130134442-10cb98267c6c",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/gopkg.in/check.v1/@v/v1.0.0-20201130134442-10cb98267c6c.zip",
+      "go_sum_expected": "h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=",
+      "go_sum_computed": "h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "69ce77f2b1c9c608d27f2d749b0e7d0c13960ed3b0dc07b973ac940e362e5d9c",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 42835,
+      "archive_sha256": "f555684e5c5dacc2850dddb345fef1b8f93f546b72685589789da6d2b062710e"
+    },
+    {
+      "module": "gopkg.in/yaml.v3",
+      "version": "v3.0.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/gopkg.in/yaml.v3/@v/v3.0.1.zip",
+      "go_sum_expected": "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=",
+      "go_sum_computed": "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b",
+          "detected_license": "Apache-2.0 (text detected)"
+        },
+        {
+          "path": "NOTICE",
+          "sha256": "f6c2dd3a67b576eafb89b80200b8b1627230bf3821a0c14cb99a22ac19107d00",
+          "detected_license": "Apache-2.0 (text detected)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 104623,
+      "archive_sha256": "aab8fbc4e6300ea08e6afe1caea18a21c90c79f489f52c53e2f20431f1a9a015"
+    },
+    {
+      "module": "modernc.org/cc/v4",
+      "version": "v4.28.2",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/cc/v4/@v/v4.28.2.zip",
+      "go_sum_expected": "h1:3tQ0lf2ADtoby2EtSP+J7IE2SHwEJdP8ioR59wx7XpY=",
+      "go_sum_computed": "h1:3tQ0lf2ADtoby2EtSP+J7IE2SHwEJdP8ioR59wx7XpY=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1c77905db36f407e0fdb513f97f1f2a3f2282049ca273637841face982d5d003",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "testdata/jhjourdan/LICENSE",
+          "sha256": "f4e673d9ef995ee5da2c7a08e5ad9aea5d899be917618b7367c3a748c53b6c63",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 235052,
+      "archive_sha256": "a84e577e1f69a068cf573d8a92946cd431f92523a00ccf56d160b06a8e54650a"
+    },
+    {
+      "module": "modernc.org/ccgo/v4",
+      "version": "v4.34.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/ccgo/v4/@v/v4.34.0.zip",
+      "go_sum_expected": "h1:yRLPFZieg532OT4rp4JFNIVcquwalMX26G95WQDqwCQ=",
+      "go_sum_computed": "h1:yRLPFZieg532OT4rp4JFNIVcquwalMX26G95WQDqwCQ=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "343748b20da2ceb739c1ab7b85fe16f6fe4b67fad88fea40c5835a08383d8ffe",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 838111,
+      "archive_sha256": "923e7409fe06445e001e1aedd93e172ee9a201155677317eb248ece8f6478dec"
+    },
+    {
+      "module": "modernc.org/fileutil",
+      "version": "v1.4.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/fileutil/@v/v1.4.0.zip",
+      "go_sum_expected": "h1:j6ZzNTftVS054gi281TyLjHPp6CPHr2KCxEXjEbD6SM=",
+      "go_sum_computed": "h1:j6ZzNTftVS054gi281TyLjHPp6CPHr2KCxEXjEbD6SM=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "7dc07397727fc500d5ce768d724e4d555eee8fb7687f421fd40d72249868b0ca",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "falloc/LICENSE",
+          "sha256": "078134734db24112b59bcfd4ce3462e2d167471e5a11a69911785e881fc92c86",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "hdb/LICENSE",
+          "sha256": "078134734db24112b59bcfd4ce3462e2d167471e5a11a69911785e881fc92c86",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "storage/LICENSE",
+          "sha256": "078134734db24112b59bcfd4ce3462e2d167471e5a11a69911785e881fc92c86",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 58134,
+      "archive_sha256": "521c4c8778420b7cf8e72cc3e7dea296989bf651fde511e6919939af8424b6c3"
+    },
+    {
+      "module": "modernc.org/gc/v2",
+      "version": "v2.6.5",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/gc/v2/@v/v2.6.5.zip",
+      "go_sum_expected": "h1:nyqdV8q46KvTpZlsw66kWqwXRHdjIlJOhG6kxiV/9xI=",
+      "go_sum_computed": "h1:nyqdV8q46KvTpZlsw66kWqwXRHdjIlJOhG6kxiV/9xI=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "4719790df5e9d33b1cef3a67df8264fb1e3e7f54f3ca900c562e84a951de62d9",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 67405,
+      "archive_sha256": "81acefe8212e783eaca4d33554acce0ee60b3ce060071f96047b922e1214e2f5"
+    },
+    {
+      "module": "modernc.org/gc/v3",
+      "version": "v3.1.2",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/gc/v3/@v/v3.1.2.zip",
+      "go_sum_expected": "h1:ZtDCnhonXSZexk/AYsegNRV1lJGgaNZJuKjJSWKyEqo=",
+      "go_sum_computed": "h1:ZtDCnhonXSZexk/AYsegNRV1lJGgaNZJuKjJSWKyEqo=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "4719790df5e9d33b1cef3a67df8264fb1e3e7f54f3ca900c562e84a951de62d9",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 463020,
+      "archive_sha256": "a7127995cf97a71ada73821b6aa2259d567dfcf14809d0251f905c1ca90808eb"
+    },
+    {
+      "module": "modernc.org/goabi0",
+      "version": "v0.2.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/goabi0/@v/v0.2.0.zip",
+      "go_sum_expected": "h1:HvEowk7LxcPd0eq6mVOAEMai46V+i7Jrj13t4AzuNks=",
+      "go_sum_computed": "h1:HvEowk7LxcPd0eq6mVOAEMai46V+i7Jrj13t4AzuNks=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "6d33428c98f9d7113dfc86e17fca00f81aeaac33e02f79c8a5afafb0a5fd33c6",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 19271,
+      "archive_sha256": "b6f4bb78a21d826d1c4933a3ea4c8b9939a61391c289aeb45f5f53929ab9827a"
+    },
+    {
+      "module": "modernc.org/libc",
+      "version": "v1.72.3",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/libc/@v/v1.72.3.zip",
+      "go_sum_expected": "h1:ZnDF4tXn4NBXFutMMQC4vtbTFSXhhKzR73fv0beZEAU=",
+      "go_sum_computed": "h1:ZnDF4tXn4NBXFutMMQC4vtbTFSXhhKzR73fv0beZEAU=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "95ff867eb55a56935fa7492406cfa953fb7c13ca73f4c0a86ae05756b4605600",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "LICENSE-3RD-PARTY.md",
+          "sha256": "f597097efe3d97021f89170746bd3a0fb9a8b6fb26b82043ed68a4e0283bee6c",
+          "detected_license": "MIT (text detected)"
+        },
+        {
+          "path": "testdata/nsz.repo.hu/libc-test/COPYRIGHT",
+          "sha256": "41b8f2e2706012eb534f89e72ff547308cb81dcb9acf077c40a9058a7c06088d",
+          "detected_license": "MIT (text detected)"
+        },
+        {
+          "path": "testdata/nsz.repo.hu/libc-test/src/math/crlibm/COPYING",
+          "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+          "detected_license": "GPL (text detected; inspect version/exception)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 18202473,
+      "archive_sha256": "02838cde09ce990d0fbf9e8b3157e2e0220ac52218edff41ead392b25a781d67"
+    },
+    {
+      "module": "modernc.org/mathutil",
+      "version": "v1.7.1",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/mathutil/@v/v1.7.1.zip",
+      "go_sum_expected": "h1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=",
+      "go_sum_computed": "h1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "bfa9bf72a72ca009fd62a8f84fca3dca67e51d93af96352723646599898b6cf5",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "mersenne/LICENSE",
+          "sha256": "c05630f9ca899ea094620d37daea6ba66f99adbf9268ea5fea9db607e1102bd9",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 133068,
+      "archive_sha256": "5be0da18eb557a1198bfe370e37022f2dbdb9cdc5d63130fc8e8330ab240bd2e"
+    },
+    {
+      "module": "modernc.org/memory",
+      "version": "v1.11.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/memory/@v/v1.11.0.zip",
+      "go_sum_expected": "h1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=",
+      "go_sum_computed": "h1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "59895e669f48f168b6b858358f6005779cdf40a265f7828813061b56af67b496",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "LICENSE-GO",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        },
+        {
+          "path": "LICENSE-LOGO",
+          "sha256": "5ae5bee3072a841376451b48d8cfcec7188e10543926d5870828d36c8a750dc5",
+          "detected_license": "unclassified notice; manual review required"
+        },
+        {
+          "path": "LICENSE-MMAP-GO",
+          "sha256": "c2eba69f20d05414538c3a5df7694dde392e065ff70882e1625e90f5d6659fff",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 29241,
+      "archive_sha256": "4930b81d10818a6d11497204fe06b2edc359136a7881586363caa694c8607d0c"
+    },
+    {
+      "module": "modernc.org/opt",
+      "version": "v0.2.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/opt/@v/v0.2.0.zip",
+      "go_sum_expected": "h1:tGyef5ApycA7FSEOMraay9SaTk5zmbx7Tu+cJs4QKZg=",
+      "go_sum_computed": "h1:tGyef5ApycA7FSEOMraay9SaTk5zmbx7Tu+cJs4QKZg=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "7a0dd90f1d1c8fa80d03c1806bdd8e4dca7285fae9b4a34f2c4a8a2552fdd77c",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 6194,
+      "archive_sha256": "e8629d448ebc94f7143c5ff3fb981a099a5ea173958770f4b9a36b27c27eec43"
+    },
+    {
+      "module": "modernc.org/sortutil",
+      "version": "v1.2.1",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/sortutil/@v/v1.2.1.zip",
+      "go_sum_expected": "h1:+xyoGf15mM3NMlPDnFqrteY07klSFxLElE2PVuWIJ7w=",
+      "go_sum_computed": "h1:+xyoGf15mM3NMlPDnFqrteY07klSFxLElE2PVuWIJ7w=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "7bc9df688c16dd8e64463ec0ad66728730a0e1a70a1dbda3dcbcd8a9b45bfaab",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 8811,
+      "archive_sha256": "9e1de659d552156ce018f31eb88ff879d82c406fd4746b9a1131e0f89c6d1ee1"
+    },
+    {
+      "module": "modernc.org/sqlite",
+      "version": "v1.52.0",
+      "required_by": [
+        "go.mod"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/sqlite/@v/v1.52.0.zip",
+      "go_sum_expected": "h1:p4dhYh2tXZCiyaqHwRVJDjIGKWyXayiQpThxgDzJaxo=",
+      "go_sum_computed": "h1:p4dhYh2tXZCiyaqHwRVJDjIGKWyXayiQpThxgDzJaxo=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "c6fe05491a60ae13bcd223088d2705e36dede24e5587226231d2459ada5c4822",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 43818878,
+      "archive_sha256": "184a3e13d917629d6b191ffe0fe254a660103665e08cf33b1a14b4ba07cdd7b3"
+    },
+    {
+      "module": "modernc.org/strutil",
+      "version": "v1.2.1",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/strutil/@v/v1.2.1.zip",
+      "go_sum_expected": "h1:UneZBkQA+DX2Rp35KcM69cSsNES9ly8mQWD71HKlOA0=",
+      "go_sum_computed": "h1:UneZBkQA+DX2Rp35KcM69cSsNES9ly8mQWD71HKlOA0=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "0f594b710bedb0335b15155204150cb1aac98e76144b52b852b43ce6a65eaaad",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 11900,
+      "archive_sha256": "5b8fa61ca4141c5fd82183fad4bc7a45af8237b6fb1dfca65ce7960a03c483c4"
+    },
+    {
+      "module": "modernc.org/token",
+      "version": "v1.1.0",
+      "required_by": [
+        "checksum-only:go.sum"
+      ],
+      "scope": "Original Go reference; not compiled into the Rust native executable as a Go module",
+      "source_archive_url": "https://proxy.golang.org/modernc.org/token/@v/v1.1.0.zip",
+      "go_sum_expected": "h1:Xl7Ap9dKaEs5kLoOQeQmPWevfnk/DM5qcLcYlA8ys6Y=",
+      "go_sum_computed": "h1:Xl7Ap9dKaEs5kLoOQeQmPWevfnk/DM5qcLcYlA8ys6Y=",
+      "go_sum_match": true,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+          "detected_license": "BSD-like (text detected; inspect clauses)"
+        }
+      ],
+      "status": "notice-files-collected",
+      "bytes_fetched": 6860,
+      "archive_sha256": "3efaa49e9fb10569da9e09e785fa230cd5c0f50fcf605f3b5439dfcd61577c58"
+    }
+  ]
+}

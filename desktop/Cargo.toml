@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/store", "crates/domain", "crates/agent", "crates/tools", "crates/rpc", "crates/host", "crates/platform", "crates/importer", "crates/runtime", "crates/migrate"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+
+[workspace.dependencies]
+artex-core = { path = "crates/core" }
+artex-store = { path = "crates/store" }
+artex-domain = { path = "crates/domain" }
+artex-agent = { path = "crates/agent" }
+artex-tools = { path = "crates/tools" }
+artex-rpc = { path = "crates/rpc" }
+artex-host = { path = "crates/host" }
+artex-platform = { path = "crates/platform" }
+artex-importer = { path = "crates/importer" }
+artex-runtime = { path = "crates/runtime" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "2"
+fs2 = "0.4"
+tempfile = "3"
+jsonschema = { version = "0.33", default-features = false }

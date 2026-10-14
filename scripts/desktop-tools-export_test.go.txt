@@ -1,0 +1,61 @@
+package server
+
+// Temporary, read-only catalog exporter. It constructs tools but never calls them.
+import (
+ "encoding/json"
+ "os"
+ "sort"
+ "testing"
+
+ "github.com/Autumn-27/artex/agent"
+ "github.com/Autumn-27/artex/traffic"
+ "github.com/Autumn-27/norma/memory"
+ "github.com/Autumn-27/norma/noa"
+ "github.com/Autumn-27/norma/plan"
+ "github.com/Autumn-27/norma/skill"
+ actool "github.com/Autumn-27/norma/tool"
+)
+
+func TestDesktopContractDump(t *testing.T) {
+ type entry struct {
+  Name string `json:"name"`
+  Family string `json:"family"`
+  Description string `json:"description"`
+  Schema map[string]any `json:"input_schema"`
+  DefaultAgents []string `json:"default_agents"`
+  ReadOnlyEmpty bool `json:"read_only_empty_input"`
+  ConcurrentEmpty bool `json:"concurrent_empty_input"`
+ }
+ out := []entry{}
+ bindings := map[string][]string{}
+ for _, seed := range agent.BuiltinToolSeeds() { bindings[seed.Key] = seed.Agents }
+ s := &Server{}
+ domain := agent.NewToolSet(nil, "").AllDomainTools()
+ domain = append(domain, s.orchestrationTools()...)
+ domain = append(domain, s.platformTools()...)
+ domain = append(domain, s.findingRetestTools()...)
+ domain = append(domain, traffic.SeedToolMetas()...)
+ sdk := actool.DefaultTools()
+ sdk = append(sdk, actool.ShellSessionTools()...)
+ sdk = append(sdk, actool.NewTaskOutput(), actool.NewTaskStop(), actool.NewTaskList(), actool.NewMonitor())
+ sdk = append(sdk, actool.NewWebFetch(actool.WebFetchConfig{}), actool.NewTodoStore().Tool(), actool.NewAskUserQuestion(nil))
+ search, err := actool.NewWebSearch(actool.WebSearchConfig{Backend: "ddgs"}); if err != nil { t.Fatal(err) }
+ sdk = append(sdk, search, skill.NewRegistry().Tool())
+ sdk = append(sdk, plan.Tools(plan.NewController("", ""), nil)...)
+ sdk = append(sdk, memory.Tools(memory.NewStore(""))...)
+ sdk = append(sdk, actool.NewSearchExtraTools(actool.NewRegistry(), nil), actool.NewExecuteExtraTool(actool.NewRegistry(), actool.NewUnlockSet()))
+ sdk = append(sdk, actool.Build(actool.Spec{Name: noa.CompressToolName, Description: noa.CompressToolDescription, Schema: noa.CompressToolSchema(), RawInput: true}))
+ seen := map[string]bool{}
+ for _, group := range []struct{ family string; tools []actool.CoreTool }{{"artex",domain},{"sdk",sdk}} {
+  for _, tool := range group.tools {
+   if seen[tool.Name()] { continue }; seen[tool.Name()] = true
+   agents := bindings[tool.Name()]; if agents == nil { agents = []string{} }
+   out = append(out, entry{tool.Name(),group.family,tool.Description(),tool.InputSchema(),agents,tool.IsReadOnly(json.RawMessage(`{}`)),tool.IsConcurrencySafe(json.RawMessage(`{}`))})
+  }
+ }
+ sort.Slice(out,func(i,j int) bool { if out[i].Family != out[j].Family { return out[i].Family<out[j].Family }; return out[i].Name<out[j].Name })
+ data, err := json.MarshalIndent(out,"","  "); if err != nil { t.Fatal(err) }
+ target := os.Getenv("ARTEX_CONTRACT_DUMP"); if target=="" { t.Fatal("missing export path") }
+ if err := os.WriteFile(target,append(data,'\n'),0600); err != nil { t.Fatal(err) }
+ t.Logf("exported %d definitions",len(out))
+}

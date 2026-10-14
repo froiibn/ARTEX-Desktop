@@ -1,0 +1,62 @@
+[
+  {
+    "file": "desktop/web/LICENSE",
+    "sha256": "5ddb30b0e77a231eaee8ca50e77985db21bb13e8136f145169702db7619705d4",
+    "action": "Preserved verbatim"
+  },
+  {
+    "file": "docs/licenses/original-web-MIT.txt",
+    "sha256": "5ddb30b0e77a231eaee8ca50e77985db21bb13e8136f145169702db7619705d4",
+    "action": "Preserved verbatim"
+  },
+  {
+    "file": "docs/licenses/norma-Apache-2.0.txt",
+    "sha256": "930307fe92c0cdd524172effd340e5177b4e054d8576735db4e0b08f69ac6ba9",
+    "action": "Preserved verbatim"
+  },
+  {
+    "file": "docs/licenses/AegisHook-MIT.txt",
+    "sha256": "5c2b4c076f881967f0572d0b5b2696a22dd328259adf094fa116a6bba49ce088",
+    "action": "Preserved verbatim"
+  },
+  {
+    "file": "docs/licenses/country-flag-icons-MIT.txt",
+    "sha256": "197bacbd1e1d9f40017ab2ae3dadd1383a5aa70bf7a2d749dcef474ec6e3c5eb",
+    "action": "Preserved verbatim"
+  },
+  {
+    "file": "docs/licenses/shadcn-ui-MIT.txt",
+    "sha256": "1564074e13439397221ffd522e2e504d56561994a23d371aa5e3ad43e4f5423f",
+    "action": "Preserved verbatim"
+  },
+  {
+    "file": "desktop/crates/domain/resources/psl/MPL-2.0.txt",
+    "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "upstream_url": "https://raw.githubusercontent.com/publicsuffix/list/d6c92f1bbb7433e5db7b8405c25d4035fb8ff376/LICENSE",
+    "action": "Preserved pinned upstream source / notice"
+  },
+  {
+    "file": "desktop/crates/domain/resources/psl/public_suffix_list.dat",
+    "sha256": "a5638281157e8c902b127a5376f9ea2d024bf2ee11524133a6a76cd1d14ee7be",
+    "upstream_url": "https://raw.githubusercontent.com/publicsuffix/list/d6c92f1bbb7433e5db7b8405c25d4035fb8ff376/public_suffix_list.dat",
+    "action": "Preserved pinned upstream source / notice"
+  },
+  {
+    "file": "desktop/crates/domain/resources/psl/text",
+    "sha256": "9b649c8a6aeabdb8971286d07683a20dc00e406a99631f960e0a47bb85df4af8",
+    "upstream_url": "https://raw.githubusercontent.com/golang/net/v0.58.0/publicsuffix/data/text",
+    "action": "Existing table bytes verified; unchanged"
+  },
+  {
+    "file": "desktop/crates/domain/resources/psl/nodes",
+    "sha256": "47ed63d4f3763b7e4515345e1f06054d3bff97c6175a6f53466218e633a0b9cb",
+    "upstream_url": "https://raw.githubusercontent.com/golang/net/v0.58.0/publicsuffix/data/nodes",
+    "action": "Existing table bytes verified; unchanged"
+  },
+  {
+    "file": "desktop/crates/domain/resources/psl/children",
+    "sha256": "761402a681757153843a161c71955577e76a5ef96abc1a845d20a9a96304bfb7",
+    "upstream_url": "https://raw.githubusercontent.com/golang/net/v0.58.0/publicsuffix/data/children",
+    "action": "Existing table bytes verified; unchanged"
+  }
+]

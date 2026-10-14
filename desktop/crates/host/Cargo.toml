@@ -1,0 +1,50 @@
+[package]
+name = "artex-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+artex-core.workspace = true
+artex-platform.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+hex.workspace = true
+fs2.workspace = true
+regex = "1"
+globset = "0.4"
+walkdir = "2"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls", "stream", "socks"] }
+tokio = { version = "1", features = ["rt", "time", "macros"] }
+futures-util = "0.3"
+hudsucker = { version = "0.25", features = ["http2"] }
+http-body-util = "0.1"
+hmac = "0.12"
+base64 = "0.22"
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "rustls-tls"] }
+gtmpl = "0.7.1"
+scraper = "0.24"
+portable-pty = "0.9"
+vt100 = "0.15"
+serde_yaml = "0.9"
+zip = { version = "4", default-features = false, features = ["deflate"] }
+tempfile.workspace = true
+
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+keyring = { version = "3", features = ["windows-native", "apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+zbus = { version = "4.4", default-features = false, features = ["blocking", "async-io"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp", "Win32_Security", "Win32_System_Console", "Win32_System_Pipes", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+

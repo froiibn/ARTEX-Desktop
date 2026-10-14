@@ -1,0 +1,156 @@
+{
+  "project": {
+    "format": "artex-workspace",
+    "format_version": 1,
+    "workspace_id": "workspace_11111111111111111111111111111111",
+    "name": "ARTEX",
+    "created_at": "2026-10-12T00:00:00Z"
+  },
+  "message": {
+    "protocol": "artex-agent/1.0",
+    "message_id": "message_11111111111111111111111111111111",
+    "command_id": "command_11111111111111111111111111111111",
+    "workspace_id": "workspace_11111111111111111111111111111111",
+    "kind": "request",
+    "sender": {
+      "kind": "agent",
+      "agent_id": "agent_11111111111111111111111111111111",
+      "run_id": "run_11111111111111111111111111111111",
+      "engine_epoch": "epoch_11111111111111111111111111111111"
+    },
+    "recipients": [
+      "agent_22222222222222222222222222222222"
+    ],
+    "channel": "workspace/workspace_11111111111111111111111111111111/agents",
+    "topic": "verify-fact",
+    "correlation_id": null,
+    "created_at": "2026-10-12T00:00:00Z",
+    "deadline_at": "2026-10-12T00:02:00Z",
+    "body": {
+      "text": "추가 검증 결과를 알려주세요.",
+      "blob": null
+    },
+    "object_refs": [
+      {
+        "collection": "exploration_nodes",
+        "id": "node_11111111111111111111111111111111",
+        "version": "1",
+        "access": "read"
+      }
+    ],
+    "final": false,
+    "outcome": "none",
+    "hop_count": 0
+  },
+  "rpc_request": {
+    "jsonrpc": "2.0",
+    "protocol": "artex-rpc/1.0",
+    "id": "host-1",
+    "method": "agent.send",
+    "workspace_id": "workspace_11111111111111111111111111111111",
+    "engine_epoch": "epoch_11111111111111111111111111111111",
+    "command_id": "command_11111111111111111111111111111111",
+    "expected": [],
+    "timeout_ms": 30000,
+    "params": {
+      "message": {
+        "protocol": "artex-agent/1.0",
+        "message_id": "message_11111111111111111111111111111111",
+        "command_id": "command_11111111111111111111111111111111",
+        "workspace_id": "workspace_11111111111111111111111111111111",
+        "kind": "request",
+        "sender": {
+          "kind": "agent",
+          "agent_id": "agent_11111111111111111111111111111111",
+          "run_id": "run_11111111111111111111111111111111",
+          "engine_epoch": "epoch_11111111111111111111111111111111"
+        },
+        "recipients": [
+          "agent_22222222222222222222222222222222"
+        ],
+        "channel": "workspace/workspace_11111111111111111111111111111111/agents",
+        "topic": "verify-fact",
+        "correlation_id": null,
+        "created_at": "2026-10-12T00:00:00Z",
+        "deadline_at": "2026-10-12T00:02:00Z",
+        "body": {
+          "text": "추가 검증 결과를 알려주세요.",
+          "blob": null
+        },
+        "object_refs": [
+          {
+            "collection": "exploration_nodes",
+            "id": "node_11111111111111111111111111111111",
+            "version": "1",
+            "access": "read"
+          }
+        ],
+        "final": false,
+        "outcome": "none",
+        "hop_count": 0
+      },
+      "request_options": {
+        "completion_mode": "one",
+        "expected_reports": [
+          "agent_22222222222222222222222222222222"
+        ]
+      }
+    }
+  },
+  "rpc_success": {
+    "jsonrpc": "2.0",
+    "id": "host-1",
+    "engine_epoch": "epoch_11111111111111111111111111111111",
+    "read_seq": "1",
+    "result": {
+      "message_id": "message_11111111111111111111111111111111",
+      "delivery_ids": [
+        "delivery_11111111111111111111111111111111"
+      ],
+      "request_id": "message_11111111111111111111111111111111"
+    }
+  },
+  "rpc_failure": {
+    "jsonrpc": "2.0",
+    "id": "host-1",
+    "engine_epoch": "epoch_11111111111111111111111111111111",
+    "error": {
+      "code": -32005,
+      "message": "객체가 변경되었습니다.",
+      "data": {
+        "code": "VERSION_CONFLICT",
+        "retryable": false,
+        "recovery_required": false,
+        "details": {
+          "id": "node_11111111111111111111111111111111",
+          "expected": "1",
+          "actual": "2"
+        }
+      }
+    }
+  },
+  "company": {
+    "header": {
+      "id": "company_11111111111111111111111111111111",
+      "collection": "companies",
+      "version": "1",
+      "commit_seq": "1",
+      "created_at": "2026-10-12T00:00:00Z",
+      "updated_at": "2026-10-12T00:00:00Z",
+      "legacy_key": "42"
+    },
+    "data": {
+      "id": "company_11111111111111111111111111111111",
+      "name": "Example",
+      "nkey": "example",
+      "logo": null,
+      "created_at": "2026-10-12T00:00:00Z",
+      "updated_at": "2026-10-12T00:00:00Z"
+    }
+  },
+  "report_input": {
+    "finding_node_id": "node_11111111111111111111111111111111",
+    "report": "재현과 증거를 확인한 보고서입니다.",
+    "evidence_version": "1"
+  }
+}

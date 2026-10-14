@@ -1,0 +1,87 @@
+# Manual verification only; no release publishing or secrets.
+name: Integrated Rust desktop checks
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platforms to verify
+        type: choice
+        options: [all, windows, macos, arch]
+        default: all
+permissions:
+  contents: read
+env:
+  RUST_TEST_THREADS: "1"
+  CARGO_TARGET_DIR: ${{ github.workspace }}/desktop/target
+concurrency:
+  group: native-checks-${{ github.ref }}-${{ inputs.platform || 'all' }}
+  cancel-in-progress: true
+jobs:
+  native:
+    if: inputs.platform != 'arch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.platform == 'macos' && '["macos-latest"]' || inputs.platform == 'windows' && '["windows-latest"]' || '["windows-latest","macos-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.0
+      - name: Native service tests
+        run: cargo test --locked --manifest-path desktop/native-core/Cargo.toml
+      - name: Durable storage and path-security regression
+        run: cargo test --locked --manifest-path desktop/Cargo.toml -p artex-store
+      - name: Native host tests
+        run: cargo test --locked --manifest-path desktop/Cargo.toml -p artex-host --no-default-features
+      - name: Rust UI tests
+        run: cargo test --locked --manifest-path desktop/native/Cargo.toml
+      - name: Build native application
+        run: cargo build --locked --release --manifest-path desktop/native/Cargo.toml
+      - name: Actual service and LLM fixture (macOS)
+        if: runner.os == 'macOS'
+        run: desktop/target/release/artex-native --self-test --workspace "$RUNNER_TEMP/artex-native-$GITHUB_RUN_ID"
+      - name: Native window and process audit (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: desktop/native/scripts/verify.ps1 -FullRegression
+      - name: Isolated window failure logs (Windows)
+        if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $root = 'desktop/native/test-results'
+          if (Test-Path -LiteralPath $root) {
+            Get-ChildItem -LiteralPath $root -Directory | ForEach-Object {
+              foreach ($name in @('window.stdout.log','window.stderr.log')) {
+                $log = Join-Path $_.FullName $name
+                if (Test-Path -LiteralPath $log) {
+                  Write-Host "--- $name ---"
+                  Get-Content -LiteralPath $log -Tail 120 | ForEach-Object { Write-Host $_ }
+                }
+              }
+            }
+          }
+  arch:
+    if: inputs.platform != 'macos' && inputs.platform != 'windows'
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Arch dependencies
+        run: pacman -Syu --noconfirm git rust python clang cmake pkgconf libx11 libxcursor libxrandr libxi wayland libxkbcommon libxkbcommon-x11 mesa dbus xorg-server-xvfb xorg-xauth
+      - uses: actions/checkout@v4
+      - name: Native service and UI tests
+        run: |
+          cargo test --locked --manifest-path desktop/native-core/Cargo.toml
+          cargo test --locked --manifest-path desktop/Cargo.toml -p artex-store
+          cargo test --locked --manifest-path desktop/Cargo.toml -p artex-host --no-default-features
+          cargo test --locked --manifest-path desktop/native/Cargo.toml
+      - name: Arch application build and actual native window
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          cargo build --locked --release --manifest-path desktop/native/Cargo.toml
+          desktop/target/release/artex-native --self-test --workspace /tmp/artex-native-fixture
+          xvfb-run -a desktop/target/release/artex-native --workspace /tmp/artex-native-fixture --profile /tmp/artex-native-profile --smoke --screenshot /tmp/artex-native-window.png
+          test -s /tmp/artex-native-window.png
+          python -c 'import json; r=json.load(open("/tmp/artex-native-profile/native-window-smoke.json")); assert r["orderly_shutdown"] and r["screenshot_received"] and not r["error"]'

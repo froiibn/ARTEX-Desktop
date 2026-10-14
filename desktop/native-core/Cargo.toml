@@ -1,0 +1,20 @@
+[package]
+name = "artex-native-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+
+[workspace]
+
+[dependencies]
+artex-core = { path = "../crates/core" }
+artex-store = { path = "../crates/store" }
+artex-rpc = { path = "../crates/rpc" }
+artex-runtime = { path = "../crates/runtime" }
+artex-host = { path = "../crates/host" }
+serde_json = "1"
+tempfile = "3"
+base64 = "0.22"
+
+[dev-dependencies]
+sha2 = "0.10"

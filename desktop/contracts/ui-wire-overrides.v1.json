@@ -1,0 +1,2648 @@
+{
+  "version": "1.0",
+  "identity_fields": [
+    {
+      "method": "ui.task",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.renameTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.pinTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.renameTaskCategory",
+      "field": "id",
+      "prefix": "category",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTaskCategory",
+      "field": "id",
+      "prefix": "category",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateTaskCategory",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateTaskTemplate",
+      "field": "id",
+      "prefix": "template",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTaskTemplate",
+      "field": "id",
+      "prefix": "template",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateTaskLLMProfiles",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.controlTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskArchive",
+      "field": "id",
+      "prefix": "archive",
+      "role": "params"
+    },
+    {
+      "method": "ui.archiveTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.restoreTaskArchive",
+      "field": "id",
+      "prefix": "archive",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTaskArchive",
+      "field": "id",
+      "prefix": "archive",
+      "role": "params"
+    },
+    {
+      "method": "ui.controlIntent",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.controlIntent",
+      "field": "intentId",
+      "prefix": "node",
+      "role": "params"
+    },
+    {
+      "method": "ui.sendWorkerMessage",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.sendWorkerMessage",
+      "field": "intentId",
+      "prefix": "node",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskLLMResolution",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.rerunIntent",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.rerunIntent",
+      "field": "intentId",
+      "prefix": "node",
+      "role": "params"
+    },
+    {
+      "method": "ui.rerunBlocked",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.setActive",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskCoverage",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskCoverageGraph",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskGoals",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.addGoal",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateGoal",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateGoal",
+      "field": "goalId",
+      "prefix": "node",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteGoal",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteGoal",
+      "field": "goalId",
+      "prefix": "node",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskConstraints",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.addConstraint",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateConstraint",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateConstraint",
+      "field": "constraintId",
+      "prefix": "constraint",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteConstraint",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteConstraint",
+      "field": "constraintId",
+      "prefix": "constraint",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskInterceptRules",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.createTaskInterceptRule",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateTaskInterceptRule",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateTaskInterceptRule",
+      "field": "ruleId",
+      "prefix": "taskrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTaskInterceptRule",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTaskInterceptRule",
+      "field": "ruleId",
+      "prefix": "taskrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.toggleTaskInterceptRule",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.toggleTaskInterceptRule",
+      "field": "ruleId",
+      "prefix": "taskrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskScope",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.addTaskScope",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTaskScope",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTaskScope",
+      "field": "scopeId",
+      "prefix": "scope",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskAssetRefs",
+      "field": "id",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskAssetRefs",
+      "field": "assetId",
+      "prefix": "asset",
+      "role": "params"
+    },
+    {
+      "method": "ui.assetCounts",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteAssets",
+      "field": "ids",
+      "prefix": "asset",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskAssets",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.searchTaskAssets",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.attachTaskAssets",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.registerTaskAssetScopes",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.detachTaskAsset",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.detachTaskAsset",
+      "field": "assetId",
+      "prefix": "asset",
+      "role": "params"
+    },
+    {
+      "method": "ui.taskIntentAssets",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.addCompanyScope",
+      "field": "id",
+      "prefix": "company",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateCompanyScope",
+      "field": "id",
+      "prefix": "company",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteCompany",
+      "field": "id",
+      "prefix": "company",
+      "role": "params"
+    },
+    {
+      "method": "ui.exportFindings",
+      "field": "ids",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "contextTaskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.findingTraffic",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.bindFindingTraffic",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.bindFindingTraffic",
+      "field": "traffic_id",
+      "prefix": "traffic",
+      "role": "params"
+    },
+    {
+      "method": "ui.editFindingTraffic",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.editFindingTraffic",
+      "field": "bindingId",
+      "prefix": "binding",
+      "role": "params"
+    },
+    {
+      "method": "ui.removeFindingTraffic",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.removeFindingTraffic",
+      "field": "bindingId",
+      "prefix": "binding",
+      "role": "params"
+    },
+    {
+      "method": "ui.orderFindingTraffic",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.findingTrafficDetail",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.findingTrafficDetail",
+      "field": "bindingId",
+      "prefix": "binding",
+      "role": "params"
+    },
+    {
+      "method": "ui.findingTrafficBody",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.findingTrafficBody",
+      "field": "bindingId",
+      "prefix": "binding",
+      "role": "params"
+    },
+    {
+      "method": "ui.downloadFindingTrafficBody",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.downloadFindingTrafficBody",
+      "field": "bindingId",
+      "prefix": "binding",
+      "role": "params"
+    },
+    {
+      "method": "ui.findingLineage",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.setFindingStatus",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.setFindingSeverity",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateFinding",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteFinding",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.findingRetests",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.startFindingRetest",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.deepenFinding",
+      "field": "id",
+      "prefix": "finding",
+      "role": "params"
+    },
+    {
+      "method": "ui.activityDetail",
+      "field": "id",
+      "prefix": "activity",
+      "role": "params"
+    },
+    {
+      "method": "ui.notifyUpdateChannel",
+      "field": "id",
+      "prefix": "notifychannel",
+      "role": "params"
+    },
+    {
+      "method": "ui.notifyDeleteChannel",
+      "field": "id",
+      "prefix": "notifychannel",
+      "role": "params"
+    },
+    {
+      "method": "ui.notifyTestChannel",
+      "field": "id",
+      "prefix": "notifychannel",
+      "role": "params"
+    },
+    {
+      "method": "ui.notifyDeliveries",
+      "field": "channelId",
+      "prefix": "notifychannel",
+      "role": "params"
+    },
+    {
+      "method": "ui.notifyRetryDelivery",
+      "field": "id",
+      "prefix": "notifydelivery",
+      "role": "params"
+    },
+    {
+      "method": "ui.chatStatus",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.chatUpload",
+      "field": "id",
+      "prefix": "task|conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.stopChat",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.testLLM",
+      "field": "profile_id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.saveLLMProfile",
+      "field": "id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteLLMProfile",
+      "field": "id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.activateLLMProfile",
+      "field": "id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.resetLLMPool",
+      "field": "id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.fetchLLMModels",
+      "field": "profile_id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.createConversation",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.renameConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.pinConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateConversationProfile",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateConversationProfile",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteConversations",
+      "field": "ids",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.conversationMessages",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.conversationMessages",
+      "field": "since",
+      "prefix": "conversationactivity",
+      "role": "params"
+    },
+    {
+      "method": "ui.conversationHistory",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.conversationMsgDetail",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.conversationMsgDetail",
+      "field": "seq",
+      "prefix": "conversationactivity",
+      "role": "params"
+    },
+    {
+      "method": "ui.sendConversationMessage",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.stopConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateTrigger",
+      "field": "id",
+      "prefix": "trigger",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteTrigger",
+      "field": "id",
+      "prefix": "trigger",
+      "role": "params"
+    },
+    {
+      "method": "ui.saveAgentConfig",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "params"
+    },
+    {
+      "method": "ui.saveMcpServer",
+      "field": "id",
+      "prefix": "mcp",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteMcpServer",
+      "field": "id",
+      "prefix": "mcp",
+      "role": "params"
+    },
+    {
+      "method": "ui.mcpTools",
+      "field": "id",
+      "prefix": "mcp",
+      "role": "params"
+    },
+    {
+      "method": "ui.refreshMcpServer",
+      "field": "id",
+      "prefix": "mcp",
+      "role": "params"
+    },
+    {
+      "method": "ui.resourceVisibility",
+      "field": "id",
+      "prefix": "mcp",
+      "role": "params"
+    },
+    {
+      "method": "ui.toggleVisibility",
+      "field": "agentId",
+      "prefix": "agent",
+      "role": "params"
+    },
+    {
+      "method": "ui.toggleVisibility",
+      "field": "resourceId",
+      "prefix": "mcp",
+      "role": "params"
+    },
+    {
+      "method": "ui.toggleSkillVisibility",
+      "field": "agentId",
+      "prefix": "agent",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateInterceptRule",
+      "field": "id",
+      "prefix": "interceptrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteInterceptRule",
+      "field": "id",
+      "prefix": "interceptrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.toggleInterceptRule",
+      "field": "id",
+      "prefix": "interceptrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.updateAssetInterceptRule",
+      "field": "id",
+      "prefix": "assetrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.deleteAssetInterceptRule",
+      "field": "id",
+      "prefix": "assetrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.toggleAssetInterceptRule",
+      "field": "id",
+      "prefix": "assetrule",
+      "role": "params"
+    },
+    {
+      "method": "ui.interceptGetOne",
+      "field": "id",
+      "prefix": "approval",
+      "role": "params"
+    },
+    {
+      "method": "ui.interceptDecide",
+      "field": "id",
+      "prefix": "approval",
+      "role": "params"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "id",
+      "prefix": "approval",
+      "role": "params"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "conversationId",
+      "prefix": "conversation",
+      "role": "params"
+    },
+    {
+      "method": "ui.interceptDetail",
+      "field": "id",
+      "prefix": "approval",
+      "role": "params"
+    },
+    {
+      "method": "ui.interceptTask",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.interceptTaskPage",
+      "field": "taskId",
+      "prefix": "task",
+      "role": "params"
+    },
+    {
+      "method": "ui.llmRecordDetail",
+      "field": "id",
+      "prefix": "llmrecord",
+      "role": "params"
+    },
+    {
+      "method": "ui.tasks",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.tasks",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.tasks",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.tasks",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.task",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.task",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.task",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.task",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTask",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTask",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTask",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskCategories",
+      "field": "id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTask",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTask",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTask",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.renameTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.renameTask",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.renameTask",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.renameTask",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.pinTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.pinTask",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.pinTask",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.pinTask",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTaskCategory",
+      "field": "id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.renameTaskCategory",
+      "field": "id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteTaskCategory",
+      "field": "deleted",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskCategory",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskCategory",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskCategory",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskCategory",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTasksCategory",
+      "field": "id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskTemplates",
+      "field": "id",
+      "prefix": "template",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskTemplates",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTaskTemplate",
+      "field": "id",
+      "prefix": "template",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTaskTemplate",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskTemplate",
+      "field": "id",
+      "prefix": "template",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskTemplate",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteTaskTemplate",
+      "field": "deleted",
+      "prefix": "template",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskLLMProfiles",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskLLMProfiles",
+      "field": "seq",
+      "prefix": "activity",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskLLMProfiles",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskLLMProfiles",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskLLMProfiles",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.controlTask",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskArchives",
+      "field": "id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskArchives",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskArchives",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskArchive",
+      "field": "id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskArchive",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskArchive",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.archiveTask",
+      "field": "id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.archiveTask",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.archiveTask",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.restoreTaskArchive",
+      "field": "id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.restoreTaskArchive",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.restoreTaskArchive",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteTaskArchive",
+      "field": "id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteTaskArchive",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteTaskArchive",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.controlIntent",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskLLMResolution",
+      "field": "profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.rerunIntent",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.rerunBlocked",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.stats",
+      "field": "id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.stats",
+      "field": "category_id",
+      "prefix": "category",
+      "role": "result"
+    },
+    {
+      "method": "ui.stats",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.stats",
+      "field": "active_llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskCoverageGraph",
+      "field": "asset_id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskCoverageGraph",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskGoals",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.addGoal",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateGoal",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskConstraints",
+      "field": "id",
+      "prefix": "constraint",
+      "role": "result"
+    },
+    {
+      "method": "ui.addConstraint",
+      "field": "id",
+      "prefix": "constraint",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateConstraint",
+      "field": "id",
+      "prefix": "constraint",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskInterceptRules",
+      "field": "id",
+      "prefix": "taskrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTaskInterceptRule",
+      "field": "id",
+      "prefix": "taskrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateTaskInterceptRule",
+      "field": "id",
+      "prefix": "taskrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskScope",
+      "field": "id",
+      "prefix": "scope",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskScope",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskScope",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.addTaskScope",
+      "field": "id",
+      "prefix": "scope",
+      "role": "result"
+    },
+    {
+      "method": "ui.addTaskScope",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.addTaskScope",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskAssetRefs",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskAssetRefs",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.assets",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.assets",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.searchAssets",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.searchAssets",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskAssets",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskAssets",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.searchTaskAssets",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.searchTaskAssets",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskIntentAssets",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskIntentAssets",
+      "field": "asset_id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskIntentAssets",
+      "field": "source_node_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskIntentAssets",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.companies",
+      "field": "id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.companies",
+      "field": "id",
+      "prefix": "companyscope",
+      "role": "result"
+    },
+    {
+      "method": "ui.companies",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.createCompany",
+      "field": "id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.frontier",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.frontier",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.findings",
+      "field": "id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findings",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findings",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.findings",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.findings",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.findings",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingsPage",
+      "field": "id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingsPage",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingsPage",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingsPage",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingsPage",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingsPage",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingGroups",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingAssetTree",
+      "field": "asset_id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingAssetTree",
+      "field": "company_id",
+      "prefix": "company",
+      "role": "result"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.getFinding",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTraffic",
+      "field": "id",
+      "prefix": "binding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTraffic",
+      "field": "snapshot_id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTraffic",
+      "field": "id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.bindFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.bindFindingTraffic",
+      "field": "id",
+      "prefix": "binding",
+      "role": "result"
+    },
+    {
+      "method": "ui.bindFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.bindFindingTraffic",
+      "field": "snapshot_id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.bindFindingTraffic",
+      "field": "id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.editFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.editFindingTraffic",
+      "field": "id",
+      "prefix": "binding",
+      "role": "result"
+    },
+    {
+      "method": "ui.editFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.editFindingTraffic",
+      "field": "snapshot_id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.editFindingTraffic",
+      "field": "id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.removeFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.removeFindingTraffic",
+      "field": "id",
+      "prefix": "binding",
+      "role": "result"
+    },
+    {
+      "method": "ui.removeFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.removeFindingTraffic",
+      "field": "snapshot_id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.removeFindingTraffic",
+      "field": "id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.orderFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.orderFindingTraffic",
+      "field": "id",
+      "prefix": "binding",
+      "role": "result"
+    },
+    {
+      "method": "ui.orderFindingTraffic",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.orderFindingTraffic",
+      "field": "snapshot_id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.orderFindingTraffic",
+      "field": "id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTrafficDetail",
+      "field": "id",
+      "prefix": "binding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTrafficDetail",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTrafficDetail",
+      "field": "snapshot_id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingTrafficDetail",
+      "field": "id",
+      "prefix": "evidence",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingLineage",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingLineage",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingStatus",
+      "field": "id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingStatus",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingStatus",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingStatus",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingStatus",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingStatus",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingSeverity",
+      "field": "id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingSeverity",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingSeverity",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingSeverity",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingSeverity",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.setFindingSeverity",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateFinding",
+      "field": "id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateFinding",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateFinding",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateFinding",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateFinding",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateFinding",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteFinding",
+      "field": "id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingRetests",
+      "field": "id",
+      "prefix": "retest",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingRetests",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.findingRetests",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.activeFindingRetests",
+      "field": "id",
+      "prefix": "retest",
+      "role": "result"
+    },
+    {
+      "method": "ui.activeFindingRetests",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.activeFindingRetests",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.startFindingRetest",
+      "field": "id",
+      "prefix": "retest",
+      "role": "result"
+    },
+    {
+      "method": "ui.startFindingRetest",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.startFindingRetest",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.deepenFinding",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.deepenFinding",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.intents",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.intents",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationTokens",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.explorationGraph",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.explorationGraph",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.explorationNodes",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.explorationNodes",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.explorationNodes",
+      "field": "id",
+      "prefix": "asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.activity",
+      "field": "seq",
+      "prefix": "activity",
+      "role": "result"
+    },
+    {
+      "method": "ui.activity",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.activity",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.activity",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.activityHistory",
+      "field": "seq",
+      "prefix": "activity",
+      "role": "result"
+    },
+    {
+      "method": "ui.activityHistory",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.activityHistory",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.activityHistory",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.intentsPage",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.intentsPage",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.traffic",
+      "field": "id",
+      "prefix": "traffic",
+      "role": "result"
+    },
+    {
+      "method": "ui.notifyChannels",
+      "field": "id",
+      "prefix": "notifychannel",
+      "role": "result"
+    },
+    {
+      "method": "ui.notifyCreateChannel",
+      "field": "id",
+      "prefix": "notifychannel",
+      "role": "result"
+    },
+    {
+      "method": "ui.notifyUpdateChannel",
+      "field": "id",
+      "prefix": "notifychannel",
+      "role": "result"
+    },
+    {
+      "method": "ui.notifyDeliveries",
+      "field": "id",
+      "prefix": "notifydelivery",
+      "role": "result"
+    },
+    {
+      "method": "ui.notifyDeliveries",
+      "field": "finding_id",
+      "prefix": "finding",
+      "role": "result"
+    },
+    {
+      "method": "ui.notifyDeliveries",
+      "field": "channel_id",
+      "prefix": "notifychannel",
+      "role": "result"
+    },
+    {
+      "method": "ui.notifyDeliveries",
+      "field": "batch_id",
+      "prefix": "notifydelivery",
+      "role": "result"
+    },
+    {
+      "method": "ui.llmProfiles",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.saveLLMProfile",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.llmPool",
+      "field": "profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.resetLLMPool",
+      "field": "profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.agents",
+      "field": "id",
+      "prefix": "agent",
+      "role": "result"
+    },
+    {
+      "method": "ui.agents",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.getAgent",
+      "field": "id",
+      "prefix": "agent",
+      "role": "result"
+    },
+    {
+      "method": "ui.getAgent",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.getAgent",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.createAgent",
+      "field": "id",
+      "prefix": "agent",
+      "role": "result"
+    },
+    {
+      "method": "ui.createAgent",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversations",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversations",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.createConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.createConversation",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateConversation",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.renameConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.renameConversation",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.pinConversation",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.pinConversation",
+      "field": "llm_profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteConversations",
+      "field": "id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationMessages",
+      "field": "seq",
+      "prefix": "conversationactivity",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationMessages",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationMessages",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationMessages",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationHistory",
+      "field": "seq",
+      "prefix": "conversationactivity",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationHistory",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationHistory",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.conversationHistory",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.agentTriggers",
+      "field": "id",
+      "prefix": "trigger",
+      "role": "result"
+    },
+    {
+      "method": "ui.createTrigger",
+      "field": "id",
+      "prefix": "trigger",
+      "role": "result"
+    },
+    {
+      "method": "ui.mcpServers",
+      "field": "id",
+      "prefix": "mcp",
+      "role": "result"
+    },
+    {
+      "method": "ui.saveMcpServer",
+      "field": "id",
+      "prefix": "mcp",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptRules",
+      "field": "id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.createInterceptRule",
+      "field": "id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateInterceptRule",
+      "field": "id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteInterceptRule",
+      "field": "deleted",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.assetInterceptRules",
+      "field": "id",
+      "prefix": "assetrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.createAssetInterceptRule",
+      "field": "id",
+      "prefix": "assetrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.updateAssetInterceptRule",
+      "field": "id",
+      "prefix": "assetrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptPending",
+      "field": "id",
+      "prefix": "approval",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptPending",
+      "field": "rule_id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptPending",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptPending",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptGetOne",
+      "field": "id",
+      "prefix": "approval",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptGetOne",
+      "field": "rule_id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptGetOne",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptGetOne",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "seq",
+      "prefix": "activity|conversationactivity",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "intent_id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptExecution",
+      "field": "source_task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptDetail",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptDetail",
+      "field": "profile_id",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptDetail",
+      "field": "id",
+      "prefix": "approval",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptDetail",
+      "field": "rule_id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptDetail",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptDetail",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistory",
+      "field": "id",
+      "prefix": "approval",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistory",
+      "field": "rule_id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistory",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistory",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistoryPage",
+      "field": "id",
+      "prefix": "approval",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistoryPage",
+      "field": "rule_id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistoryPage",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptHistoryPage",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTask",
+      "field": "id",
+      "prefix": "approval",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTask",
+      "field": "rule_id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTask",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTask",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTaskPage",
+      "field": "id",
+      "prefix": "approval",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTaskPage",
+      "field": "rule_id",
+      "prefix": "interceptrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTaskPage",
+      "field": "conversation_id",
+      "prefix": "conversation",
+      "role": "result"
+    },
+    {
+      "method": "ui.interceptTaskPage",
+      "field": "task_id",
+      "prefix": "task",
+      "role": "result"
+    },
+    {
+      "method": "ui.commands",
+      "field": "id",
+      "prefix": "activity",
+      "role": "result"
+    },
+    {
+      "method": "ui.commands",
+      "field": "exploration_id",
+      "prefix": "exploration",
+      "role": "result"
+    },
+    {
+      "method": "ui.llmRecords",
+      "field": "id",
+      "prefix": "llmrecord",
+      "role": "result"
+    },
+    {
+      "method": "ui.llmRecordDetail",
+      "field": "id",
+      "prefix": "llmrecord",
+      "role": "result"
+    }
+  ],
+  "source": "ui-dtos.v1.json",
+  "wire_definitions": "rpc.v1.schema.json",
+  "rules": "desktop-implementation-spec.md#원본-api의-전환과-dto-변환"
+}

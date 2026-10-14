@@ -1,0 +1,29 @@
+{
+  "name": "Brevduva",
+  "repository": "https://github.com/froiibn/brevduva",
+  "license": "Apache-2.0",
+  "copyright": "Copyright 2026 SEIZIA (Jaeyoung Ko)",
+  "checked_at_utc": "2026-10-13T21:37:04.458196+00:00",
+  "verification_commit": "f6f7219143c615db02a1f927f0a5402512327dda",
+  "workspace_version_at_verification": "0.7.5",
+  "usage_scope": "Protocol structure reference for the independently implemented ARTEX artex-agent/1.0 internal protocol; no Brevduva SDK, client, server or Cargo dependency added. This checked commit is a license verification baseline, not a verified historical implementation input.",
+  "original_audit_coverage": "Missing from the earlier ARTEX audit; identified separately in this follow-up.",
+  "source_files": [
+    {
+      "upstream_path": "LICENSE",
+      "local_path": "docs/licenses/brevduva-Apache-2.0.txt",
+      "source_url": "https://github.com/froiibn/brevduva/blob/f6f7219143c615db02a1f927f0a5402512327dda/LICENSE",
+      "git_blob_sha1": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357
+    },
+    {
+      "upstream_path": "NOTICE",
+      "local_path": "docs/licenses/brevduva-NOTICE.txt",
+      "source_url": "https://github.com/froiibn/brevduva/blob/f6f7219143c615db02a1f927f0a5402512327dda/NOTICE",
+      "git_blob_sha1": "4b03bad9fdc7249bb17f904941cccbb7eab19268",
+      "sha256": "446948cdd1f203783b7ecb3af059ce57103e4b2b8c9a4a91e289fcc624d45f50",
+      "bytes": 200
+    }
+  ]
+}

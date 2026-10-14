@@ -1,0 +1,94 @@
+[
+  {
+    "path": "desktop/app/icons/128x128.png",
+    "sha256": "80ff251405d0965530c540630b151ffb0aa9c120d0abed1f762831c73b56a7ad",
+    "bytes": 493,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/app/icons/256x256.png",
+    "sha256": "b8eedf777f708e5f417ee415b7d2b0a3d1e1dc079319adaf2bfe7a4c37fe8543",
+    "bytes": 1569,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/app/icons/32x32.png",
+    "sha256": "aae66ee143f84fe9addc09b1ec5cea38fa13e69c08a3b60ddbb59ec6fcf8eda5",
+    "bytes": 163,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/app/icons/icon.icns",
+    "sha256": "18c68fca843bc428e9c5adaa227fedaed2f34f1d4df36bd354e899ba4d49d16a",
+    "bytes": 1585,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/app/icons/icon.ico",
+    "sha256": "6dcf55b55d7861f786952ce8eda7e10b58dd8842331c8be529737cafb35f7a74",
+    "bytes": 4286,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/design/ui-comparison-20261013/A-soft-linux.png",
+    "sha256": "c7bf942a293a3e9509eaf724447345910d76db4ffbecccfac7b41cf3b1fb72d5",
+    "bytes": 1332941,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/design/ui-comparison-20261013/B-precision-workspace.png",
+    "sha256": "9416cb8d636048f09835fc8da3b5e8a6d7d2a442d72af3e728bbdbf8101fd188",
+    "bytes": 1352342,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/design/ui-comparison-20261013/C-conversation-first.png",
+    "sha256": "bb74d2b407247ac76d04eaca5633736481d1cee9aed9c7688f72353828d1691d",
+    "bytes": 1377324,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/native/assets/fonts/NotoSansKR-Regular.ttf",
+    "sha256": "f4d9a1a362aea79a70ef0ec2da6bbc7cb0cac598650dcc42f848df2b4250cefb",
+    "bytes": 6224884,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/native/assets/fonts/NotoSansKR.ttf",
+    "sha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+    "bytes": 10414588,
+    "original_matches": []
+  },
+  {
+    "path": "desktop/web/public/logo.png",
+    "sha256": "30fcea978f7cef5a3b6d00df2d16b943091e043497901dc90f941d1713aed42c",
+    "bytes": 492065,
+    "original_matches": [
+      "web/public/logo.png"
+    ]
+  },
+  {
+    "path": "desktop/web/public/logo.svg",
+    "sha256": "6064af93f8118c0b5a2e547be541cb1e72ff99df4eaaebdf77bcd3a3d64f51d1",
+    "bytes": 63981,
+    "original_matches": [
+      "web/public/logo.svg"
+    ]
+  },
+  {
+    "path": "desktop/web/src/original/app/favicon.ico",
+    "sha256": "8b567c0244f2dbee787165aea9c4ddabaaafb0fdb3b29899ac898c60a589856b",
+    "bytes": 15086,
+    "original_matches": [
+      "web/src/app/favicon.ico"
+    ]
+  },
+  {
+    "path": "desktop/web/src/original/app/icon.png",
+    "sha256": "30fcea978f7cef5a3b6d00df2d16b943091e043497901dc90f941d1713aed42c",
+    "bytes": 492065,
+    "original_matches": [
+      "web/src/app/icon.png"
+    ]
+  }
+]

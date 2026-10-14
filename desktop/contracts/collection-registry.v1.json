@@ -1,0 +1,467 @@
+{
+  "version": "1.0",
+  "collections": [
+    {
+      "collection": "companies",
+      "schema": "companies",
+      "id_prefix": "company",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "assets",
+      "schema": "assets",
+      "id_prefix": "asset",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "company_scope",
+      "schema": "company_scope",
+      "id_prefix": "companyscope",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "explorations",
+      "schema": "explorations",
+      "id_prefix": "exploration",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "exploration_nodes",
+      "schema": "exploration_nodes",
+      "id_prefix": "node",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "exploration_edges",
+      "schema": "exploration_edges",
+      "id_prefix": "edge",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "exploration_anchors",
+      "schema": "exploration_anchors",
+      "id_prefix": "anchor",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_constraints",
+      "schema": "task_constraints",
+      "id_prefix": "constraint",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "activity",
+      "schema": "activity",
+      "id_prefix": "activity",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "main_sessions",
+      "schema": "main_sessions",
+      "id_prefix": "mainsession",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "settings",
+      "schema": "settings",
+      "id_prefix": "setting",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "llm_profiles",
+      "schema": "llm_profiles",
+      "id_prefix": "profile",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "llm_profile_health",
+      "schema": "llm_profile_health",
+      "id_prefix": "profilehealth",
+      "source": "db/schema.sql",
+      "kind": "rebuildable_projection"
+    },
+    {
+      "collection": "task_categories",
+      "schema": "task_categories",
+      "id_prefix": "category",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "tasks",
+      "schema": "tasks",
+      "id_prefix": "task",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_archives",
+      "schema": "task_archives",
+      "id_prefix": "archive",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_templates",
+      "schema": "task_templates",
+      "id_prefix": "template",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_relations",
+      "schema": "task_relations",
+      "id_prefix": "relation",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_asset_links",
+      "schema": "task_asset_links",
+      "id_prefix": "assetlink",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_llm_profiles",
+      "schema": "task_llm_profiles",
+      "id_prefix": "profilelink",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_scope",
+      "schema": "task_scope",
+      "id_prefix": "scope",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "agents",
+      "schema": "agents",
+      "id_prefix": "agent",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "agent_prompts",
+      "schema": "agent_prompts",
+      "id_prefix": "prompt",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "agent_prompt_vars",
+      "schema": "agent_prompt_vars",
+      "id_prefix": "promptvar",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "mcp_servers",
+      "schema": "mcp_servers",
+      "id_prefix": "mcp",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "mcp_tools_cache",
+      "schema": "mcp_tools_cache",
+      "id_prefix": "mcptool",
+      "source": "db/schema.sql",
+      "kind": "rebuildable_projection"
+    },
+    {
+      "collection": "agent_visibility",
+      "schema": "agent_visibility",
+      "id_prefix": "visibility",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "agent_skill_visibility",
+      "schema": "agent_skill_visibility",
+      "id_prefix": "skillvisibility",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "skill_usage",
+      "schema": "skill_usage",
+      "id_prefix": "skillusage",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "tool_usage",
+      "schema": "tool_usage",
+      "id_prefix": "toolusage",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "tools",
+      "schema": "tools",
+      "id_prefix": "toolconfig",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "conversations",
+      "schema": "conversations",
+      "id_prefix": "conversation",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "conversation_activities",
+      "schema": "conversation_activities",
+      "id_prefix": "conversationactivity",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "agent_triggers",
+      "schema": "agent_triggers",
+      "id_prefix": "trigger",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "scheduler_state",
+      "schema": "scheduler_state",
+      "id_prefix": "scheduler",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "intercept_rules",
+      "schema": "intercept_rules",
+      "id_prefix": "interceptrule",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "intercept_pending",
+      "schema": "intercept_pending",
+      "id_prefix": "approval",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "findings",
+      "schema": "findings",
+      "id_prefix": "finding",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "finding_retests",
+      "schema": "finding_retests",
+      "id_prefix": "retest",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "traffic_evidence_snapshots",
+      "schema": "traffic_evidence_snapshots",
+      "id_prefix": "evidence",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "finding_traffic_bindings",
+      "schema": "finding_traffic_bindings",
+      "id_prefix": "binding",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "server_logs",
+      "schema": "server_logs",
+      "id_prefix": "log",
+      "source": "db/schema.sql",
+      "kind": "rebuildable_projection"
+    },
+    {
+      "collection": "side_question_sessions",
+      "schema": "side_question_sessions",
+      "id_prefix": "sidesession",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "side_question_requests",
+      "schema": "side_question_requests",
+      "id_prefix": "sidequestion",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "asset_intercept_rules",
+      "schema": "asset_intercept_rules",
+      "id_prefix": "assetrule",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "task_intercept_rules",
+      "schema": "task_intercept_rules",
+      "id_prefix": "taskrule",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "notification_channels",
+      "schema": "notification_channels",
+      "id_prefix": "notifychannel",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "notification_events",
+      "schema": "notification_events",
+      "id_prefix": "notifyevent",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "notification_deliveries",
+      "schema": "notification_deliveries",
+      "id_prefix": "notifydelivery",
+      "source": "db/schema.sql",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "llm_records",
+      "schema": "llm_records",
+      "id_prefix": "llmrecord",
+      "source": "db/commands.go",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "llm_usage",
+      "schema": "llm_usage",
+      "id_prefix": "llmusage",
+      "source": "db/llm_usage.go",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "exchanges",
+      "schema": "exchanges",
+      "id_prefix": "traffic",
+      "source": "traffic/traffic.go",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "exchange_bodies",
+      "schema": "exchange_bodies",
+      "id_prefix": "trafficbody",
+      "source": "traffic/traffic.go",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "blob_refs",
+      "schema": "blob_refs",
+      "id_prefix": "bloblink",
+      "source": "traffic/traffic.go",
+      "kind": "workspace_collection"
+    },
+    {
+      "collection": "agent_runs",
+      "schema": "Run",
+      "kind": "workspace_collection",
+      "id_prefix": "run"
+    },
+    {
+      "collection": "tool_invocations",
+      "schema": "ToolInvocation",
+      "kind": "workspace_collection",
+      "id_prefix": "invocation"
+    },
+    {
+      "collection": "domain_events",
+      "schema": "DomainEvent",
+      "kind": "workspace_collection",
+      "id_prefix": "event"
+    },
+    {
+      "collection": "agent_messages",
+      "schema": "AgentMessage",
+      "kind": "workspace_collection",
+      "id_prefix": "message"
+    },
+    {
+      "collection": "agent_deliveries",
+      "schema": "AgentDelivery",
+      "kind": "workspace_collection",
+      "id_prefix": "delivery"
+    },
+    {
+      "collection": "conversation_requests",
+      "schema": "ConversationRequest",
+      "kind": "workspace_collection",
+      "id_prefix": "message"
+    },
+    {
+      "collection": "steering_messages",
+      "schema": "SteeringMessage",
+      "kind": "workspace_collection",
+      "id_prefix": "steering"
+    },
+    {
+      "collection": "command_receipts",
+      "schema": "CommandReceipt",
+      "kind": "workspace_collection",
+      "id_prefix": "command"
+    },
+    {
+      "collection": "user_questions",
+      "schema": "UserQuestion",
+      "kind": "workspace_collection",
+      "id_prefix": "question"
+    },
+    {
+      "collection": "memory_records",
+      "schema": "MemoryRecord",
+      "kind": "workspace_collection",
+      "id_prefix": "memory"
+    },
+    {
+      "collection": "resource_files",
+      "schema": "ResourceFile",
+      "kind": "workspace_collection",
+      "id_prefix": "resource"
+    },
+    {
+      "collection": "agent_features",
+      "schema": "AgentFeatures",
+      "kind": "workspace_collection",
+      "id_prefix": "agentfeature"
+    },
+    {
+      "collection": "task_runtime",
+      "schema": "TaskRuntime",
+      "kind": "workspace_collection",
+      "id_prefix": "taskruntime"
+    },
+    {
+      "collection": "traffic_records",
+      "kind": "read_projection",
+      "schema": "exchanges+exchange_bodies",
+      "id_prefix": "traffic"
+    }
+  ]
+}

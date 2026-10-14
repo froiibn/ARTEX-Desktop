@@ -1,0 +1,197 @@
+[
+  {
+    "name": "NotoSansKR-Regular.ttf",
+    "sha256": "f4d9a1a362aea79a70ef0ec2da6bbc7cb0cac598650dcc42f848df2b4250cefb",
+    "bytes": 6224884,
+    "names": {
+      "0": [
+        "(c) 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'."
+      ],
+      "1": [
+        "Noto Sans KR Thin"
+      ],
+      "2": [
+        "Regular"
+      ],
+      "3": [
+        "2.004;ADBO;NotoSansKR-Thin;ADOBE"
+      ],
+      "4": [
+        "Noto Sans KR Thin"
+      ],
+      "6": [
+        "NotoSansKR-Thin"
+      ],
+      "13": [
+        "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL"
+      ],
+      "14": [
+        "http://scripts.sil.org/OFL"
+      ],
+      "16": [
+        "Noto Sans KR"
+      ],
+      "17": [
+        "Thin"
+      ]
+    },
+    "variable": false
+  },
+  {
+    "name": "NotoSansKR.ttf",
+    "sha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+    "bytes": 10414588,
+    "names": {
+      "0": [
+        "(c) 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'."
+      ],
+      "1": [
+        "Noto Sans KR Thin"
+      ],
+      "2": [
+        "Regular"
+      ],
+      "3": [
+        "2.004;ADBO;NotoSansKR-Thin;ADOBE"
+      ],
+      "4": [
+        "Noto Sans KR Thin"
+      ],
+      "6": [
+        "NotoSansKR-Thin"
+      ],
+      "13": [
+        "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL"
+      ],
+      "14": [
+        "http://scripts.sil.org/OFL"
+      ],
+      "16": [
+        "Noto Sans KR"
+      ],
+      "17": [
+        "Thin"
+      ]
+    },
+    "variable": true
+  },
+  {
+    "name": "emoji-icon-font.ttf",
+    "sha256": "3a706840d2f888b83c184f7d41900dbaa0151a806c4d130cc88539d53fedef0a",
+    "bytes": 317864,
+    "names": {
+      "1": [
+        "emoji"
+      ],
+      "2": [
+        "Regular"
+      ],
+      "3": [
+        "emoji"
+      ],
+      "4": [
+        "emoji"
+      ],
+      "6": [
+        "emoji"
+      ]
+    },
+    "variable": false
+  },
+  {
+    "name": "Hack-Regular.ttf",
+    "sha256": "15f55cc0c85a2988d2b4b3a8cdb5d77fdfbaf319e1bb5309d725db9818fb7125",
+    "bytes": 309408,
+    "names": {
+      "0": [
+        "Copyright (c) 2018 Source Foundry Authors / Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved."
+      ],
+      "1": [
+        "Hack"
+      ],
+      "2": [
+        "Regular"
+      ],
+      "3": [
+        "SourceFoundry: Hack: 2018"
+      ],
+      "4": [
+        "Hack Regular"
+      ],
+      "6": [
+        "Hack-Regular"
+      ],
+      "13": [
+        "The work in the Hack project is Copyright 2018 Source Foundry Authors and licensed under the MIT License\n\nThe work in the DejaVu project was committed to the public domain.\n\nBitstream Vera Sans Mono Copyright 2003 Bitstream Inc. and licensed under the Bitstream Vera License with Reserved Font Names \"Bitstream\" and \"Vera\"\n\nMIT License\n\nCopyright (c) 2018 Source Foundry Authors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\nBITSTREAM VERA LICENSE\n\nCopyright (c) 2003 by Bitstream, Inc. All Rights Reserved. Bitstream Vera is a trademark of Bitstream, Inc.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of the fonts accompanying this license (\"Fonts\") and associated documentation files (the \"Font Software\"), to reproduce and distribute the Font Software, including without limitation the rights to use, copy, merge, publish, distribute, and/or sell copies of the Font Software, and to permit persons to whom the Font Software is furnished to do so, subject to the following conditions:\n\nThe above copyright and trademark notices and this permission notice shall be included in all copies of one or more of the Font Software typefaces.\n\nThe Font Software may be modified, altered, or added to, and in particular the designs of glyphs or characters in the Fonts may be modified and additional glyphs or characters may be added to the Fonts, only if the fonts are renamed to names not containing either the words \"Bitstream\" or the word \"Vera\".\n\nThis License becomes null and void to the extent applicable to Fonts or Font Software that has been modified and is distributed under the \"Bitstream Vera\" names.\n\nThe Font Software may be sold as part of a larger software package but no copy of one or more of the Font Software typefaces may be sold by itself.\n\nTHE FONT SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL BITSTREAM OR THE GNOME FOUNDATION BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.\n\nExcept as contained in this notice, the names of Gnome, the Gnome Foundation, and Bitstream Inc., shall not be used in advertising or otherwise to promote the sale, use or other dealings in this Font Software without prior written authorization from the Gnome Foundation or Bitstream Inc., respectively. For further information, contact: fonts at gnome dot org."
+      ],
+      "14": [
+        "https://github.com/source-foundry/Hack/blob/master/LICENSE.md"
+      ]
+    },
+    "variable": false
+  },
+  {
+    "name": "NotoEmoji-Regular.ttf",
+    "sha256": "415dc6290378574135b64c808dc640c1df7531973290c4970c51fdeb849cb0c5",
+    "bytes": 418804,
+    "names": {
+      "0": [
+        "Copyright 2013 Google Inc. All Rights Reserved."
+      ],
+      "1": [
+        "Noto Emoji"
+      ],
+      "2": [
+        "Regular"
+      ],
+      "3": [
+        "Monotype Imaging - Noto Emoji"
+      ],
+      "4": [
+        "Noto Emoji"
+      ],
+      "6": [
+        "NotoEmoji"
+      ],
+      "13": [
+        "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+      ],
+      "14": [
+        "http://scripts.sil.org/OFL"
+      ]
+    },
+    "variable": false
+  },
+  {
+    "name": "Ubuntu-Light.ttf",
+    "sha256": "80307b8da7649aa4ee4d484b232140e3ce1ec0ca093073d3c53c8f5a5ced7a70",
+    "bytes": 361676,
+    "names": {
+      "0": [
+        "Copyright 2011 Canonical Ltd.  Licensed under the Ubuntu Font Licence 1.0"
+      ],
+      "1": [
+        "Ubuntu Light"
+      ],
+      "2": [
+        "Regular"
+      ],
+      "3": [
+        "0.83;DAMA;Ubuntu-Light"
+      ],
+      "4": [
+        "Ubuntu Light"
+      ],
+      "6": [
+        "Ubuntu-Light"
+      ],
+      "16": [
+        "Ubuntu"
+      ],
+      "17": [
+        "Light"
+      ]
+    },
+    "variable": false
+  }
+]
