@@ -43,6 +43,23 @@
 
 macOS는 서비스·저장·host·UI 시험, release 빌드와 통합 자체 시험을 통과했다. Arch도 같은 범위와 Xvfb의 실제 창·스크린샷·정상 종료를 통과했다. Windows는 전체 공유 회귀를 포함한 시험과 debug 실행 파일의 통합 자체 시험·실제 창 검증 및 release 빌드를 통과했다. 이 결과는 같은 개발 commit의 후속 CI이며 고정 배포 후보 `34ad9f…`에서 원격 CI가 실행됐다고 주장하지 않는다.
 
+### 새 저장소의 후속 CI — 2026-10-15 확인
+
+| 대상 | 새 소스 commit | 결과 | 실행 기록 |
+| --- | --- | --- | --- |
+| Windows MSVC / software OpenGL | `ce1f75e8a5a170e0371a9f32de8b1243f772afeb` | success | [Windows job](https://github.com/froiibn/ARTEX-Desktop/actions/runs/38595311266/job/115960523214) |
+| Arch Linux (Xvfb) | `ce1f75e8a5a170e0371a9f32de8b1243f772afeb` | success | [Arch job](https://github.com/froiibn/ARTEX-Desktop/actions/runs/38595311266/job/115960522781) |
+| macOS Intel (`macos-15-intel`) | `84098a0bcaf756b31382f27ce36434ca7c1de476` | success | [Intel Mac run](https://github.com/froiibn/ARTEX-Desktop/actions/runs/38599721218) |
+| macOS Apple Silicon (`macos-latest`) | `ce1f75e8a5a170e0371a9f32de8b1243f772afeb` | 실행 머신 배정 실패; 시험 미실행 | [ARM job](https://github.com/froiibn/ARTEX-Desktop/actions/runs/38595311266/job/115960523364) |
+
+Windows는 전체 공유 회귀·서비스·host·UI 시험, 통합 자체 시험, 실제 창·두 번째 실행·정상 종료 및 release 빌드를 통과했다. Arch는 서비스·저장·host·UI 시험, release 빌드·통합 자체 시험과 Xvfb의 실제 창 검증을 통과했다. Intel Mac은 서비스·저장·host·UI 시험, release 빌드·실제 서비스/LLM fixture를 통과했다. Mac의 실기기 GUI 수락 시험을 완료했다는 의미는 아니다.
+
+실행 `38595311266` 전체의 결론은 success가 아니다. Apple Silicon 머신을 배정받지 못해 해당 job은 단계 실행 없이 취소됐으며, Windows·Arch job은 success다. Intel Mac은 별도 실행 `38599721218`에서 success로 확인했다. 앞서 Apple Silicon은 `c892f180a7a07f143c7e800bf13f64c8c4d8c8c3`의 실행 `38592745002`에서 통과했지만, 이를 `ce1f75e…`의 ARM 재검증으로 바꾸어 기록하지 않는다.
+
+새 저장소의 첫 Windows 실패 `38592745002`는 PowerMonitor 시작 전 초기 작업 공간 Create 시험의 10초 대기에서 발생했다. 두 lifecycle 시험의 초기 Create에만 기존 durable Create 시험과 같은 60초 예산을 적용하고, 일치하는 오류 응답을 즉시 표시하도록 고쳤다. 전원 이벤트·종료·재개 시험의 대기와 제품 동작은 유지했다. `84098a0…`은 `ce1f75e…`와 Rust 소스가 같고, 수동 CI의 Intel Mac 선택 항목 및 플랫폼 문서만 추가한 commit이다.
+
+새 main의 추적 파일 301개에서 미검토 개인정보·자격 증명 탐지 0건을 확인했다. 고정 소스 ZIP은 root commit의 297개 Git blob과 정확히 일치한다. 두 저장소의 비공개 상태, History의 refs·릴리스·asset ID/크기/해시 보존, preview.2의 GitHub asset 해시와 로컬 원본 일치도 다시 확인했다.
+
 이전 Windows 실행 `38512194823`에서는 CI의 OpenGL 환경 부족으로 창이 종료됐다. 고정·검증한 소프트웨어 OpenGL을 격리된 시험 폴더에 제공하고 실제 로드 경로·SHA256까지 확인하도록 보완했다. 후속 실행 `38521823069`에서는 Bash의 정상 비동기 `running` 반환을 시험이 즉시 `completed`로 단정한 별도 실패를 확인했다. 동일 실행의 최종 상태·종료 코드·실제 파일 출력을 확인하도록 시험을 수정했다. 모니터 배치·클릭 시험의 1초 렌더 가정도 실제 pending 조회를 이용해 제거했다. 진단이 없었던 첫 UI 실패의 원인은 확정하지 않는다. 구체적인 범위와 대기 예산은 [CI 보완 기록](windows-ci-graphics.md)에 있다.
 
 후속 변경은 CI 검증 및 `cfg(test)` 코드와 문서에 한정된다. 제품의 폴링·실행 수명·권한 정책, 고정 배포 실행 파일·대응 소스 ZIP은 변경하지 않았다. Windows 소프트웨어 OpenGL 검증을 실제 GPU 드라이버 인증 또는 MSVC release 실행 파일의 창 검증으로 해석하지 않는다. 로컬에서는 이미 고정 GNU release 실행 파일 자체의 창·정상 종료 및 동일 소프트웨어 OpenGL 라이브러리 로드를 별도로 검증했다.
