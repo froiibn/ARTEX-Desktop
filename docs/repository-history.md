@@ -1,6 +1,6 @@
 # 저장소와 개발 이력
 
-2026-10-15, 저장소 분리 후 사용자가 기존 이력을 GitHub에서 제거하도록 요청했다. 기존 `ARTEX-Desktop-History`를 삭제하고 GitHub에는 현재 `ARTEX-Desktop`만 보존했다. 현재 저장소는 비공개다.
+2026-10-15, 저장소 분리 후 사용자가 기존 이력을 GitHub에서 제거하도록 요청했다. 기존 `ARTEX-Desktop-History`를 삭제하고 GitHub에는 현재 `ARTEX-Desktop`만 보존했다. 현재 저장소는 2026-10-15에 공개로 전환했다.
 
 - [ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop): 정리한 현재 소스와 이후 개발. 기본 브랜치는 main이며 초기 root commit은 `34ad9fffffdaee951b9e024155b17b4511196b34`이다. 과거 개발 commit·브랜치·`preview.1` 태그를 가져오지 않았다.
 - 기존 `ARTEX-Desktop-History`(ID `1417875247`): GitHub에서 삭제했으며 404 응답으로 확인했다. 삭제 전 브랜치·`v0.2.0-preview.1` 태그를 포함한 전체 Git bundle과 릴리스 파일 3개의 로컬 백업을 검증했다. 로컬 `../rebuilt`는 복구용으로 보존하고 삭제된 저장소의 remote는 제거했다. 이 백업은 현재 GitHub 저장소에 업로드하지 않는다.
@@ -11,4 +11,4 @@ Windows `v0.2.0-preview.2` 실행 파일과 대응 소스 ZIP은 새 저장소�
 
 현재 저장소의 ID `1419301831`, main, 고정 배포 태그·릴리스와 파일 해시는 기존 이력 삭제 직후 그대로 유지되는 것을 확인했다. 이후 main 변경은 이 삭제 사실을 반영한 문서 수정이다.
 
-저장소 공개 전환은 이번 승인에 포함하지 않았으며 수행하지 않았다. [검증과 배포 기록](public-release-remediation-result-20261014.md)과 [다운로드 안내](download-and-run.md)를 함께 참고한다.
+기존 이력 삭제 이후 사용자의 별도 공개 요청에 따라 2026-10-15에 현재 저장소(ID `1419301831`)를 공개했다. 공개 범위는 현재 소스와 고정된 `preview.2`이며 로컬 과거 이력·`preview.1` 백업은 포함하지 않는다. [검증과 배포 기록](public-release-remediation-result-20261014.md)과 [다운로드 안내](download-and-run.md)를 함께 참고한다.

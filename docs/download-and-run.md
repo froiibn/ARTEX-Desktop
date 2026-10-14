@@ -1,8 +1,8 @@
 # 시험 빌드 다운로드와 실행
 
-Windows x64의 `v0.2.0-preview.2` 시험 배포를 다운로드할 수 있다. 저장소는 비공개이며 계정 로그인과 저장소 접근 권한이 필요하다. 공개 전환은 별도 승인 전까지 수행하지 않는다.
+Windows x64의 `v0.2.0-preview.2` 시험 배포를 다운로드할 수 있다. 2026-10-15에 저장소를 공개로 전환했으며 로그인 없이 내려받을 수 있다.
 
-1. [릴리스 페이지](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.2)에 로그인해 접속한다.
+1. [릴리스 페이지](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.2)에 접속한다.
 2. Assets에서 `ARTEX-Desktop-v0.2.0-preview.2-windows-x64.zip`을 받는다. `Source code` ZIP은 직접 빌드할 때 사용한다.
 3. ZIP 전체를 쓰기 가능한 폴더에 압축 해제한다.
 4. `ARTEX-Windows-x64` 폴더의 `ARTEX.exe`를 실행한다. 설치 프로그램은 없다.

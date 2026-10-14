@@ -21,7 +21,7 @@ ARTEX Desktop은 원본 ARTEX를 바탕으로 만든 수정 버전이며, 프로
 
 확인한 원본과 재구축 저장소의 소스·문서에서는 위 사용 금지를 개별적으로 합의한 별도 계약 문서를 발견하지 못했다. 이는 저장소 밖에서 체결된 계약, 별도로 수락한 서비스 조건이나 모든 실제 계약이 없다는 단정이 아니다. 이 방침은 그러한 계약의 존재·효력이나 특정 지역 법률상 원본 고지의 효과를 판정하지 않는다. 실제 계약과 AGPL 의무가 충돌하면 AGPL 제12조를 포함한 관련 조건을 검토해야 한다.
 
-원작자의 추가 허락이 모든 AGPL 사용·수정·재배포에 무조건 필요하다고 설명하지 않으며, 모든 법적 분쟁이나 제3자 권리가 해결되었다고 보증하지 않는다. 현재 저장소는 비공개이며 Windows `v0.2.0-preview.2`와 대응 소스를 비공개 Releases에서 제공한다. 패키지의 고지·소스·검증 범위는 [최종 산출물 기록](public-release-remediation-result-20261014.md)을 따른다. 공개 전환은 수행하지 않았다. 이전 감사 문서는 당시 상태를 보여 주는 역사적 증거로 유지한다.
+원작자의 추가 허락이 모든 AGPL 사용·수정·재배포에 무조건 필요하다고 설명하지 않으며, 모든 법적 분쟁이나 제3자 권리가 해결되었다고 보증하지 않는다. 2026-10-15에 저장소를 공개로 전환했으며 Windows `v0.2.0-preview.2`와 대응 소스를 Releases에서 제공한다. 패키지의 고지·소스·검증 범위는 [최종 산출물 기록](public-release-remediation-result-20261014.md)을 따른다. 이전 감사 문서는 당시 상태를 보여 주는 역사적 증거로 유지한다.
 
 ## English
 
@@ -37,7 +37,7 @@ Defensive assessment of self-owned or authorized targets is the project's intend
 
 No separate agreement individually adopting the use prohibition was found in the examined original and rebuilt repository sources and documents. This does not establish that no agreements exist outside those repositories or that no service terms were accepted. This policy does not determine the existence or enforceability of such agreements or the effect of the original notice under a particular jurisdiction. Conflicts between actual agreements and AGPL obligations require assessment, including section 12.
 
-Additional author permission is not described as universally mandatory for all AGPL use, modification, or redistribution, and resolution of all legal disputes or third-party rights is not guaranteed. The repository remains private, and Windows `v0.2.0-preview.2` and its corresponding source are available through private Releases. See the [final artifact and verification record](public-release-remediation-result-20261014.md) for the package notices, source and verification scope. The repository has not been made public. Earlier audits remain historical evidence.
+Additional author permission is not described as universally mandatory for all AGPL use, modification, or redistribution, and resolution of all legal disputes or third-party rights is not guaranteed. The repository was made public on 2026-10-15, and Windows `v0.2.0-preview.2` and its corresponding source are available through Releases. See the [final artifact and verification record](public-release-remediation-result-20261014.md) for the package notices, source and verification scope. Earlier audits remain historical evidence.
 
 ## 简体中文
 
@@ -53,4 +53,4 @@ ARTEX Desktop 是原版 ARTEX 的修改版本。整体项目保留 **AGPL-3.0-on
 
 在已检查的原版和重构仓库源码及文档中，未发现单独约定上述使用禁令的个别合同文件。这不代表仓库之外不存在合同，也不代表用户未另行接受服务条款。本方针不判定此类合同的存在或效力，也不判定原始声明在特定法域中的法律效果。实际合同与 AGPL 义务冲突时，需要结合第12条等相关条件审查。
 
-不将原作者的额外许可描述为所有 AGPL 使用、修改或再分发都无条件必需，也不保证所有法律争议或第三方权利问题已解决。仓库仍为私有，Windows `v0.2.0-preview.2` 及其对应源码已通过私有 Releases 提供。程序包声明、源码与验证范围参见[最终产物与验证记录](public-release-remediation-result-20261014.md)。仓库尚未转为公开。此前的审查文档保留为历史证据。
+不将原作者的额外许可描述为所有 AGPL 使用、修改或再分发都无条件必需，也不保证所有法律争议或第三方权利问题已解决。仓库已于 2026-10-15 转为公开，Windows `v0.2.0-preview.2` 及其对应源码通过 Releases 提供。程序包声明、源码与验证范围参见[最终产物与验证记录](public-release-remediation-result-20261014.md)。此前的审查文档保留为历史证据。

@@ -1,6 +1,6 @@
 # 공개 전 수정 작업의 최종 산출물
 
-2026-10-14 검증, 2026-10-15 저장소 분리 반영. [수정 내역](public-release-remediation-20261014.md)의 후속 결과다. 소스·실행 파일의 수정, 배포 조립과 세 플랫폼 CI 검증을 완료했다. 저장소 분리 후 사용자의 후속 요청에 따라 기존 `ARTEX-Desktop-History`는 GitHub에서 삭제했고, 현재 `ARTEX-Desktop`만 비공개로 유지한다. 기존 이력·릴리스의 검증된 로컬 복구 백업은 남겼다.
+2026-10-14 검증, 2026-10-15 저장소 분리 반영. [수정 내역](public-release-remediation-20261014.md)의 후속 결과다. 소스·실행 파일의 수정, 배포 조립과 세 플랫폼 CI 검증을 완료했다. 저장소 분리 후 사용자의 후속 요청에 따라 기존 `ARTEX-Desktop-History`는 GitHub에서 삭제했고, 현재 `ARTEX-Desktop`만 2026-10-15에 공개했다. 기존 이력·릴리스의 검증된 로컬 복구 백업은 남겼다.
 
 ## 반영 결과
 
@@ -17,7 +17,7 @@
 - 배포 기준: `D:/Artex/public-candidate`의 root commit 1개, 소스 297개 파일. 후속 CI·시험·문서 보완은 이 root 위에 별도 commit으로 반영하며 과거 개발 이력을 가져오지 않는다.
 - 실행 파일: `D:/Artex/builds/v0.2.0-preview.2/ARTEX-Windows-x64/ARTEX.exe`.
 - 실행 파일 SHA256: `1a82005fc01dee92ad1dae4474c72ad5072beab44806edd5b20b7e1d78e8291f`.
-- 대응 소스 ZIP도 `D:/Artex/builds/v0.2.0-preview.2`에 함께 보관했다. 배포 기준 commit과 `v0.2.0-preview.2` 태그를 새 비공개 GitHub 저장소에 등록했다. 소스 접근에는 로그인과 저장소 권한이 필요하다.
+- 대응 소스 ZIP도 `D:/Artex/builds/v0.2.0-preview.2`에 함께 보관했다. 배포 기준 commit과 `v0.2.0-preview.2` 태그를 새 GitHub 저장소에 등록한 뒤 2026-10-15 공개로 전환했다. 소스와 배포 파일은 로그인 없이 접근할 수 있다.
 
 | 파일 | 바이트 | SHA256 |
 | --- | ---: | --- |
@@ -67,7 +67,7 @@ Windows는 전체 공유 회귀·서비스·host·UI 시험, 통합 자체 시�
 ## 저장소 분리와 남은 조치
 
 - 최초 분리 시 기존 저장소를 비공개 `ARTEX-Desktop-History`로 변경하고 refs·릴리스 보존을 확인했다. 이후 사용자의 명시적 삭제 요청에 따라 해당 저장소(ID `1417875247`)를 GitHub에서 삭제했고 404 응답으로 확인했다. 삭제 전 전체 Git bundle에 원격 브랜치·태그가 포함되는 것을 검증하고 `preview.1` 릴리스 파일 3개의 크기·SHA256을 대조해 로컬 복구 백업을 남겼다. 이전 GitHub CI 기록·링크는 삭제된 저장소에서 제공되지 않으며 당시 로그는 로컬에 보존한다.
-- 새 비공개 `ARTEX-Desktop`에 정리한 배포 기준 root commit과 `preview.2` 다운로드 릴리스를 등록했다. 현재 저장소(ID `1419301831`)의 refs·릴리스·asset ID/크기/해시가 History 삭제 직후 그대로 유지되는 것을 확인했다. 기존 `preview.1`은 로컬 복구 백업으로만 보존한다. 분리와 삭제 범위는 [저장소 이력 안내](repository-history.md)에 있다. 공개 전환은 별도 승인 전까지 수행하지 않는다.
+- 새 비공개 `ARTEX-Desktop`에 정리한 배포 기준 root commit과 `preview.2` 다운로드 릴리스를 등록했다. 현재 저장소(ID `1419301831`)의 refs·릴리스·asset ID/크기/해시가 History 삭제 직후 그대로 유지되는 것을 확인했다. 기존 `preview.1`은 로컬 복구 백업으로만 보존한다. 분리와 삭제 범위는 [저장소 이력 안내](repository-history.md)에 있다. 기존 이력 삭제 이후 사용자의 별도 요청에 따라 2026-10-15에 현재 저장소를 공개했다. 전환 직전 준비 소스와 릴리스 ID·태그·파일 해시를 대조하고 고정 `preview.2`와 해당 소스만 공개 범위에 포함했다.
 - macOS/Arch 실기기의 DPI·입력·절전/복구·키 저장·외부 프로세스 정리와 해당 OS 배포 패키지는 별도 수락 범위다. [플랫폼 점검](desktop-platform-audit.md)의 잔여 사항을 유지한다. 코드 서명·설치 프로그램·자동 업데이트는 포함하지 않는다.
 
 사용자의 실제 작업 공간·LLM 키·최근 작업 공간 설정과 원본 소스는 수정하지 않았다. 이 기록은 모든 저작권 관계의 법률적 보증이 아니다. 정확한 로컬 증거 색인은 `D:/Artex/.organization/public-remediation-final-result.json`에 보관한다. 이 후속 기록은 빌드 후 생성했으며 고정 소스 ZIP을 변경하지 않는다.
