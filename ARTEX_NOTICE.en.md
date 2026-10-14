@@ -20,4 +20,4 @@ The project as a whole retains **AGPL-3.0-only**. Existing rights and notices of
 
 The original README's prohibitions on online and practical use are handled under the [policy based on AGPL sections 7 and 10](docs/license-policy.md) and are not adopted as additional license conditions for this derivative project. Original author, attribution, warranty, modification, and AGPL notices are preserved, as are obligations under applicable laws and separate agreements. This is not a guarantee that all legal disputes or third-party rights have been resolved.
 
-The project remains in private development and review. A new Windows candidate reflecting recent code, prompts, and distribution notices is being prepared; public release and external distribution of that candidate are not yet complete.
+The project remains in private development and review. Windows `v0.2.0-preview.2` and its corresponding source are available through private Releases. See the [final artifact and verification record](docs/public-release-remediation-result-20261014.md) for notices, source and verification scope. The repository has not been made public.

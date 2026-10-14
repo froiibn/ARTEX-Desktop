@@ -1,14 +1,14 @@
 # 출처 및 라이선스 고지
 
-이 문서는 현재 확인한 출처와 고지를 보존한다. 공개 배포에 필요한 전체 의존성 고지의 완료를 뜻하지 않는다. 2026-10-14의 상세 결과는 [라이선스 감사](../../docs/license-audit-20261014.md), 진행 상태는 [공개 전 점검](../../docs/public-release-review.md)을 따른다.
+이 문서는 확인한 소스 출처와 고지를 보존한다. 실제 Windows `preview.2`에 포함하는 고지·원문·소스 안내는 패키지의 라이선스 색인과 [최종 산출물·검증 기록](../../docs/public-release-remediation-result-20261014.md)을 따른다. 2026-10-14의 이전 조사 결과는 [라이선스 감사](../../docs/license-audit-20261014.md), 현재 판정은 [공개 전 점검](../../docs/public-release-review.md)에서 구분한다.
 
 ## ARTEX와 원본 기반 코드·계약
 
 이 프로젝트는 사용자가 `https://github.com/mhtsec/ARTEX.git`에서 받은 Go/Web ARTEX를 바탕으로 Rust 네이티브 앱을 재구축한 수정 버전이다. 비교 기준 Git commit은 `a9d11cb852eadad00669e4f6a05ee59cbbd14860`이다. 원본 Go 모듈에는 `github.com/Autumn-27/artex`와 `github.com/Autumn-27/norma`가 기록되어 있다. 원본과 그 기여자의 권리를 주장하지 않는다.
 
-2026-10-14 기준 수정 내용에는 Rust 객체·파일 저장, 같은 프로세스의 네이티브 UI·실행 서비스, 실행 승인/중지, 대화·작업 관리와 한국어/영어 표시가 포함된다. 원본 프롬프트·계약·코드 발췌를 보존하며, 완전히 독립적으로 작성한 코드라고 표시하지 않는다. 이전 웹·Tauri 구현은 미사용 코드 정리로 현재 작업 트리에서 제거했고 과거 Git 기록과 복구 백업에 보존했다.
+2026-10-14 기준 수정 내용에는 Rust 객체·파일 저장, 같은 프로세스의 네이티브 UI·실행 서비스, 실행 승인/중지, 대화·작업 관리와 한국어/영어 표시가 포함된다. 원본 프롬프트·계약·코드 발췌를 보존하며, 완전히 독립적으로 작성한 코드라고 표시하지 않는다. 이전 웹·Tauri 구현은 미사용 코드 정리로 현재 작업 트리에서 제거했고 로컬의 과거 Git 복구 백업에 보존했다.
 
-현재 프로젝트의 LICENSE와 Rust manifest는 AGPL-3.0-only를 사용한다. [LICENSE](../../LICENSE)의 원문을 유지한다. 원본 README의 별도 사용 제한 문구와 AGPL의 관계는 공개 전 해결 대상이다. 기존 고지를 임의로 제거하거나 전체 프로젝트의 라이선스를 바꾸지 않는다.
+현재 프로젝트의 LICENSE와 Rust manifest는 AGPL-3.0-only를 사용한다. [LICENSE](../../LICENSE)의 원문을 유지한다. 원본 README의 별도 사용 제한 문구는 [AGPL 7·10조에 따른 처리 방침](../../docs/license-policy.md)으로 다루며 파생 프로젝트의 추가 라이선스 조건으로 채택하지 않는다. 기존 고지를 임의로 제거하거나 전체 프로젝트의 라이선스를 바꾸지 않는다.
 
 ## Brevduva 프로토콜 구조 참고
 
@@ -24,7 +24,7 @@ Norma v0.4.3의 tag `320ae32989da97dd91469bb89164cbfe87d83d5d`에는 라이선�
 
 ## 원본 웹 템플릿과 UI 자료
 
-원본 `web/LICENSE`는 MIT, `Copyright (c) 2024 Mohammed Arham Khan`이며 `arhamkhnz/next-shadcn-admin-dashboard`의 MIT 고지와 일치한다. 이전 React 코드와 원본 고지는 복구 기준 commit `7d09ee2a0bd8a24ed50d1ceba3570afd9433f443`에 보존되며, 현재 트리에는 [원문 사본](../../docs/licenses/original-web-MIT.txt)을 유지한다.
+원본 `web/LICENSE`는 MIT, `Copyright (c) 2024 Mohammed Arham Khan`이며 `arhamkhnz/next-shadcn-admin-dashboard`의 MIT 고지와 일치한다. 이전 React 코드와 원본 고지는 로컬 과거 이력의 복구 기준 commit `7d09ee2a0bd8a24ed50d1ceba3570afd9433f443`에 보존되며, 현재 트리에는 [원문 사본](../../docs/licenses/original-web-MIT.txt)을 유지한다.
 
 이전 shadcn UI 기반 구성 요소는 MIT, `Copyright (c) 2023 shadcn`이며 [고지 원문](../../docs/licenses/shadcn-ui-MIT.txt)을 보존한다. 제거한 웹 CSS의 국기 SVG는 `country-flag-icons`의 자료였으며 MIT, `Copyright (c) 2020 @catamphetamine` [고지](../../docs/licenses/country-flag-icons-MIT.txt)를 보존한다. 정리 전 최신 CSS와 257개 중 238개 SVG의 XML이 정확히 일치했다. 이 자산은 현재 트리에 포함되지 않으며 과거 자산을 다시 배포하면 정확한 도입 버전의 확인이 필요하다.
 
