@@ -263,8 +263,14 @@ pub(crate) fn show_titlebar(
                     egui::Sense::click_and_drag(),
                 );
                 let icon = crate::app_icon::title_texture(ctx);
+                let title = ui.painter().layout_no_wrap(
+                    "ARTEX".into(),
+                    egui::FontId::proportional(14.0),
+                    theme::muted(ui),
+                );
+                let title_rect = Rect::from_center_size(area.center(), title.size());
                 let icon_rect = Rect::from_center_size(
-                    drag_rect.left_center() + egui::vec2(20.0, 0.0),
+                    egui::pos2(title_rect.left() - 20.0, area.center().y),
                     egui::Vec2::splat(24.0),
                 );
                 ui.painter().image(
@@ -273,13 +279,7 @@ pub(crate) fn show_titlebar(
                     Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
                     Color32::WHITE,
                 );
-                ui.painter().text(
-                    drag_rect.left_center() + egui::vec2(40.0, 0.0),
-                    egui::Align2::LEFT_CENTER,
-                    "ARTEX",
-                    egui::FontId::proportional(14.0),
-                    theme::muted(ui),
-                );
+                ui.painter().galley(title_rect.min, title, theme::muted(ui));
                 if drag.double_clicked_by(egui::PointerButton::Primary) {
                     output.actions.push(WindowAction::SetMaximized(!maximized));
                 } else if drag.drag_started_by(egui::PointerButton::Primary) {
@@ -523,9 +523,18 @@ mod tests {
             } else {
                 assert!(bar.controls[0].center().x > bar.drag_rect.right());
             }
-            assert!(output.shapes.iter().any(
-                |shape| matches!(&shape.shape,egui::Shape::Text(t) if t.galley.text()=="ARTEX")
-            ));
+            let title_bounds = output
+                .shapes
+                .iter()
+                .find_map(|shape| match &shape.shape {
+                    egui::Shape::Text(text) if text.galley.text() == "ARTEX" => {
+                        Some(Rect::from_min_size(text.pos, text.galley.size()))
+                    }
+                    _ => None,
+                })
+                .expect("Centered title must be painted");
+            assert!((title_bounds.center().x - bar.rect.center().x).abs() < 0.5);
+            assert!(bar.drag_rect.contains_rect(title_bounds));
         }
     }
     #[test]

@@ -270,6 +270,16 @@ pub fn primary_button(ui: &mut Ui, label: &str) -> Response {
     })
     .inner
 }
+pub fn secondary_button(ui: &mut Ui, label: &str) -> Response {
+    let p = palette(ui.visuals().dark_mode);
+    ui.add(
+        egui::Button::new(label)
+            .frame(true)
+            .fill(p.surface)
+            .stroke(Stroke::new(1.0_f32, p.border))
+            .corner_radius(8),
+    )
+}
 #[cfg(test)]
 pub fn quiet_button(ui: &mut Ui, label: &str) -> Response {
     ui.scope(|ui| {
@@ -284,7 +294,6 @@ pub enum BadgeTone {
     Info,
     Success,
     Warning,
-    #[cfg(test)]
     Error,
 }
 pub fn badge(ui: &mut Ui, label: &str, tone: BadgeTone) -> Response {
@@ -294,7 +303,6 @@ pub fn badge(ui: &mut Ui, label: &str, tone: BadgeTone) -> Response {
         BadgeTone::Info => p.accent,
         BadgeTone::Success => p.success,
         BadgeTone::Warning => p.warning,
-        #[cfg(test)]
         BadgeTone::Error => p.error,
     };
     let mix = |base: u8, tint: u8| (f32::from(base) * 0.87 + f32::from(tint) * 0.13).round() as u8;

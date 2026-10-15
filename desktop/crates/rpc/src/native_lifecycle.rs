@@ -51,7 +51,8 @@ fn quarantine_operation(input: &Value, restore: bool) -> &'static str {
     }
 }
 fn proof(s: &Snapshot, run: &str) -> Option<Value> {
-    s.records("command_receipts")
+    let latest = s
+        .records("command_receipts")
         .into_iter()
         .filter(|r| r.data["method"] == "native.lifecycle.cleanup")
         .filter_map(|r| {
@@ -65,9 +66,64 @@ fn proof(s: &Snapshot, run: &str) -> Option<Value> {
                 .map(move |v| (seq, v.clone()))
         })
         .max_by_key(|(seq, _)| *seq)
-        .map(|(_, v)| v)
+        .map(|(_, v)| v);
+    let record = s.get("agent_runs", run)?;
+    if latest.as_ref().is_some_and(|p| {
+        p["cleanup_confirmed"] == true && p["engine_epoch"] == record.data["engine_epoch"]
+    }) {
+        return latest;
+    }
+    // A failed/completed native run can end before it admits any tool. The
+    // durable finish receipt plus the retained invocation audit proves that
+    // there was no owned external execution to clean up. A fresh host registry
+    // alone is never evidence about an earlier engine lifetime.
+    if record.header.legacy_key.is_null()
+        && matches!(text(&record.data, "state"), "failed" | "completed")
+        && record.data["finished_at"].is_string()
+        && !s
+            .records("tool_invocations")
+            .iter()
+            .any(|i| i.data["run_id"] == run)
+    {
+        let contradictory = s
+            .records("command_receipts")
+            .iter()
+            .filter(|r| r.data["method"] == "native.lifecycle.cleanup")
+            .flat_map(|r| r.data["result"]["runs"].as_array().into_iter().flatten())
+            .any(|p| {
+                p["run_id"] == run
+                    && (p["executions"].as_array().is_some_and(|e| !e.is_empty())
+                        || p["active_host_calls"].as_u64().is_some_and(|n| n > 0)
+                        || p["run_requests_quiesced"] == false)
+            });
+        if !contradictory {
+            if let Some(finish) = s.records("command_receipts").into_iter().find(|r| {
+                r.header.legacy_key.is_null()
+                    && r.data["method"] == "run.finish"
+                    && r.data["normalized_params"]["run_id"] == run
+                    && r.data["normalized_params"]["status"] == record.data["state"]
+                    && r.data["result"]["state"] == record.data["state"]
+                    && r.header.created_at.as_str()
+                        >= record.data["finished_at"].as_str().unwrap_or("")
+                    && r.header
+                        .commit_seq
+                        .parse::<u64>()
+                        .ok()
+                        .zip(record.header.commit_seq.parse::<u64>().ok())
+                        .is_some_and(|(finished, current)| finished <= current)
+            }) {
+                return Some(
+                    json!({"run_id":run,"engine_epoch":record.data["engine_epoch"],
+                    "cleanup_confirmed":true,"cleanup_state":"confirmed","executions":[],
+                    "proof_source":"durable_terminal_without_tool_admission",
+                    "terminal_receipt_id":finish.header.id}),
+                );
+            }
+        }
+    }
+    latest
 }
-fn confirmed(s: &Snapshot, run: &artex_core::Record) -> bool {
+pub(super) fn confirmed(s: &Snapshot, run: &artex_core::Record) -> bool {
     proof(s, &run.header.id).is_some_and(|v| {
         v["cleanup_confirmed"] == true && v["engine_epoch"] == run.data["engine_epoch"]
     })

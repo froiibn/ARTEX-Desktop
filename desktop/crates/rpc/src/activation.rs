@@ -138,6 +138,12 @@ impl Router {
         Ok(())
     }
     pub(super) fn schedule_activations(&mut self) -> Result<()> {
+        // Pending deliveries and interval triggers must not launch agents just
+        // because the user opened a workspace. An accepted user command that
+        // starts a run or admits a task enables automation for this lifetime.
+        if self.native_mode && !self.native_automation_admitted {
+            return Ok(());
+        }
         let s = self.snapshot()?;
         let mut p = Planner::new(&s, "scheduler.triggers", &json!({}));
         let after = s
@@ -319,7 +325,11 @@ impl Router {
                 let task_record = task.and_then(|id| s.get("tasks", id));
                 if task.is_some()
                     && task_record.is_none_or(|t| {
-                        !t.data["deleted_at"].is_null() || !t.data["archived_at"].is_null()
+                        !t.data["deleted_at"].is_null()
+                            || !t.data["archived_at"].is_null()
+                            || t.data["paused"] == true
+                            || t.data["status"] == "paused"
+                            || self.deleting_tasks.contains(&t.header.id)
                     })
                 {
                     continue;
@@ -709,6 +719,71 @@ mod tests {
         r.internal_commit(p.done(json!({}))).unwrap();
         (dir, r, rid, b, task)
     }
+    #[test]
+    fn paused_task_deliveries_wait_for_resume_even_after_automation_is_admitted() {
+        let (_dir, mut router, _sender, receiver, task) = fixture();
+        router.native_mode = true;
+        router.native_automation_admitted = true;
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.paused.trigger", &json!({}));
+        let mut data = s.get("tasks", &task).unwrap().data.clone();
+        data["status"] = json!("paused");
+        data["paused"] = json!(true);
+        p.put("tasks", &task, data);
+        p.insert(
+            "agent_triggers",
+            "trigger",
+            json!({"agent_key":"receiver","enabled":true,"on_task_create":true}),
+        )
+        .unwrap();
+        let c = Context {
+            actor: Actor {
+                kind: "engine".into(),
+                agent_id: None,
+                run_id: None,
+                engine_epoch: router.engine_epoch.clone(),
+            },
+            task_id: Some(task.clone()),
+            intent_id: None,
+            conversation_id: None,
+        };
+        artex_domain::conversation::push_event(&mut p.batch, &s, &c, "TaskCreated", "tasks", &task)
+            .unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        router.schedule_activations().unwrap();
+        let paused = router.snapshot().unwrap();
+        assert!(
+            paused
+                .records("agent_runs")
+                .iter()
+                .all(|r| r.data["agent_id"] != receiver)
+        );
+        assert_eq!(paused.records("agent_deliveries").len(), 1);
+        assert_eq!(
+            paused.records("agent_deliveries")[0].data["state"],
+            "pending"
+        );
+        router.schedule_activations().unwrap();
+        assert_eq!(router.snapshot().unwrap().commit_seq, paused.commit_seq);
+        let mut p = Planner::new(&paused, "fixture.resumed", &json!({}));
+        let mut data = paused.get("tasks", &task).unwrap().data.clone();
+        data["status"] = json!("running");
+        data["paused"] = json!(false);
+        p.put("tasks", &task, data);
+        router.internal_commit(p.done(json!({}))).unwrap();
+        router.schedule_activations().unwrap();
+        assert_eq!(
+            router
+                .snapshot()
+                .unwrap()
+                .records("agent_runs")
+                .iter()
+                .filter(|r| r.data["agent_id"] == receiver)
+                .count(),
+            1
+        );
+    }
+
     #[test]
     fn request_reply_roundtrip_injects_readonly_refs_and_preserves_independent_receiver_scope() {
         let (_dir, mut router, sender, receiver, task) = fixture();

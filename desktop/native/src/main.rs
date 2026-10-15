@@ -9,6 +9,7 @@ mod self_test;
 mod theme;
 mod tray;
 mod window_chrome;
+mod workspace_landing;
 
 use artex_native_core::{OpenMode, OpenOptions};
 use std::path::PathBuf;

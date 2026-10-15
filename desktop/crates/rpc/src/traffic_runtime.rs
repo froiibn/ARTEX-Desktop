@@ -25,6 +25,90 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
     };
     struct Ack(AtomicUsize);
+    struct ToggleTraffic {
+        configurations: AtomicUsize,
+        polls: AtomicUsize,
+        enabled: std::sync::atomic::AtomicBool,
+    }
+    impl HostGateway for ToggleTraffic {
+        fn request(
+            &self,
+            _: &str,
+            _: &Context,
+            operation: &str,
+            input: Value,
+            _: Duration,
+        ) -> Result<Value> {
+            match operation {
+                "traffic.configure" => {
+                    self.configurations.fetch_add(1, Ordering::SeqCst);
+                    self.enabled
+                        .store(input["enabled"] == true, Ordering::SeqCst);
+                    Ok(json!({"enabled":input["enabled"]}))
+                }
+                "traffic.poll" => {
+                    self.polls.fetch_add(1, Ordering::SeqCst);
+                    if !self.enabled.load(Ordering::SeqCst) {
+                        return Err(Error::new("FEATURE_DISABLED", "No capture spool is open"));
+                    }
+                    Ok(json!({"exchanges":[]}))
+                }
+                _ => panic!("Unexpected operation {operation}"),
+            }
+        }
+    }
+    fn drive_capture(router: &mut Router) {
+        for _ in 0..40 {
+            router.traffic.last_poll = Instant::now() - Duration::from_secs(1);
+            router.process_traffic().unwrap();
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+    #[test]
+    fn disabled_capture_does_not_poll_or_write_and_toggles_still_reconfigure() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut router = Router::new(BTreeMap::from([("work".into(), dir.path().join("work"))]));
+        router
+            .set_execution_capabilities(Some("work".into()), None)
+            .unwrap();
+        router.store = Some(Store::create(&dir.path().join("store"), "Disabled capture").unwrap());
+        let host = Arc::new(ToggleTraffic {
+            configurations: AtomicUsize::new(0),
+            polls: AtomicUsize::new(0),
+            enabled: std::sync::atomic::AtomicBool::new(false),
+        });
+        router.attach_host(host.clone());
+        let before = router.snapshot().unwrap().commit_seq;
+        drive_capture(&mut router);
+        assert_eq!(host.configurations.load(Ordering::SeqCst), 1);
+        assert_eq!(host.polls.load(Ordering::SeqCst), 0);
+        assert_eq!(router.snapshot().unwrap().commit_seq, before);
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.enable.capture", &json!({}));
+        let id = p
+            .insert(
+                "settings",
+                "setting",
+                json!({"key":"traffic_capture","value":"true"}),
+            )
+            .unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        drive_capture(&mut router);
+        assert!(host.polls.load(Ordering::SeqCst) > 0);
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.disable.capture", &json!({}));
+        let mut disabled = s.get("settings", &id).unwrap().data.clone();
+        disabled["value"] = json!("false");
+        p.put("settings", &id, disabled);
+        router.internal_commit(p.done(json!({}))).unwrap();
+        drive_capture(&mut router);
+        let polls = host.polls.load(Ordering::SeqCst);
+        let seq = router.snapshot().unwrap().commit_seq;
+        drive_capture(&mut router);
+        assert_eq!(host.polls.load(Ordering::SeqCst), polls);
+        assert_eq!(host.configurations.load(Ordering::SeqCst), 3);
+        assert_eq!(router.snapshot().unwrap().commit_seq, seq);
+    }
     impl HostGateway for Ack {
         fn request(
             &self,
@@ -181,7 +265,10 @@ impl Router {
                 );
                 let _ = tx.send(Reply::Configured { key, result });
             });
-        } else if self.traffic.last_poll.elapsed() >= Duration::from_millis(250) {
+        } else if enabled
+            && self.traffic.info["enabled"] == true
+            && self.traffic.last_poll.elapsed() >= Duration::from_millis(250)
+        {
             let (tx, rx) = mpsc::channel();
             self.traffic.pending = Some(rx);
             self.traffic.last_poll = Instant::now();

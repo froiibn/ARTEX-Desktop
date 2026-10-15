@@ -265,7 +265,8 @@ pub(crate) struct CompactToolbarPresentation<'a> {
     pub read_only: bool,
     pub bypass: Option<(bool, bool, bool)>,
     pub list_open: Option<bool>,
-    pub details_open: bool,
+    pub details_open: Option<bool>,
+    pub workspace_choices_enabled: bool,
     pub settings_records: Option<bool>,
     pub management_open: Option<bool>,
 }
@@ -280,6 +281,29 @@ pub(crate) enum ChromeAction {
     Management,
     Details,
 }
+fn workspace_buttons(ui: &mut egui::Ui, enabled: bool) -> Vec<ChromeAction> {
+    ui.add_enabled_ui(enabled, |ui| {
+        ui.horizontal(|ui| {
+            let mut actions = vec![];
+            if theme::secondary_button(ui, "열기")
+                .on_hover_text(format!("기존 작업 공간으로 전환 · {}", shortcut("O")))
+                .clicked()
+            {
+                actions.push(ChromeAction::Open);
+            }
+            if theme::secondary_button(ui, "새 공간")
+                .on_hover_text("현재 공간을 저장·정리한 뒤 새 작업 공간을 만듭니다.")
+                .clicked()
+            {
+                actions.push(ChromeAction::New);
+            }
+            actions
+        })
+        .inner
+    })
+    .inner
+}
+
 pub(crate) fn compact_toolbar(
     ui: &mut egui::Ui,
     state: &CompactToolbarPresentation<'_>,
@@ -290,16 +314,7 @@ pub(crate) fn compact_toolbar(
         ui.spacing_mut().interact_size.y = 28.0;
         ui.horizontal(|ui| {
             let mut actions = Vec::new();
-            ui.menu_button("작업 공간", |ui| {
-                if ui.button(format!("열기 · {}", shortcut("O"))).clicked() {
-                    actions.push(ChromeAction::Open);
-                    ui.close();
-                }
-                if ui.button("새 작업 공간").clicked() {
-                    actions.push(ChromeAction::New);
-                    ui.close();
-                }
-            });
+            actions.extend(workspace_buttons(ui, state.workspace_choices_enabled));
             if let Some(name) = state.workspace_name {
                 ui.add_sized([112.0, 28.0], egui::Label::new(name).truncate())
                     .on_hover_text(state.workspace_path.unwrap_or(name));
@@ -373,11 +388,16 @@ pub(crate) fn compact_toolbar(
                     actions.push(ChromeAction::Management);
                 }
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.selectable_label(state.details_open, "상세").clicked() {
-                    actions.push(ChromeAction::Details);
-                }
-            });
+            if let Some(open) = state.details_open {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add(egui::Button::new("상세").selected(open).frame(true))
+                        .clicked()
+                    {
+                        actions.push(ChromeAction::Details);
+                    }
+                });
+            }
             actions
         })
         .inner
@@ -484,6 +504,35 @@ fn bypass_pending(purpose: &Purpose, scope: &WorkspaceScope) -> bool {
         Purpose::Prepare { then, .. } => bypass_pending(then, scope),
         _ => false,
     }
+}
+
+fn background_observation(purpose: &Purpose) -> bool {
+    matches!(
+        purpose,
+        Purpose::Projection { .. }
+            | Purpose::NativeOperation {
+                mutation: false,
+                ..
+            }
+            | Purpose::FileRead { .. }
+            | Purpose::SourceBody { .. }
+    )
+}
+
+// The toolbar and inspector resolve exactly the same visible, supported record.
+pub(super) fn inspector_item<'a>(
+    snapshot: &'a artex_core::Snapshot,
+    section: Section,
+    id: Option<&str>,
+) -> Option<&'a artex_core::Record> {
+    if section.configuration() {
+        return None;
+    }
+    selected_record(snapshot, section, id).or_else(|| {
+        (section == Section::Chat)
+            .then(|| selected_record(snapshot, Section::Tasks, id))
+            .flatten()
+    })
 }
 
 // Presentation preferences are independent per section. Conversation reading
@@ -613,6 +662,61 @@ fn object_list_button(ui: &mut egui::Ui, selected: bool, label: &str) -> egui::R
         )
     }
 }
+
+fn object_list_row(
+    ui: &mut egui::Ui,
+    panes: &mut Panes,
+    snapshot: &artex_core::Snapshot,
+    section: Section,
+    record: &artex_core::Record,
+    selected: bool,
+    label: &str,
+) -> egui::Response {
+    let has_actions = matches!(section, Section::Chat | Section::Tasks | Section::Archives);
+    ui.push_id(&record.header.id, |ui| {
+        ui.horizontal(|ui| {
+            panes.object_batch_checkbox(ui, section, record);
+            // Reserve the action button AND the spacing before it. Otherwise
+            // the row grows the SidePanel beyond its painted/clip rectangle,
+            // leaving an unpainted strip between the list and the main pane.
+            let action_width = if has_actions {
+                let text = egui::WidgetText::from("⋯").into_galley(
+                    ui,
+                    Some(egui::TextWrapMode::Extend),
+                    f32::INFINITY,
+                    egui::TextStyle::Button,
+                );
+                (text.size().x + 2.0 * ui.spacing().button_padding.x)
+                    .max(ui.spacing().interact_size.x)
+                    + ui.spacing().item_spacing.x
+            } else {
+                0.0
+            };
+            let width = (ui.available_width() - action_width).max(1.0);
+            let response = ui
+                .allocate_ui_with_layout(
+                    egui::vec2(width, if label.contains('\n') { 52.0 } else { 36.0 }),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| object_list_button(ui, selected, label),
+                )
+                .inner
+                .on_hover_text(format!(
+                    "{}\n{}",
+                    presentation_name(snapshot, section, record),
+                    record.header.id
+                ));
+            if has_actions {
+                response.context_menu(|ui| panes.object_actions(ui, snapshot, section, record));
+                ui.menu_button("⋯", |ui| {
+                    panes.object_actions(ui, snapshot, section, record)
+                });
+            }
+            response
+        })
+        .inner
+    })
+    .inner
+}
 fn execution_label(
     snapshot: &artex_core::Snapshot,
     section: Section,
@@ -643,6 +747,160 @@ fn execution_label(
         _ => return display_name(record),
     };
     format!("{name} · {}", display_state(state))
+}
+
+#[cfg(test)]
+mod list_boundary_tests {
+    use super::*;
+
+    fn fixture(section: Section) -> (artex_core::Snapshot, artex_core::Record) {
+        let collection = section.collection().unwrap();
+        let record = serde_json::from_value(json!({
+            "header": {"id": "list-boundary-fixture", "collection": collection,
+                "version": "1", "commit_seq": "1", "created_at": "2026-10-15T00:00:00Z",
+                "updated_at": "2026-10-15T00:00:00Z", "legacy_key": null},
+            "data": {"name": "A very long conversation or task name that must stay inside the list"}
+        }))
+        .unwrap();
+        (
+            artex_core::Snapshot {
+                workspace_id: "boundary-test".into(),
+                commit_seq: 1,
+                collections: Default::default(),
+            },
+            record,
+        )
+    }
+
+    #[test]
+    fn list_rows_do_not_grow_panel_or_leave_an_unpainted_boundary() {
+        for theme in [egui::Theme::Dark, egui::Theme::Light] {
+            for section in [Section::Chat, Section::Tasks, Section::Archives] {
+                for width in [180.0, 218.0, 350.0] {
+                    let ctx = egui::Context::default();
+                    theme::apply(&ctx);
+                    ctx.set_theme(theme);
+                    let (snapshot, record) = fixture(section);
+                    let mut panes = Panes::default();
+                    // Read-only labels and action menus must use the same geometry.
+                    panes.set_read_only(true);
+                    for pass in 0..8 {
+                        let mut panel_rect = egui::Rect::NOTHING;
+                        let output = ctx.run(
+                            egui::RawInput {
+                                screen_rect: Some(egui::Rect::from_min_size(
+                                    egui::Pos2::ZERO,
+                                    egui::vec2(1000.0, 600.0),
+                                )),
+                                time: Some(f64::from(pass) / 60.0),
+                                ..Default::default()
+                            },
+                            |ctx| {
+                                panel_rect = egui::SidePanel::left("boundary-list")
+                                    .default_width(width)
+                                    .width_range(180.0..=350.0)
+                                    .frame(theme::toolbar_frame(&ctx.style()))
+                                    .show(ctx, |ui| {
+                                        ui.strong("대화 목록");
+                                        panes.object_batch_toolbar(ui, &snapshot, section);
+                                        egui::ScrollArea::vertical().show(ui, |ui| {
+                                            object_list_row(
+                                                ui,
+                                                &mut panes,
+                                                &snapshot,
+                                                section,
+                                                &record,
+                                                true,
+                                                record.data["name"].as_str().unwrap(),
+                                            );
+                                        });
+                                    })
+                                    .response
+                                    .rect;
+                                let central = egui::CentralPanel::default().show(ctx, |ui| {
+                                    ui.label("messages");
+                                });
+                                assert!(
+                                    (central.response.rect.left() - panel_rect.right()).abs() < 0.1
+                                );
+                            },
+                        );
+                        assert!(
+                            (panel_rect.width() - width).abs() < 0.1,
+                            "{theme:?} {section:?} pass {pass}: panel drifted from {width} to {}",
+                            panel_rect.width()
+                        );
+                        let painted = output.shapes.iter().find(|shape| matches!(&shape.shape,
+                            egui::Shape::Rect(rect) if rect.fill == ctx.style().visuals.panel_fill && rect.rect.height() > 500.0)).unwrap();
+                        let egui::Shape::Rect(rect) = &painted.shape else {
+                            unreachable!()
+                        };
+                        assert!(painted.clip_rect.right() >= panel_rect.right() - 0.1);
+                        assert!(
+                            rect.rect.right() >= panel_rect.right() - 0.1,
+                            "The panel must paint all the way to the main pane"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn list_boundary_still_resizes_on_drag() {
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let (snapshot, record) = fixture(Section::Chat);
+        let mut panes = Panes::default();
+        let mut widths = Vec::new();
+        for pass in 0..6 {
+            let pointer = egui::pos2(if pass < 3 { 218.0 } else { 278.0 }, 300.0);
+            let mut events = vec![egui::Event::PointerMoved(pointer)];
+            if pass == 2 || pass == 5 {
+                events.push(egui::Event::PointerButton {
+                    pos: pointer,
+                    button: egui::PointerButton::Primary,
+                    pressed: pass == 2,
+                    modifiers: Default::default(),
+                });
+            }
+            let _ = ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 600.0),
+                    )),
+                    time: Some(f64::from(pass) / 60.0),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    let panel = egui::SidePanel::left("resizable-list")
+                        .resizable(true)
+                        .default_width(218.0)
+                        .width_range(180.0..=350.0)
+                        .frame(theme::toolbar_frame(&ctx.style()))
+                        .show(ctx, |ui| {
+                            object_list_row(
+                                ui,
+                                &mut panes,
+                                &snapshot,
+                                Section::Chat,
+                                &record,
+                                false,
+                                "대화",
+                            );
+                        });
+                    widths.push(panel.response.rect.width());
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        ui.label("messages");
+                    });
+                },
+            );
+        }
+        assert!((widths[0] - 218.0).abs() < 0.1);
+        assert!((widths[5] - 278.0).abs() < 0.1, "Resize failed: {widths:?}");
+    }
 }
 
 #[cfg(test)]
@@ -704,6 +962,7 @@ mod bypass_tests {
                                             read_only: true,
                                             bypass: Some((true, false, false)),
                                             list_open: Some(false),
+                                            details_open: Some(false),
                                             management_open: Some(tab == DrawerTab::Management),
                                             ..Default::default()
                                         },
@@ -802,7 +1061,7 @@ mod bypass_tests {
                         toolbar_rect.height() <= 48.0,
                         "compact toolbar wrapped into multiple rows: {toolbar_rect:?}"
                     );
-                    let labels = ["작업 공간", "Bypass 켜짐", "목록", "관리", "상세"];
+                    let labels = ["열기", "새 공간", "Bypass 켜짐", "목록", "관리", "상세"];
                     let positions: Vec<_> = output
                         .shapes
                         .iter()
@@ -1296,7 +1555,16 @@ impl NativeApp {
             self.list_preferences.set_open(self.section, true);
         }
         let status = self.handle.status();
+        let workspace_choices_enabled = self.workspace_choices_enabled();
         let view = self.handle.view();
+        let details_state = view.as_ref().and_then(|view| {
+            inspector_item(
+                &view.generation.snapshot,
+                self.section,
+                self.selected.get(&self.section).and_then(Option::as_deref),
+            )
+            .map(|_| self.details_open())
+        });
         let window_titlebar = crate::window_chrome::show_titlebar(
             ctx,
             crate::window_chrome::Platform::current(),
@@ -1304,17 +1572,35 @@ impl NativeApp {
                 egui::MenuBar::new().ui(ui, |ui| {
                     ui.menu_button("파일", |ui| {
                         if ui
-                            .button(format!("작업 공간 열기          {}", shortcut("O")))
+                            .add_enabled(
+                                workspace_choices_enabled,
+                                egui::Button::new(format!(
+                                    "작업 공간 열기          {}",
+                                    shortcut("O")
+                                )),
+                            )
                             .clicked()
                         {
                             self.choose(false);
                             ui.close();
                         }
-                        if ui.button("읽기 전용으로 열기").clicked() {
+                        if ui
+                            .add_enabled(
+                                workspace_choices_enabled,
+                                egui::Button::new("읽기 전용으로 열기"),
+                            )
+                            .clicked()
+                        {
                             self.choose_mode(false, true);
                             ui.close();
                         }
-                        if ui.button("새 작업 공간").clicked() {
+                        if ui
+                            .add_enabled(
+                                workspace_choices_enabled,
+                                egui::Button::new("새 작업 공간"),
+                            )
+                            .clicked()
+                        {
                             self.choose(true);
                             ui.close();
                         }
@@ -1362,9 +1648,10 @@ impl NativeApp {
                                 self.list_preferences.set_open(self.section, open);
                             }
                         }
-                        let mut open = self.details_open();
-                        if ui.checkbox(&mut open, "선택 항목 상세 패널").changed() {
-                            self.set_details_open(open);
+                        if let Some(mut open) = details_state {
+                            if ui.checkbox(&mut open, "선택 항목 상세 패널").changed() {
+                                self.set_details_open(open);
+                            }
                         }
                         if ui
                             .selectable_label(
@@ -1456,7 +1743,8 @@ impl NativeApp {
                 crate::window_chrome::dispatch_action(ctx, action);
             }
         }
-        egui::TopBottomPanel::top("desktop_context_toolbar")
+        if view.is_some() {
+            egui::TopBottomPanel::top("desktop_context_toolbar")
             .frame(theme::toolbar_frame(&ctx.style()))
             .show(ctx, |ui| {
                 if self.list_preferences.compact {
@@ -1468,7 +1756,8 @@ impl NativeApp {
                         read_only: view.as_ref().is_some_and(|v|v.workspace.read_only),
                         bypass: view.as_ref().map(|view| (workspace_bypass(&view.generation.snapshot),self.pending.values().any(|p|bypass_pending(p,&view.workspace.scope)),status.phase==ServicePhase::Ready&&!view.workspace.read_only)),
                         list_open: (view.is_some() && (self.section.collection().is_some() || self.section==Section::Skills) && (self.section!=Section::Settings||self.list_preferences.settings_records)).then(||self.list_preferences.open(self.section)),
-                        details_open: self.details_open(),
+                        details_open: details_state,
+                        workspace_choices_enabled,
                         settings_records: (view.is_some()&&self.section==Section::Settings).then_some(self.list_preferences.settings_records),
                         management_open: (view.is_some()&&self.section==Section::Chat).then_some(self.drawer.open&&self.drawer.tab==DrawerTab::Management),
                     });
@@ -1487,15 +1776,12 @@ impl NativeApp {
                 } else {
                 ui.horizontal_wrapped(|ui| {
                     theme::icon(ui, Icon::Workspace, 18.0);
-                    if ui
-                        .add(egui::Button::new("열기").frame(false))
-                        .on_hover_text(format!("작업 공간 열기 · {}", shortcut("O")))
-                        .clicked()
-                    {
-                        self.choose(false);
-                    }
-                    if ui.add(egui::Button::new("새 공간").frame(false)).clicked() {
-                        self.choose(true);
+                    for action in workspace_buttons(ui, workspace_choices_enabled) {
+                        match action {
+                            ChromeAction::Open => self.choose(false),
+                            ChromeAction::New => self.choose(true),
+                            _ => {}
+                        }
                     }
                     ui.separator();
                     ui.strong("ARTEX");
@@ -1561,20 +1847,20 @@ impl NativeApp {
                     if view.is_some() && self.section == Section::Chat && ui.selectable_label(self.drawer.open && self.drawer.tab == DrawerTab::Management, "추가 관리").clicked() {
                         self.drawer.toggle(DrawerTab::Management);
                     }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .selectable_label(self.details_open(), "상세")
-                            .on_hover_text(
-                                "선택된 항목의 저장 상태·관계 조회 · 창이 좁으면 자동으로 접습니다",
-                            )
-                            .clicked()
-                        {
-                            self.set_details_open(!self.details_open());
-                        }
-                    });
+                    if let Some(open) = details_state {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.add(egui::Button::new("상세").selected(open).frame(true))
+                                .on_hover_text("선택한 항목의 저장 상태·연결 정보 열기/닫기")
+                                .clicked()
+                            {
+                                self.set_details_open(!open);
+                            }
+                        });
+                    }
                 });
                 }
             });
+        }
         egui::TopBottomPanel::bottom("desktop_status_bar")
             .frame(theme::status_frame(&ctx.style()))
             .show(ctx, |ui| {
@@ -1590,12 +1876,26 @@ impl NativeApp {
                     ui.small(phase);
                     if let Some(view) = &view {
                         ui.separator();
-                        ui.small(format!("저장 세대 {}", view.generation.commit_seq));
+                        ui.small(format!("저장 세대 {}", view.generation.commit_seq))
+                            .on_hover_text("로컬 저장 기록 번호입니다. 복구·설정·기록 저장도 포함하며 에이전트 실행 횟수가 아닙니다.");
+                        let active = view.generation.snapshot.records("agent_runs").iter().filter(|run| {
+                            run.data["engine_epoch"] == view.workspace.scope.engine_epoch
+                                && matches!(run.data["state"].as_str(), Some("queued" | "running" | "waiting"))
+                        }).count();
+                        if active > 0 {
+                            ui.separator();
+                            ui.small(format!("활성 에이전트 {active}"));
+                        }
                     }
                     if status.outstanding > 0 {
                         ui.separator();
-                        ui.spinner();
-                        ui.small(format!("처리 중 {}", status.outstanding));
+                        let actions = self.pending.values().filter(|purpose| !background_observation(purpose)).count();
+                        if actions > 0 {
+                            ui.spinner();
+                            ui.small(format!("변경 처리 중 {actions}"));
+                        } else {
+                            ui.weak(format!("상태 조회 {}", status.outstanding));
+                        }
                     }
                     if self.error.is_some()
                         && ui
@@ -1902,22 +2202,7 @@ impl NativeApp {
                                 let selected =
                                     self.selected.get(&self.section).and_then(Option::as_deref)
                                         == Some(record.header.id.as_str());
-                                let has_actions = matches!(self.section,Section::Chat|Section::Tasks|Section::Archives);
-                                let mut clicked=false;
-                                ui.push_id(&record.header.id, |ui| {
-                                    ui.horizontal(|ui| {
-                                        self.panes.object_batch_checkbox(ui,self.section,record);
-                                        let width=(ui.available_width()-if has_actions{38.0}else{0.0}).max(30.0);
-                                        let response=ui.allocate_ui_with_layout(egui::vec2(width,if label.contains('\n'){52.0}else{36.0}),egui::Layout::top_down(egui::Align::Min),|ui|object_list_button(ui,selected,&label)).inner
-                                            .on_hover_text(format!("{}\n{}",presentation_name(snapshot,self.section,record),record.header.id));
-                                        if has_actions {
-                                            response.context_menu(|ui|self.panes.object_actions(ui,snapshot,self.section,record));
-                                            let _=ui.menu_button("⋯",|ui|self.panes.object_actions(ui,snapshot,self.section,record));
-                                        }
-                                        clicked=response.clicked();
-                                    });
-                                });
-                                if clicked {
+                                if object_list_row(ui, &mut self.panes, snapshot, self.section, record, selected, &label).clicked() {
                                     self.selected
                                         .insert(self.section, Some(record.header.id.clone()));
                                     self.panes.projection.clear();
@@ -1935,164 +2220,342 @@ impl NativeApp {
         snapshot: &artex_core::Snapshot,
         item: Option<&artex_core::Record>,
     ) {
-        // No live queries or editable forms are rendered here: this panel must
-        // never rebase a draft or change a staged file's owner.
-        if !self.details_open()
-            || ctx.available_rect().width() < 720.0
-            || self.section.configuration()
-        {
+        if !self.details_open() || self.section.configuration() {
             return;
         }
         let Some(item) = item else {
             return;
         };
-        egui::SidePanel::right("selection_inspector")
-            .resizable(true)
-            .default_width(232.0)
-            .width_range(205.0..=320.0)
-            .frame(theme::toolbar_frame(&ctx.style()))
-            .show(ctx, |ui| {
-                ui.add_space(7.0);
+        let section = self.section;
+        let floating = ctx.available_rect().width() < 720.0;
+        // Read only: never query, hydrate a form, or change a draft's owner.
+        let contents = |ui: &mut egui::Ui| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+            ui.add_space(7.0);
+            if !floating {
                 ui.strong("선택 항목 상세");
                 ui.separator();
-                egui::ScrollArea::vertical()
-                    .id_salt("inspector-content")
-                    .show(ui, |ui| {
-                        ui.add_space(9.0);
-                        ui.label(
-                            RichText::new(presentation_name(snapshot, self.section, item)).strong(),
-                        );
-                        if let Some(state) = item
-                            .data
-                            .get("state")
-                            .or_else(|| item.data.get("status"))
-                            .and_then(Value::as_str)
-                            .filter(|s| !s.is_empty())
-                        {
-                            ui.add_space(7.0);
-                            ui.small("저장된 상태");
-                            ui.label(display_state(state));
-                        }
-                        for (key, label, collection) in [
-                            ("task_id", "연결된 작업", "tasks"),
-                            ("agent_id", "참여 에이전트", "agents"),
-                            ("company_id", "회사·대상", "companies"),
-                            ("asset_id", "참조 자산", "assets"),
-                        ] {
-                            if let Some(id) = item.data[key].as_str() {
-                                ui.add_space(12.0);
-                                ui.small(label);
-                                ui.label(
-                                    snapshot
-                                        .get(collection, id)
-                                        .map(display_name)
-                                        .unwrap_or_else(|| "연결된 항목 정보 없음".to_owned()),
-                                );
-                            }
-                        }
-                        if matches!(self.section, Section::Tasks | Section::Chat) {
-                            let runs: Vec<_> = snapshot
-                                .records("agent_runs")
-                                .into_iter()
-                                .filter(|run| {
-                                    if item.header.collection == "tasks" {
-                                        run.data["task_id"].as_str()
-                                            == Some(item.header.id.as_str())
-                                    } else {
-                                        run.data["conversation_id"].as_str()
-                                            == Some(item.header.id.as_str())
-                                    }
-                                })
-                                .collect();
+            }
+            egui::ScrollArea::vertical()
+                .id_salt("inspector-content")
+                .show(ui, |ui| {
+                    ui.add_space(9.0);
+                    ui.label(RichText::new(presentation_name(snapshot, section, item)).strong());
+                    if let Some(state) = item
+                        .data
+                        .get("state")
+                        .or_else(|| item.data.get("status"))
+                        .and_then(Value::as_str)
+                        .filter(|s| !s.is_empty())
+                    {
+                        ui.add_space(7.0);
+                        ui.small("저장된 상태");
+                        ui.label(display_state(state));
+                    }
+                    for (key, label, collection) in [
+                        ("task_id", "연결된 작업", "tasks"),
+                        ("agent_id", "참여 에이전트", "agents"),
+                        ("company_id", "회사·대상", "companies"),
+                        ("asset_id", "참조 자산", "assets"),
+                    ] {
+                        if let Some(id) = item.data[key].as_str() {
                             ui.add_space(12.0);
-                            ui.small(format!("관련 에이전트 실행 · {}개", runs.len()));
-                            ui.horizontal_wrapped(|ui| {
-                                let active = runs
-                                    .iter()
-                                    .filter(|run| run.data["state"] == "running")
-                                    .count();
-                                let completed = runs
-                                    .iter()
-                                    .filter(|run| {
-                                        matches!(
-                                            run.data["state"].as_str(),
-                                            Some("completed" | "succeeded")
-                                        )
-                                    })
-                                    .count();
-                                let waiting = runs
-                                    .iter()
-                                    .filter(|run| {
-                                        matches!(
-                                            run.data["state"].as_str(),
-                                            Some("waiting" | "queued")
-                                        )
-                                    })
-                                    .count();
-                                theme::badge(
-                                    ui,
-                                    &format!("실행 중 {active}"),
-                                    theme::BadgeTone::Info,
-                                );
-                                theme::badge(
-                                    ui,
-                                    &format!("완료 {completed}"),
-                                    theme::BadgeTone::Success,
-                                );
-                                theme::badge(
-                                    ui,
-                                    &format!("대기 {waiting}"),
-                                    theme::BadgeTone::Neutral,
-                                );
-                            });
-                            ui.add_space(6.0);
-                            for run in runs.iter().take(6) {
-                                let agent = run.data["agent_id"]
-                                    .as_str()
-                                    .and_then(|id| snapshot.get("agents", id))
+                            ui.small(label);
+                            ui.label(
+                                snapshot
+                                    .get(collection, id)
                                     .map(display_name)
-                                    .unwrap_or_else(|| {
-                                        run.data["agent_key"]
-                                            .as_str()
-                                            .unwrap_or("에이전트 실행")
-                                            .to_owned()
-                                    });
-                                ui.horizontal_wrapped(|ui| {
-                                    ui.label(agent);
-                                    ui.small(display_state(
-                                        run.data["state"].as_str().unwrap_or(""),
-                                    ));
+                                    .unwrap_or_else(|| "연결된 항목 정보 없음".to_owned()),
+                            );
+                        }
+                    }
+                    if matches!(section, Section::Tasks | Section::Chat) {
+                        let runs: Vec<_> = snapshot
+                            .records("agent_runs")
+                            .into_iter()
+                            .filter(|run| {
+                                if item.header.collection == "tasks" {
+                                    run.data["task_id"].as_str() == Some(item.header.id.as_str())
+                                } else {
+                                    run.data["conversation_id"].as_str()
+                                        == Some(item.header.id.as_str())
+                                }
+                            })
+                            .collect();
+                        ui.add_space(12.0);
+                        ui.small(format!("관련 에이전트 실행 · {}개", runs.len()));
+                        ui.horizontal_wrapped(|ui| {
+                            let active = runs
+                                .iter()
+                                .filter(|run| run.data["state"] == "running")
+                                .count();
+                            let completed = runs
+                                .iter()
+                                .filter(|run| {
+                                    matches!(
+                                        run.data["state"].as_str(),
+                                        Some("completed" | "succeeded")
+                                    )
+                                })
+                                .count();
+                            let waiting = runs
+                                .iter()
+                                .filter(|run| {
+                                    matches!(run.data["state"].as_str(), Some("waiting" | "queued"))
+                                })
+                                .count();
+                            theme::badge(ui, &format!("실행 중 {active}"), theme::BadgeTone::Info);
+                            theme::badge(
+                                ui,
+                                &format!("완료 {completed}"),
+                                theme::BadgeTone::Success,
+                            );
+                            theme::badge(ui, &format!("대기 {waiting}"), theme::BadgeTone::Neutral);
+                        });
+                        ui.add_space(6.0);
+                        for run in runs.iter().take(6) {
+                            let agent = run.data["agent_id"]
+                                .as_str()
+                                .and_then(|id| snapshot.get("agents", id))
+                                .map(display_name)
+                                .unwrap_or_else(|| {
+                                    run.data["agent_key"]
+                                        .as_str()
+                                        .unwrap_or("에이전트 실행")
+                                        .to_owned()
                                 });
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(agent);
+                                ui.small(display_state(run.data["state"].as_str().unwrap_or("")));
+                            });
+                        }
+                    }
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.small("현재 저장된 객체");
+                    ui.label(format!("버전 {}", item.header.version));
+                    ui.small(crate::panes::presentation_time(&item.header.updated_at));
+                    ui.collapsing("객체 식별자·원문 상태", |ui| {
+                        ui.add(egui::Label::new(&item.header.id).wrap());
+                        for key in ["state", "status"] {
+                            if let Some(state) = item.data[key].as_str() {
+                                ui.label(format!("{key}: {state}"));
                             }
                         }
-                        ui.add_space(15.0);
-                        ui.separator();
-                        ui.small("현재 저장된 객체");
-                        ui.label(format!("버전 {}", item.header.version));
-                        ui.small(crate::panes::presentation_time(&item.header.updated_at));
-                        ui.collapsing("객체 식별자·원문 상태", |ui| {
-                            ui.add(egui::Label::new(&item.header.id).wrap());
-                            for key in ["state", "status"] {
-                                if let Some(state) = item.data[key].as_str() {
-                                    ui.label(format!("{key}: {state}"));
-                                }
+                        for key in ["agent_id", "task_id", "conversation_id", "tool_use_id"] {
+                            if let Some(id) = item.data[key].as_str() {
+                                ui.add(egui::Label::new(format!("{key}: {id}")).wrap());
                             }
-                            for key in ["agent_id", "task_id", "conversation_id", "tool_use_id"] {
-                                if let Some(id) = item.data[key].as_str() {
-                                    ui.add(egui::Label::new(format!("{key}: {id}")).wrap());
-                                }
-                            }
-                        });
-                        ui.add_space(12.0);
-                        ui.add(
-                            egui::Label::new(
-                                RichText::new("편집 중인 초안과 별개의 조회 정보입니다.")
-                                    .small()
-                                    .color(theme::muted(ui)),
-                            )
-                            .wrap(),
+                        }
+                    });
+                    ui.add_space(12.0);
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new("편집 중인 초안과 별개의 조회 정보입니다.")
+                                .small()
+                                .color(theme::muted(ui)),
+                        )
+                        .wrap(),
+                    );
+                });
+        };
+        if !floating {
+            egui::SidePanel::right("selection_inspector")
+                .resizable(true)
+                .default_width(232.0)
+                .width_range(205.0..=320.0)
+                .frame(theme::toolbar_frame(&ctx.style()))
+                .show(ctx, contents);
+        } else {
+            let mut open = true;
+            egui::Window::new("선택 항목 상세")
+                .id(egui::Id::new("selection-inspector-window"))
+                .open(&mut open)
+                .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-16.0, 120.0))
+                .default_width(280.0)
+                .max_width(340.0)
+                .max_height((ctx.available_rect().height() - 60.0).max(200.0))
+                .show(ctx, contents);
+            if !open {
+                self.set_details_open(false);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod details_visibility_tests {
+    use super::*;
+
+    fn fixture() -> artex_core::Snapshot {
+        let task: artex_core::Record = serde_json::from_value(json!({
+            "header":{"id":"task-details","collection":"tasks","version":"1","commit_seq":"1","created_at":"2026-10-15T00:00:00Z","updated_at":"2026-10-15T00:00:00Z","legacy_key":null},
+            "data":{"title":"Selected task","status":"created","deleted_at":null,"archived_at":null}
+        })).unwrap();
+        artex_core::Snapshot {
+            workspace_id: "details-fixture".into(),
+            commit_seq: 1,
+            collections: [(
+                "tasks".into(),
+                [(task.header.id.clone(), task)].into_iter().collect(),
+            )]
+            .into_iter()
+            .collect(),
+        }
+    }
+
+    #[test]
+    fn only_supported_visible_selection_resolves_for_toolbar_and_inspector() {
+        let mut snapshot = fixture();
+        assert!(inspector_item(&snapshot, Section::Overview, Some("task-details")).is_none());
+        assert!(inspector_item(&snapshot, Section::Settings, Some("task-details")).is_none());
+        assert!(inspector_item(&snapshot, Section::Tasks, None).is_none());
+        assert!(inspector_item(&snapshot, Section::Tasks, Some("stale-task")).is_none());
+        assert!(inspector_item(&snapshot, Section::Tasks, Some("task-details")).is_some());
+        assert!(inspector_item(&snapshot, Section::Chat, Some("task-details")).is_some());
+        snapshot
+            .collections
+            .get_mut("tasks")
+            .unwrap()
+            .get_mut("task-details")
+            .unwrap()
+            .data["deleted_at"] = json!("2026-10-15T01:00:00Z");
+        assert!(inspector_item(&snapshot, Section::Tasks, Some("task-details")).is_none());
+        assert!(inspector_item(&snapshot, Section::Chat, Some("task-details")).is_none());
+    }
+
+    #[test]
+    fn actual_compact_button_is_absent_without_selection_and_emits_toggle_when_clicked() {
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let render = |details_open, events, time| {
+            let mut actions = vec![];
+            let output = ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(900.0, 620.0),
+                    )),
+                    events,
+                    time: Some(time),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        actions = compact_toolbar(
+                            ui,
+                            &CompactToolbarPresentation {
+                                details_open,
+                                ..Default::default()
+                            },
                         );
                     });
+                },
+            );
+            (actions, output)
+        };
+        let (_, hidden) = render(None, vec![], 0.0);
+        assert!(
+            !hidden.shapes.iter().any(
+                |shape| matches!(&shape.shape,egui::Shape::Text(t) if t.galley.text()=="상세")
+            )
+        );
+        let (_, visible) = render(Some(false), vec![], 0.1);
+        let pos = visible
+            .shapes
+            .iter()
+            .find_map(|shape| match &shape.shape {
+                egui::Shape::Text(t) if t.galley.text() == "상세" => {
+                    Some(t.pos + t.galley.size() * 0.5)
+                }
+                _ => None,
+            })
+            .expect("Selected item must expose a details button");
+        let pointer = |pressed| egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        render(
+            Some(false),
+            vec![egui::Event::PointerMoved(pos), pointer(true)],
+            0.2,
+        );
+        let (actions, _) = render(Some(false), vec![pointer(false)], 0.3);
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, ChromeAction::Details))
+        );
+    }
+}
+
+#[cfg(test)]
+mod workspace_button_tests {
+    use super::*;
+
+    #[test]
+    fn real_toolbar_buttons_emit_open_and_new_and_are_inert_during_transition() {
+        for (label, is_open) in [("열기", true), ("새 공간", false)] {
+            let ctx = egui::Context::default();
+            theme::apply(&ctx);
+            let render = |enabled, events, time| {
+                let mut actions = vec![];
+                let output = ctx.run(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(900.0, 620.0),
+                        )),
+                        events,
+                        time: Some(time),
+                        ..Default::default()
+                    },
+                    |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            actions = workspace_buttons(ui, enabled);
+                        });
+                    },
+                );
+                (actions, output)
+            };
+            let (_, frame) = render(true, vec![], 0.0);
+            let pos = frame
+                .shapes
+                .iter()
+                .find_map(|shape| match &shape.shape {
+                    egui::Shape::Text(t) if t.galley.text() == label => {
+                        Some(t.pos + t.galley.size() * 0.5)
+                    }
+                    _ => None,
+                })
+                .unwrap();
+            let pointer = |pressed| egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            };
+            render(
+                true,
+                vec![egui::Event::PointerMoved(pos), pointer(true)],
+                0.1,
+            );
+            let (actions, _) = render(true, vec![pointer(false)], 0.2);
+            assert_eq!(actions.len(), 1);
+            assert!(if is_open {
+                matches!(actions[0], ChromeAction::Open)
+            } else {
+                matches!(actions[0], ChromeAction::New)
             });
+            render(
+                false,
+                vec![egui::Event::PointerMoved(pos), pointer(true)],
+                0.4,
+            );
+            let (actions, _) = render(false, vec![pointer(false)], 0.5);
+            assert!(actions.is_empty());
+        }
     }
 }

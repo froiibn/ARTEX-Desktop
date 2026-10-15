@@ -9,6 +9,379 @@ use std::{
     },
     time::Duration,
 };
+
+#[test]
+fn failed_model_only_task_reopens_stops_and_deletes_without_a_fictitious_process_stop() {
+    let (d, mut r, run, _conversation, host) = seeded();
+    let s = r.snapshot().unwrap();
+    let mut p = Planner::new(&s, "fixture.failed.model", &json!({}));
+    let exp = p.insert("explorations", "exploration", json!({})).unwrap();
+    let task = p.insert("tasks", "task", json!({"name":"Failed model task","exploration_id":exp,"status":"paused","paused":true})).unwrap();
+    let mut data = s.get("agent_runs", &run).unwrap().data.clone();
+    data["task_id"] = json!(task);
+    p.put("agent_runs", &run, data);
+    r.internal_commit(p.done(json!({}))).unwrap();
+    r.finish_runtime(&run, "failed", "EXTERNAL_FAILURE: LLM provider HTTP 402")
+        .unwrap();
+    let until = Instant::now() + Duration::from_secs(3);
+    while host.stops.load(Ordering::SeqCst) == 0 {
+        assert!(Instant::now() < until, "Original lifetime cleanup was not issued");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let original_stops = host.stops.load(Ordering::SeqCst);
+    r.store.take();
+    let (w, _) = r
+        .native_open(&OpenOptions {
+            path: d.path().join("store"),
+            mode: OpenMode::Existing,
+            read_only: false,
+        })
+        .unwrap();
+    r.attach_host(host.clone());
+    // Reproduce the previous UI's repeated, synthetic unknown cleanup receipts.
+    for _ in 0..3 {
+        let old_epoch =
+            r.snapshot().unwrap().get("agent_runs", &run).unwrap().data["engine_epoch"].clone();
+        let mut b = artex_domain::empty_batch("native.lifecycle.cleanup", &json!({}));
+        b.result = json!({"runs":[{"run_id":run,"engine_epoch":old_epoch,"cleanup_confirmed":false,"cleanup_state":"unknown","executions":[]}]});
+        r.internal_commit(b).unwrap();
+    }
+    let preview = r
+        .lifecycle_preview(
+            DeletionTarget::Tasks {
+                ids: vec![task.clone()],
+            },
+            DeletionOptions::Tasks {
+                options: TaskDeleteOptions::default(),
+            },
+        )
+        .unwrap();
+    assert_eq!(preview["cleanup_confirmed"], true);
+    assert_eq!(preview["can_apply"], true);
+    let ticket = NativeTicket::new();
+    let monitor = NativeTicket::new();
+    r.native_query(
+        &monitor,
+        &w.scope,
+        NativeQuery::AgentMonitor {
+            target: MonitorTarget::Task {
+                task_id: task.clone(),
+            },
+        },
+    )
+    .unwrap();
+    let versions = serde_json::from_value(
+        settle(&mut r, &monitor).unwrap().value["task_control_expected"].clone(),
+    )
+    .unwrap();
+    r.native_run_control(
+        &ticket,
+        &w.scope,
+        new_id("command"),
+        versions,
+        RunControlTarget::Task {
+            task_id: task.clone(),
+        },
+        RunControlAction::Stop,
+    )
+    .unwrap();
+    assert_eq!(
+        settle(&mut r, &ticket).unwrap().value["cleanup_confirmed"],
+        true
+    );
+    let preview = r
+        .lifecycle_preview(
+            DeletionTarget::Tasks {
+                ids: vec![task.clone()],
+            },
+            DeletionOptions::Tasks {
+                options: TaskDeleteOptions::default(),
+            },
+        )
+        .unwrap();
+    let deletion = NativeTicket::new();
+    r.native_task_delete(
+        &deletion,
+        &w.scope,
+        new_id("command"),
+        serde_json::from_value(preview["expected"].clone()).unwrap(),
+        vec![task.clone()],
+        TaskDeleteOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(settle(&mut r, &deletion).unwrap().value["succeeded"], 1);
+    assert!(r.snapshot().unwrap().get("tasks", &task).is_none());
+    assert_eq!(
+        host.stops.load(Ordering::SeqCst),
+        original_stops,
+        "Never replay effects from the old epoch"
+    );
+    assert!(
+        r.snapshot()
+            .unwrap()
+            .records("command_receipts")
+            .iter()
+            .any(
+                |v| v.data["result"]["runs"].as_array().is_some_and(|rows| rows
+                    .iter()
+                    .any(|p| p["proof_source"] == "durable_terminal_without_tool_admission"))
+            )
+    );
+}
+
+#[test]
+fn terminal_cleanup_inference_requires_audited_finish_and_no_external_admission_or_contradicting_proof()
+ {
+    for blocker in [
+        "missing_finish",
+        "tool",
+        "execution",
+        "active_call",
+        "imported",
+    ] {
+        let (_d, mut r, run, conversation, _host) = seeded();
+        r.finish_runtime(&run, "failed", "EXTERNAL_FAILURE: LLM failed before tools")
+            .unwrap();
+        let s = r.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.cleanup.blocker", &json!({}));
+        match blocker {
+            "tool" => {
+                p.insert("tool_invocations","invocation",json!({"run_id":run,"tool_use_id":"external-call","name":"Bash","state":"recovery_required"})).unwrap();
+            }
+            "missing_finish" => {
+                let mut incomplete = s.snapshot.as_ref().clone();
+                incomplete
+                    .collections
+                    .get_mut("command_receipts")
+                    .unwrap()
+                    .retain(|_, receipt| receipt.data["method"] != "run.finish");
+                assert!(!crate::native_lifecycle::confirmed(
+                    &incomplete,
+                    incomplete.get("agent_runs", &run).unwrap()
+                ));
+                continue;
+            }
+            "imported" => {
+                let mut imported = s.snapshot.as_ref().clone();
+                imported
+                    .collections
+                    .get_mut("agent_runs")
+                    .unwrap()
+                    .get_mut(&run)
+                    .unwrap()
+                    .header
+                    .legacy_key = json!("legacy-run");
+                assert!(!crate::native_lifecycle::confirmed(
+                    &imported,
+                    imported.get("agent_runs", &run).unwrap()
+                ));
+                continue;
+            }
+            _ => {}
+        }
+        r.internal_commit(p.done(json!({}))).unwrap();
+        if matches!(blocker, "execution" | "active_call") {
+            let s = r.snapshot().unwrap();
+            let mut b = artex_domain::empty_batch("native.lifecycle.cleanup", &json!({}));
+            b.result = json!({"runs":[{"run_id":run,"engine_epoch":s.get("agent_runs",&run).unwrap().data["engine_epoch"],"cleanup_confirmed":false,"executions":if blocker=="execution" {json!([{"execution_id":"owned-process","cleanup_confirmed":false}])}else{json!([])},"active_host_calls":if blocker=="active_call"{1}else{0}}]});
+            r.internal_commit(b).unwrap();
+        }
+        let s = r.snapshot().unwrap();
+        let mut mutated = s.snapshot.as_ref().clone();
+        assert!(
+            !crate::native_lifecycle::confirmed(&mutated, mutated.get("agent_runs", &run).unwrap()),
+            "{blocker}"
+        );
+        // Confirm inference remains conservative without consulting a fresh host.
+        mutated
+            .collections
+            .get_mut("agent_runs")
+            .unwrap()
+            .get_mut(&run)
+            .unwrap()
+            .data["state"] = json!("running");
+        assert!(!crate::native_lifecycle::confirmed(
+            &mutated,
+            mutated.get("agent_runs", &run).unwrap()
+        ));
+        assert!(s.get("conversations", &conversation).is_some());
+    }
+}
+
+#[test]
+fn opening_paused_and_capacity_queued_tasks_does_not_activate_triggers_or_keep_writing() {
+    let dir = tempfile::tempdir().unwrap();
+    let options = OpenOptions {
+        path: dir.path().join("idle"),
+        mode: OpenMode::Create {
+            name: "Idle workspace".into(),
+        },
+        read_only: false,
+    };
+    let mut r = Router::new(BTreeMap::new());
+    r.native_open(&options).unwrap();
+    let s = r.snapshot().unwrap();
+    let agent = s
+        .records("agents")
+        .into_iter()
+        .find(|a| a.data["key"] == "mainagent")
+        .unwrap();
+    let mut p = Planner::new(&s, "fixture.idle", &json!({}));
+    let exp = p.insert("explorations", "exploration", json!({})).unwrap();
+    let task = p
+        .insert(
+            "tasks",
+            "task",
+            json!({"name":"Paused","exploration_id":exp,"status":"paused","paused":true}),
+        )
+        .unwrap();
+    let exp2 = p.insert("explorations", "exploration", json!({})).unwrap();
+    let queued = p.insert("tasks", "task", json!({"name":"At capacity","exploration_id":exp2,"status":"created","queued":true,"paused":false})).unwrap();
+    let run = p.insert("agent_runs", "run", json!({"agent_id":agent.header.id,"task_id":task,"engine_epoch":r.engine_epoch,"state":"paused"})).unwrap();
+    p.insert(
+        "agent_triggers",
+        "trigger",
+        json!({"agent_key":"mainagent","enabled":true,"interval_sec":1,"on_task_create":true}),
+    )
+    .unwrap();
+    let c = Context {
+        actor: Actor {
+            kind: "engine".into(),
+            agent_id: None,
+            run_id: None,
+            engine_epoch: r.engine_epoch.clone(),
+        },
+        task_id: Some(task.clone()),
+        intent_id: None,
+        conversation_id: None,
+    };
+    artex_domain::conversation::push_event(&mut p.batch, &s, &c, "TaskCreated", "tasks", &task)
+        .unwrap();
+    r.internal_commit(p.done(json!({}))).unwrap();
+    // Simulate an interrupted previous lifetime, preserving pending work.
+    r.store.take();
+    r.native_automation_admitted = true;
+    r.native_open(&OpenOptions {
+        mode: OpenMode::Existing,
+        ..options
+    })
+    .unwrap();
+    assert!(!r.native_automation_admitted);
+    let opened = r.snapshot().unwrap();
+    assert_eq!(
+        opened.get("agent_runs", &run).unwrap().data["state"],
+        "interrupted"
+    );
+    for id in [&task, &queued] {
+        let row = opened.get("tasks", id).unwrap();
+        assert_eq!(row.data["status"], "paused");
+        assert_eq!(row.data["paused"], true);
+        assert_eq!(row.data["queued"], false);
+    }
+    for _ in 0..15 {
+        r.maintain().unwrap();
+    }
+    let after = r.snapshot().unwrap();
+    assert_eq!(
+        after.commit_seq, opened.commit_seq,
+        "Idle observation must settle without ongoing writes"
+    );
+    assert_eq!(after.records("agent_runs"), opened.records("agent_runs"));
+    assert!(r.runtime.runs.is_empty());
+    assert!(after.records("agent_deliveries").is_empty());
+}
+
+#[test]
+fn reopened_paused_task_can_stop_and_delete_using_durable_retirement_proof() {
+    let (dir, mut r, run, _conversation, host) = seeded();
+    let s = r.snapshot().unwrap();
+    let mut p = Planner::new(&s, "fixture.paused", &json!({}));
+    let exp = p.insert("explorations", "exploration", json!({})).unwrap();
+    let task = p
+        .insert(
+            "tasks",
+            "task",
+            json!({"name":"Paused","exploration_id":exp,"status":"paused","paused":true}),
+        )
+        .unwrap();
+    let mut data = s.get("agent_runs", &run).unwrap().data.clone();
+    data["task_id"] = json!(task);
+    data["state"] = json!("paused");
+    p.put("agent_runs", &run, data);
+    r.internal_commit(p.done(json!({}))).unwrap();
+    let scope = r.native_scope().unwrap();
+    r.native_close(&scope).unwrap();
+    let (workspace, _) = r
+        .native_open(&OpenOptions {
+            path: dir.path().join("store"),
+            mode: OpenMode::Existing,
+            read_only: false,
+        })
+        .unwrap();
+    r.attach_host(host.clone());
+    let stops = host.stops.load(Ordering::SeqCst);
+    let query = NativeTicket::new();
+    r.native_query(
+        &query,
+        &workspace.scope,
+        NativeQuery::AgentMonitor {
+            target: MonitorTarget::Task {
+                task_id: task.clone(),
+            },
+        },
+    )
+    .unwrap();
+    let monitor = settle(&mut r, &query).unwrap();
+    assert_eq!(
+        monitor.value["runs"][0]["can_stop"], false,
+        "The old per-run control is unavailable"
+    );
+    let ticket = NativeTicket::new();
+    r.native_run_control(
+        &ticket,
+        &workspace.scope,
+        new_id("command"),
+        serde_json::from_value(monitor.value["task_control_expected"].clone()).unwrap(),
+        RunControlTarget::Task {
+            task_id: task.clone(),
+        },
+        RunControlAction::Stop,
+    )
+    .unwrap();
+    assert_eq!(
+        settle(&mut r, &ticket).unwrap().value["cleanup_confirmed"],
+        true
+    );
+    assert_eq!(
+        host.stops.load(Ordering::SeqCst),
+        stops,
+        "Old external effects must never replay"
+    );
+    let preview = r
+        .lifecycle_preview(
+            DeletionTarget::Tasks {
+                ids: vec![task.clone()],
+            },
+            DeletionOptions::Tasks {
+                options: TaskDeleteOptions::default(),
+            },
+        )
+        .unwrap();
+    assert_eq!(preview["can_apply"], true);
+    let deletion = NativeTicket::new();
+    r.native_task_delete(
+        &deletion,
+        &workspace.scope,
+        new_id("command"),
+        serde_json::from_value(preview["expected"].clone()).unwrap(),
+        vec![task.clone()],
+        TaskDeleteOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(settle(&mut r, &deletion).unwrap().value["succeeded"], 1);
+    assert!(r.snapshot().unwrap().get("tasks", &task).is_none());
+}
+
 struct Host {
     confirmed: AtomicBool,
     stops: AtomicUsize,
@@ -771,6 +1144,7 @@ fn normal_close_records_real_retirement_proof_but_missing_agent_never_forges_a_c
 #[test]
 fn actual_ui_control_task_queues_at_capacity_with_legal_status_and_admits_when_slot_frees() {
     let (_d, mut r, _run, _conversation, _host) = seeded();
+    assert!(!r.native_automation_admitted);
     let s = r.snapshot().unwrap();
     let mut p = Planner::new(&s, "fixture.capacity", &json!({}));
     p.insert(
@@ -836,6 +1210,10 @@ fn actual_ui_control_task_queues_at_capacity_with_legal_status_and_admits_when_s
     let s = r.snapshot().unwrap();
     assert_eq!(s.get("tasks", &waiting).unwrap().data["status"], "created");
     assert_eq!(s.get("tasks", &waiting).unwrap().data["queued"], true);
+    assert!(
+        r.native_automation_admitted,
+        "Only accepted execution admission unlocks automation"
+    );
     artex_core::validate_snapshot(&s).unwrap();
     let mut p = Planner::new(&s, "fixture.free.slot", &json!({}));
     let mut data = s.get("tasks", &running).unwrap().data.clone();

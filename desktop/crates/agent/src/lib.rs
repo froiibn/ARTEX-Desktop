@@ -1709,7 +1709,7 @@ pub fn recovery_plan(state: &Snapshot, epoch: &str) -> Option<CommandBatch> {
     for r in state.records("agent_runs") {
         if matches!(
             r.data["state"].as_str(),
-            Some("queued" | "running" | "waiting")
+            Some("queued" | "running" | "waiting" | "paused")
         ) && r.data["engine_epoch"] != epoch
         {
             let mut d = r.data.clone();
@@ -1788,7 +1788,7 @@ pub fn recovery_plan(state: &Snapshot, epoch: &str) -> Option<CommandBatch> {
     for task in state
         .records("tasks")
         .into_iter()
-        .filter(|t| t.data["status"] == "running" || t.data["status"] == "queued")
+        .filter(|t| t.data["status"] == "running" || t.data["status"] == "queued" || t.data["queued"] == true)
     {
         let mut data = task.data.clone();
         data["status"] = json!("paused");

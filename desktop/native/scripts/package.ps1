@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$VerificationResult,
-    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$')][string]$Version = '0.2.0-preview.3',
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$')][string]$Version = '0.2.0-preview.4',
     [string]$LicenseCache
 )
 $ErrorActionPreference = 'Stop'

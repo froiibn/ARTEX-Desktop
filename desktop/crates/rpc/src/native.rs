@@ -506,7 +506,28 @@ impl Router {
             timeout_ms,
             params: params.clone(),
         };
+        let before = (command.is_some() && !self.native_automation_admitted)
+            .then(|| self.snapshot())
+            .transpose()?;
         let value = self.dispatch_request(&request, None)?;
+        if let Some(before) = before {
+            let after = self.snapshot()?;
+            self.native_automation_admitted = after.records("agent_runs").iter().any(|run| {
+                before.get("agent_runs", &run.header.id).is_none()
+                    && run.data["engine_epoch"] == self.engine_epoch
+                    && matches!(
+                        run.data["state"].as_str(),
+                        Some("queued" | "running" | "waiting")
+                    )
+            }) || after.records("tasks").iter().any(|task| {
+                task.data["paused"] != true
+                    && (task.data["status"] == "running" || task.data["queued"] == true)
+                    && before.get("tasks", &task.header.id).is_none_or(|old| {
+                        old.data["paused"] == true
+                            || (old.data["status"] != "running" && old.data["queued"] != true)
+                    })
+            });
+        }
         if value["__deferred"] == true {
             Ok(NativeDispatch::Deferred)
         } else {
@@ -537,6 +558,7 @@ impl Router {
         // Results from a retired folder cannot authenticate against a reopened
         // copy that happens to contain the same record identifiers.
         self.engine_epoch = new_id("epoch");
+        self.native_automation_admitted = false;
         let directory = new_id("capability");
         self.capabilities.insert(directory.clone(), root.clone());
         let method = match options.mode {

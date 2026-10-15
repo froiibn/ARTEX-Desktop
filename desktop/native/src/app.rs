@@ -170,6 +170,7 @@ pub struct NativeApp {
     pub smoke_hold_until: Option<PathBuf>,
     smoke_hold_released: bool,
     smoke_about_started: Option<Instant>,
+    smoke_final_started: Option<Instant>,
     smoke_about_settled: bool,
     smoke_started: Instant,
     smoke_sections: Vec<Section>,
@@ -278,6 +279,7 @@ impl NativeApp {
             smoke_hold_until: None,
             smoke_hold_released: false,
             smoke_about_started: None,
+            smoke_final_started: None,
             smoke_about_settled: false,
             smoke_started: Instant::now(),
             smoke_sections: Vec::new(),
@@ -1075,7 +1077,16 @@ impl NativeApp {
                     self.panes.file_locked = true;
                 }
             }
-            Purpose::Close | Purpose::Shutdown | Purpose::Suspend => self.exit_after_close = false,
+            Purpose::Close => {
+                self.exit_after_close = false;
+                // A failed close must never leave a latent target that opens
+                // after an unrelated later close. Retry requires confirmation.
+                restore_workspace_confirmation(
+                    &mut self.incoming_workspace,
+                    &mut self.next_workspace,
+                );
+            }
+            Purpose::Shutdown | Purpose::Suspend => self.exit_after_close = false,
             _ => {}
         }
         if !matches!(error.code.as_str(), "CANCELLED" | "STALE_EPOCH") {
@@ -1086,12 +1097,26 @@ impl NativeApp {
     fn choose(&mut self, create: bool) {
         self.choose_mode(create, false);
     }
+    fn workspace_choices_enabled(&self) -> bool {
+        workspace_choice_route(
+            self.handle.status().phase,
+            self.workspace_transition_pending(),
+        ) != WorkspaceChoiceRoute::Busy
+    }
+    fn workspace_transition_pending(&self) -> bool {
+        self.incoming_workspace.is_some()
+            || self.next_workspace.is_some()
+            || self.close_confirmation
+            || self.pending.values().any(|purpose| {
+                matches!(
+                    purpose,
+                    Purpose::Open(_) | Purpose::Close | Purpose::Shutdown | Purpose::Suspend
+                )
+            })
+    }
     fn choose_mode(&mut self, create: bool, read_only: bool) {
-        if self.handle.status().phase != ServicePhase::Closed {
-            self.error = Some(Error::new(
-                "BUSY",
-                "현재 작업 공간을 저장하고 닫은 뒤 다른 공간을 여세요.",
-            ));
+        if !self.workspace_choices_enabled() {
+            self.workspace_choice_busy();
             return;
         }
         if let Some(folder) = rfd::FileDialog::new()
@@ -1110,21 +1135,53 @@ impl NativeApp {
             } else {
                 folder
             };
-            self.submit(
-                NativeAction::Open(OpenOptions {
-                    path: path.clone(),
-                    mode: if create {
-                        OpenMode::Create {
-                            name: self.workspace_name.clone(),
-                        }
+            let options = OpenOptions {
+                path,
+                mode: if create {
+                    OpenMode::Create {
+                        name: self.workspace_name.clone(),
+                    }
+                } else {
+                    OpenMode::Existing
+                },
+                read_only,
+            };
+            // Recheck after the OS dialog: the service may have changed phase.
+            match workspace_choice_route(
+                self.handle.status().phase,
+                self.workspace_transition_pending(),
+            ) {
+                WorkspaceChoiceRoute::OpenNow => {
+                    let path = options.path.clone();
+                    self.submit(NativeAction::Open(options), Purpose::Open(path));
+                }
+                WorkspaceChoiceRoute::Confirm => {
+                    let already_open = matches!(options.mode, OpenMode::Existing)
+                        && self.handle.view().is_some_and(|view| {
+                            std::fs::canonicalize(&options.path).ok().as_ref()
+                                == Some(&view.workspace.root)
+                                && options.read_only == view.workspace.read_only
+                        });
+                    if already_open {
+                        self.notices
+                            .push_back("현재 열려 있는 작업 공간입니다.".into());
+                        self.drawer.show(DrawerTab::Activity);
                     } else {
-                        OpenMode::Existing
-                    },
-                    read_only,
-                }),
-                Purpose::Open(path),
-            );
+                        // No close, creation or open occurs until the existing
+                        // transition confirmation is accepted.
+                        self.incoming_workspace = Some(options);
+                    }
+                }
+                WorkspaceChoiceRoute::Busy => self.workspace_choice_busy(),
+            }
         }
+    }
+    fn workspace_choice_busy(&mut self) {
+        self.error = Some(Error::new(
+            "BUSY",
+            "작업 공간 전환이나 저장·정리가 진행 중입니다. 완료 후 다시 시도하세요.",
+        ));
+        self.drawer.show(DrawerTab::Activity);
     }
     fn request_close(&mut self, exit: bool) {
         self.close_confirmation = true;
@@ -1606,66 +1663,41 @@ impl NativeApp {
         }
     }
     fn workspace_screen(&mut self, ui: &mut egui::Ui) {
-        ui.vertical_centered(|ui| {
-            ui.add_space(80.0);
-            ui.label(
-                RichText::new("ARTEX")
-                    .size(42.0)
-                    .color(crate::theme::accent(ui)),
-            );
-            ui.heading("작업 공간 열기");
-            ui.label("대화·작업·자산·증거를 하나의 공간에서 관리합니다.");
-            if self.suspended {
-                ui.colored_label(
-                    ui.visuals().warn_fg_color,
-                    "절전으로 실행을 중지했습니다. 불명확한 실행을 자동 반복하지 않습니다.",
-                );
+        let phase = self.handle.status().phase;
+        let busy = !self.workspace_choices_enabled();
+        let action = crate::workspace_landing::show(
+            ui,
+            &mut self.workspace_name,
+            &self.recent,
+            self.suspended,
+            phase == ServicePhase::Closed && self.last_workspace.is_some(),
+            busy,
+        );
+        match action {
+            Some(crate::workspace_landing::Action::Create) => self.choose(true),
+            Some(crate::workspace_landing::Action::Browse) => self.choose(false),
+            Some(crate::workspace_landing::Action::Recent(path)) => self.submit(
+                NativeAction::Open(OpenOptions {
+                    path: path.clone(),
+                    mode: OpenMode::Existing,
+                    read_only: false,
+                }),
+                Purpose::Open(path),
+            ),
+            Some(crate::workspace_landing::Action::Resume) => {
                 if let Some(path) = self.last_workspace.clone() {
-                    if ui
-                        .add_enabled(
-                            self.handle.status().phase == ServicePhase::Closed,
-                            egui::Button::new("저장된 작업 공간 다시 열기"),
-                        )
-                        .clicked()
-                    {
-                        self.submit(
-                            NativeAction::Open(OpenOptions {
-                                path: path.clone(),
-                                mode: OpenMode::Existing,
-                                read_only: self.last_read_only,
-                            }),
-                            Purpose::Open(path),
-                        );
-                    }
-                }
-            }
-            ui.add_space(20.0);
-            ui.horizontal(|ui| {
-                ui.label("새 공간 이름");
-                ui.text_edit_singleline(&mut self.workspace_name);
-            });
-            ui.horizontal(|ui| {
-                if ui.button("작업 공간 열기 · Ctrl+O").clicked() {
-                    self.choose(false);
-                }
-                if ui.button("새 작업 공간").clicked() {
-                    self.choose(true);
-                }
-            });
-            ui.add_space(18.0);
-            for path in self.recent.clone() {
-                if ui.button(path.to_string_lossy()).clicked() {
                     self.submit(
                         NativeAction::Open(OpenOptions {
                             path: path.clone(),
                             mode: OpenMode::Existing,
-                            read_only: false,
+                            read_only: self.last_read_only,
                         }),
                         Purpose::Open(path),
                     );
                 }
             }
-        });
+            None => {}
+        }
     }
     pub fn render(&mut self, ctx: &egui::Context) {
         self.poll(ctx);
@@ -1724,11 +1756,7 @@ impl NativeApp {
         self.draw_object_list(ctx, snapshot, view.workspace.read_only);
         let selected = self.selected.get(&self.section).cloned().flatten();
         let item = selected_record(snapshot, self.section, selected.as_deref());
-        let inspector_item = item.or_else(|| {
-            (self.section == Section::Chat)
-                .then(|| selected.as_deref().and_then(|id| snapshot.get("tasks", id)))
-                .flatten()
-        });
+        let inspector_item = workbench::inspector_item(snapshot, self.section, selected.as_deref());
         self.draw_inspector(ctx, snapshot, inspector_item);
         self.panes.set_context(self.section, selected.as_deref());
         let mut submissions = Vec::new();
@@ -1742,7 +1770,7 @@ impl NativeApp {
                 // Conversation already has its own title and the workspace
                 // toolbar always shows read-only mode. Keep this area for
                 // messages and the composer, including in the minimum window.
-                if self.section != Section::Chat {
+                if !matches!(self.section, Section::Chat | Section::Overview) {
                     ui.horizontal(|ui| {
                         if self.section != Section::Chat {
                             ui.strong(self.section.label());
@@ -1873,12 +1901,15 @@ impl NativeApp {
     }
     fn close_dialog(&mut self, ctx: &egui::Context) {
         if let Some(options) = self.incoming_workspace.clone() {
-            egui::Window::new("작업 공간 열기 요청")
+            egui::Window::new("작업 공간 전환")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
                 .show(ctx, |ui| {
-                    ui.label(options.path.to_string_lossy());
+                    ui.add(egui::Label::new(options.path.to_string_lossy()).wrap());
+                    if let OpenMode::Create { name } = &options.mode {
+                        ui.label(format!("새 작업 공간: {name}"));
+                    }
                     if options.read_only {
                         ui.label("요청 모드: 읽기 전용");
                     }
@@ -1892,7 +1923,12 @@ impl NativeApp {
                                     self.handle.status().phase,
                                     ServicePhase::Ready | ServicePhase::Closed
                                 ),
-                                egui::Button::new("저장 후 전환"),
+                                egui::Button::new(RichText::new("저장 후 전환").color(
+                                    crate::theme::palette(ui.visuals().dark_mode).selection_text,
+                                ))
+                                .frame(true)
+                                .fill(crate::theme::palette(ui.visuals().dark_mode).selection)
+                                .stroke(egui::Stroke::new(1.0_f32, crate::theme::accent(ui))),
                             )
                             .clicked()
                         {
@@ -1909,7 +1945,7 @@ impl NativeApp {
                                 self.close();
                             }
                         }
-                        if ui.button("현재 공간 유지").clicked() {
+                        if crate::theme::secondary_button(ui, "현재 공간 유지").clicked() {
                             self.incoming_workspace = None;
                         }
                     });
@@ -1945,6 +1981,28 @@ impl NativeApp {
             self.write_smoke_report(false);
             self.exit_after_close = true;
             self.close();
+            return;
+        }
+        // With no workspace argument, smoke captures the actual start screen.
+        if self.handle.status().phase == ServicePhase::Closed
+            && self.handle.view().is_none()
+            && self.pending.is_empty()
+        {
+            if self.smoke_started.elapsed() < Duration::from_millis(500)
+                || !smoke_release_ready(
+                    self.smoke_hold_until.as_deref(),
+                    &mut self.smoke_hold_released,
+                )
+            {
+                ctx.request_repaint_after(Duration::from_millis(16));
+            } else if self.screenshot.is_some() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+                self.smoke = false;
+            } else {
+                self.write_smoke_report(false);
+                self.exit_after_close = true;
+                self.close();
+            }
             return;
         }
         if self.handle.status().phase == ServicePhase::Ready && !self.smoke_final_requested {
@@ -1990,12 +2048,23 @@ impl NativeApp {
                     }
                 }
                 self.smoke_final_requested = true;
+                self.smoke_final_started = Some(Instant::now());
                 ctx.request_repaint();
             }
         } else if self.smoke_final_requested
             && self.handle.status().phase == ServicePhase::Ready
             && self.pending.is_empty()
         {
+            // Capture after the final selected item's animated panels have
+            // settled; a newly opened floating inspector needs another frame.
+            let settle = Duration::from_secs_f32(ctx.style().animation_time.max(0.25) + 0.1);
+            if self
+                .smoke_final_started
+                .is_some_and(|started| started.elapsed() < settle)
+            {
+                ctx.request_repaint_after(Duration::from_millis(16));
+                return;
+            }
             if !smoke_release_ready(
                 self.smoke_hold_until.as_deref(),
                 &mut self.smoke_hold_released,
@@ -2193,6 +2262,31 @@ fn smoke_release_ready(path: Option<&std::path::Path>, released: &mut bool) -> b
     }
     *released
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WorkspaceChoiceRoute {
+    OpenNow,
+    Confirm,
+    Busy,
+}
+fn workspace_choice_route(phase: ServicePhase, transition_pending: bool) -> WorkspaceChoiceRoute {
+    if transition_pending {
+        return WorkspaceChoiceRoute::Busy;
+    }
+    match phase {
+        ServicePhase::Closed => WorkspaceChoiceRoute::OpenNow,
+        ServicePhase::Ready => WorkspaceChoiceRoute::Confirm,
+        _ => WorkspaceChoiceRoute::Busy,
+    }
+}
+fn restore_workspace_confirmation(
+    incoming: &mut Option<OpenOptions>,
+    next: &mut Option<OpenOptions>,
+) {
+    if let Some(options) = next.take() {
+        *incoming = Some(options);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2329,4 +2423,207 @@ pub fn configure(ctx: &egui::Context) {
         .push("korean".into());
     ctx.set_fonts(fonts);
     crate::theme::apply(ctx);
+}
+
+#[cfg(test)]
+mod workspace_switch_tests {
+    use super::*;
+
+    #[test]
+    fn open_workspace_requires_confirmation_and_transitions_reject_reentry() {
+        assert_eq!(
+            workspace_choice_route(ServicePhase::Closed, false),
+            WorkspaceChoiceRoute::OpenNow
+        );
+        assert_eq!(
+            workspace_choice_route(ServicePhase::Ready, false),
+            WorkspaceChoiceRoute::Confirm
+        );
+        for phase in [
+            ServicePhase::Closed,
+            ServicePhase::Ready,
+            ServicePhase::Opening,
+            ServicePhase::Closing,
+            ServicePhase::Shutdown,
+            ServicePhase::RecoveryRequired,
+        ] {
+            assert_eq!(
+                workspace_choice_route(phase, true),
+                WorkspaceChoiceRoute::Busy
+            );
+        }
+        for phase in [
+            ServicePhase::Opening,
+            ServicePhase::Closing,
+            ServicePhase::Shutdown,
+            ServicePhase::RecoveryRequired,
+        ] {
+            assert_eq!(
+                workspace_choice_route(phase, false),
+                WorkspaceChoiceRoute::Busy
+            );
+        }
+    }
+
+    #[test]
+    fn failed_close_preserves_options_for_explicit_retry_without_a_latent_auto_open() {
+        for options in [
+            OpenOptions {
+                path: PathBuf::from("existing-target"),
+                mode: OpenMode::Existing,
+                read_only: true,
+            },
+            OpenOptions {
+                path: PathBuf::from("new-target"),
+                mode: OpenMode::Create {
+                    name: "New named space".into(),
+                },
+                read_only: false,
+            },
+        ] {
+            let mut next = Some(options.clone());
+            let mut incoming = None;
+            restore_workspace_confirmation(&mut incoming, &mut next);
+            assert!(
+                next.is_none(),
+                "An unrelated future close must not open this target"
+            );
+            let retry = incoming.take().unwrap();
+            assert_eq!(retry.path, options.path);
+            assert_eq!(retry.read_only, options.read_only);
+            match (retry.mode, options.mode) {
+                (OpenMode::Existing, OpenMode::Existing) => {}
+                (OpenMode::Create { name: a }, OpenMode::Create { name: b }) => assert_eq!(a, b),
+                _ => panic!("The user's selected create/existing mode changed"),
+            }
+            assert!(
+                incoming.is_none(),
+                "Canceling the confirmation retains no target"
+            );
+        }
+    }
+
+    #[test]
+    fn real_service_switch_saves_old_space_and_opens_create_then_existing_modes() {
+        let directory = tempfile::tempdir().unwrap();
+        let first = directory.path().join("first");
+        let second = directory.path().join("second");
+        let service = Service::spawn(ServiceConfig::default()).unwrap();
+        let handle = service.handle();
+        let wait = |ticket: NativeTicket| {
+            let deadline = Instant::now() + Duration::from_secs(60);
+            loop {
+                for completion in handle.drain_completions() {
+                    if completion.ticket == ticket {
+                        return completion.result.unwrap();
+                    }
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "Switch completion deadline: {ticket:?}"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        };
+        let first_scope = wait(
+            handle
+                .try_submit(NativeAction::Open(OpenOptions {
+                    path: first.clone(),
+                    mode: OpenMode::Create {
+                        name: "First space".into(),
+                    },
+                    read_only: false,
+                }))
+                .unwrap(),
+        )
+        .scope
+        .unwrap();
+        wait(
+            handle
+                .try_submit(NativeAction::Command {
+                    scope: first_scope.clone(),
+                    command: NativeCommand::new(
+                        "ui.createCompany",
+                        json!({"name":"Saved before switching","scope":[]}),
+                        vec![],
+                    ),
+                })
+                .unwrap(),
+        );
+        let target = OpenOptions {
+            path: second.clone(),
+            mode: OpenMode::Create {
+                name: "Second space".into(),
+            },
+            read_only: false,
+        };
+        assert_eq!(
+            workspace_choice_route(handle.status().phase, false),
+            WorkspaceChoiceRoute::Confirm
+        );
+        assert_eq!(handle.scope().unwrap(), first_scope);
+        assert!(
+            !second.exists(),
+            "Selecting a new destination must not create or switch early"
+        );
+        let mut next = Some(target);
+        wait(
+            handle
+                .try_submit(NativeAction::Close {
+                    scope: first_scope.clone(),
+                })
+                .unwrap(),
+        );
+        assert_eq!(handle.status().phase, ServicePhase::Closed);
+        let second_scope = wait(
+            handle
+                .try_submit(NativeAction::Open(next.take().unwrap()))
+                .unwrap(),
+        )
+        .scope
+        .unwrap();
+        assert_ne!(second_scope.workspace_id, first_scope.workspace_id);
+        assert_eq!(
+            handle
+                .try_submit(NativeAction::Query {
+                    scope: first_scope,
+                    query: NativeQuery::WorkspaceInfo
+                })
+                .unwrap_err()
+                .code,
+            "STALE_EPOCH"
+        );
+        wait(
+            handle
+                .try_submit(NativeAction::Close {
+                    scope: second_scope,
+                })
+                .unwrap(),
+        );
+        let restored = wait(
+            handle
+                .try_submit(NativeAction::Open(OpenOptions {
+                    path: first,
+                    mode: OpenMode::Existing,
+                    read_only: true,
+                }))
+                .unwrap(),
+        )
+        .scope
+        .unwrap();
+        let snapshot = handle.snapshot().unwrap();
+        assert_eq!(snapshot.records("companies").len(), 1);
+        assert_eq!(
+            snapshot.records("companies")[0].data["name"],
+            "Saved before switching"
+        );
+        assert!(handle.view().unwrap().workspace.read_only);
+        wait(
+            handle
+                .try_submit(NativeAction::Close { scope: restored })
+                .unwrap(),
+        );
+        wait(handle.try_submit(NativeAction::Shutdown).unwrap());
+        service.join().unwrap();
+    }
 }

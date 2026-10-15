@@ -146,6 +146,8 @@ pub struct Router {
     side: side_runtime::SideState,
     stream_state: stream_runtime::StreamState,
     native_mode: bool,
+    // Opening a desktop workspace is observation, not execution admission.
+    native_automation_admitted: bool,
     native_completions: std::collections::VecDeque<native::NativeCompletion>,
 }
 impl Router {
@@ -180,6 +182,7 @@ impl Router {
             side: Default::default(),
             stream_state: Default::default(),
             native_mode: false,
+            native_automation_admitted: false,
             native_completions: Default::default(),
         }
     }

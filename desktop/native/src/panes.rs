@@ -8,6 +8,9 @@ use eframe::egui::{self, RichText};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[path = "dashboard.rs"]
+mod dashboard;
+
 pub enum Effect {
     AgentMonitor {
         target: MonitorTarget,
@@ -1055,99 +1058,7 @@ impl Panes {
         self.projection.insert(method.into(), value);
     }
     pub fn overview(&mut self, ui: &mut egui::Ui, snapshot: &Snapshot, effects: &mut Vec<Effect>) {
-        ui.heading("대시보드");
-        ui.small(format!(
-            "현재 작업 공간 · 저장 세대 {}",
-            snapshot.commit_seq
-        ));
-        ui.add_space(12.0);
-        let tasks = snapshot
-            .records("tasks")
-            .into_iter()
-            .filter(|r| live_task(r))
-            .count();
-        let runs = snapshot
-            .records("agent_runs")
-            .into_iter()
-            .filter(|r| active_run(r))
-            .count();
-        let approvals = snapshot
-            .records("intercept_pending")
-            .into_iter()
-            .filter(|r| pending_record(r))
-            .count()
-            + snapshot
-                .records("user_questions")
-                .into_iter()
-                .filter(|r| pending_record(r))
-                .count();
-        ui.horizontal_wrapped(|ui| {
-            for (label, count) in [
-                ("작업", tasks),
-                ("실행 중", runs),
-                ("실행 승인·질문", approvals),
-                ("발견 사항", snapshot.records("findings").len()),
-                ("자산", snapshot.records("assets").len()),
-            ] {
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    ui.set_min_width(104.0);
-                    ui.small(label);
-                    ui.label(RichText::new(count.to_string()).size(26.0).strong());
-                });
-            }
-        });
-        ui.add_space(14.0);
-        if ui.available_width() > 740.0 {
-            ui.columns(2, |columns| {
-                dashboard_tasks(&mut columns[0], snapshot, effects);
-                dashboard_approvals(&mut columns[1], snapshot, effects);
-            });
-        } else {
-            dashboard_tasks(ui, snapshot, effects);
-            ui.add_space(10.0);
-            dashboard_approvals(ui, snapshot, effects);
-        }
-        ui.add_space(12.0);
-        egui::Frame::group(ui.style()).show(ui, |ui| {
-            ui.strong("최근 활동");
-            let mut entries = snapshot.records("activity");
-            entries.extend(snapshot.records("conversation_activities"));
-            entries.retain(|r| visible_activity(text(&r.data, "kind")));
-            recent_first(&mut entries);
-            if entries.is_empty() {
-                ui.weak("아직 기록된 활동이 없습니다.");
-            }
-            for entry in entries.into_iter().take(8) {
-                ui.push_id(&entry.header.id, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.small(compact_time(&entry.header.created_at));
-                        ui.strong(if text(&entry.data, "worker").is_empty() {
-                            "시스템"
-                        } else {
-                            text(&entry.data, "worker")
-                        });
-                        ui.label(display_name(entry));
-                    });
-                });
-                ui.separator();
-            }
-        });
-        let mut running = snapshot
-            .records("agent_runs")
-            .into_iter()
-            .filter(|r| active_run(r))
-            .collect::<Vec<_>>();
-        recent_first(&mut running);
-        egui::CollapsingHeader::new(format!("현재 에이전트 실행 · {}", running.len()))
-            .id_salt("dashboard-runs")
-            .show(ui, |ui| {
-                if running.is_empty() {
-                    ui.weak("현재 실행 중인 에이전트가 없습니다.");
-                }
-                for run in running.into_iter().take(20) {
-                    run_row(ui, snapshot, run, effects);
-                }
-            });
+        dashboard::show(ui, snapshot, effects);
     }
     pub fn tasks(
         &mut self,
@@ -1209,27 +1120,6 @@ impl Panes {
             });
         });
         self.request_agent_monitor(false);
-        let task_run = self
-            .management
-            .monitor
-            .as_ref()
-            .and_then(|v| v["runs"].as_array())
-            .and_then(|runs| {
-                runs.iter()
-                    .find(|r| r["task_id"] == task.header.id && monitor_can_stop(r))
-            })
-            .cloned();
-        if let Some(row) = task_run {
-            if ui
-                .add_enabled(
-                    !self.read_only && !self.native_target_busy(&task.header.id),
-                    egui::Button::new("작업의 모든 실행 중지"),
-                )
-                .clicked()
-            {
-                self.stop_native_run(&row, true, snapshot);
-            }
-        }
         if let Some(feedback) = self.management.feedback.get(&task.header.id) {
             ui.add(egui::Label::new(feedback).wrap());
         }
@@ -1261,6 +1151,12 @@ impl Panes {
             ));
         });
         ui.horizontal_wrapped(|ui| {
+            if ui.add_enabled_ui(!self.read_only && !self.native_target_busy(&task.header.id),
+                |ui| crate::theme::secondary_button(ui, "작업 중지·정리")).inner
+                .on_hover_text("일시정지된 작업도 모든 실행을 취소하고 외부 자원 정리를 확인합니다. 작업과 분석 기록은 유지됩니다.")
+                .clicked() {
+                self.stop_native_task(task);
+            }
             for (label, action) in [("일시정지", "pause"), ("재개", "resume")] {
                 if ui
                     .add_enabled(
@@ -2444,104 +2340,6 @@ fn run_row(ui: &mut egui::Ui, s: &Snapshot, run: &Record, effects: &mut Vec<Effe
             }
             ui.small(compact_time(&run.header.updated_at));
         });
-    });
-}
-fn dashboard_tasks(ui: &mut egui::Ui, s: &Snapshot, effects: &mut Vec<Effect>) {
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.strong("최근 작업");
-        let mut tasks = s
-            .records("tasks")
-            .into_iter()
-            .filter(|r| live_task(r))
-            .collect::<Vec<_>>();
-        recent_first(&mut tasks);
-        if tasks.is_empty() {
-            ui.weak("탐색의 작업 메뉴에서 새 작업을 만드세요.");
-        }
-        for task in tasks.into_iter().take(6) {
-            ui.push_id(&task.header.id, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    state_badge(ui, text(&task.data, "status"));
-                    if ui
-                        .selectable_label(false, RichText::new(display_name(task)).strong())
-                        .clicked()
-                    {
-                        effects.push(Effect::Select {
-                            section: Section::Tasks,
-                            id: task.header.id.clone(),
-                        });
-                    }
-                });
-                let exploration = text(&task.data, "exploration_id");
-                let runs = s
-                    .records("agent_runs")
-                    .into_iter()
-                    .filter(|r| r.data["task_id"] == task.header.id && active_run(r))
-                    .count();
-                let findings = s
-                    .records("findings")
-                    .into_iter()
-                    .filter(|r| {
-                        r.data["task_id"] == task.header.id
-                            || r.data["exploration_id"] == exploration
-                    })
-                    .count();
-                ui.small(format!(
-                    "실행 {runs} · 발견 사항 {findings} · {}",
-                    compact_time(&task.header.updated_at)
-                ));
-            });
-            ui.separator();
-        }
-    });
-}
-fn dashboard_approvals(ui: &mut egui::Ui, s: &Snapshot, effects: &mut Vec<Effect>) {
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.strong("실행 승인·사용자 질문");
-        let mut pending = s.records("intercept_pending");
-        pending.extend(s.records("user_questions"));
-        pending.retain(|r| pending_record(r));
-        recent_first(&mut pending);
-        if pending.is_empty() {
-            ui.weak("현재 확인이 필요한 요청이 없습니다.");
-        }
-        for item in pending.into_iter().take(6) {
-            ui.push_id(&item.header.id, |ui| {
-                let question = item.header.collection == "user_questions";
-                ui.horizontal_wrapped(|ui| {
-                    state_badge(ui, "pending");
-                    ui.strong(if question {
-                        "사용자 질문"
-                    } else {
-                        "도구 실행 승인"
-                    });
-                    if ui.button("확인").clicked() {
-                        effects.push(Effect::Select {
-                            section: if question {
-                                Section::Sessions
-                            } else {
-                                Section::Approvals
-                            },
-                            id: if question {
-                                text(&item.data, "run_id").into()
-                            } else {
-                                item.header.id.clone()
-                            },
-                        });
-                    }
-                });
-                let description = if question {
-                    item.data["payload"]["questions"][0]["question"]
-                        .as_str()
-                        .unwrap_or(text(&item.data, "kind"))
-                } else {
-                    text(&item.data, "tool_name")
-                };
-                ui.label(description.chars().take(120).collect::<String>());
-                ui.small(compact_time(&item.header.created_at));
-            });
-            ui.separator();
-        }
     });
 }
 fn profile_selector(ui: &mut egui::Ui, snapshot: &Snapshot, id: &mut Option<String>) {
@@ -6898,7 +6696,7 @@ impl Panes {
                 if let Some(counts)=preview["affected"].as_object(){ui.horizontal_wrapped(|ui|{for (key,value)in counts{let label=match key.as_str(){"activities"=>"활동","runs"=>"실행","questions"=>"질문","assets"=>"자산","traffic"=>"트래픽","findings"=>"발견사항","llm_records"=>"모델 기록",_=>key};ui.label(format!("{label} {value}"));}});}
                 if let Some(files)=preview["owned_attachments"].as_array(){ui.label(format!("소유 범위의 디렉터리 후보 {}개",files.len()));ui.collapsing("대상 디렉터리 후보",|ui|{for file in files{ui.add(egui::Label::new(text(file,"relative_path")).wrap());}});}
                 if preview["shared_preserved"].is_object(){ui.collapsing("보존되는 공유 자료",|ui|read_value(ui,&preview["shared_preserved"]));}
-                if let Some(runs)=preview["requires_stop"].as_array(){if !runs.is_empty(){ui.colored_label(ui.visuals().warn_fg_color,format!("{}개 실행의 중지와 자원 정리 확인이 필요합니다.",runs.len()));}}
+                if let Some(runs)=preview["requires_stop"].as_array(){if !runs.is_empty(){ui.colored_label(ui.visuals().warn_fg_color,if preview["can_apply"]==true {format!("삭제 시 {}개 실행을 자동 중지하고 자원 정리를 확인합니다.",runs.len())}else{format!("{}개 이전 실행의 자원 정리가 미확인 상태입니다. 작업 화면에서 중지·정리 결과를 확인하세요.",runs.len())});}}
                 if let Some(reason)=preview["blocked_reason"].as_str(){ui.add(egui::Label::new(reason).wrap());}
                 if d.action==ManagementAction::ForceStop {
                     ui.small("이 앱이 소유한 외부 실행만 대상으로 합니다. 모델 요청은 취소 후 응답 반영을 차단하며 원격 모델 서버를 종료하지 않습니다.");
@@ -7113,22 +6911,7 @@ impl Panes {
             let Some(parent) = snapshot.get("tasks", id) else {
                 return;
             };
-            let token = self.management_token();
-            self.management.requests.insert(
-                token.clone(),
-                ManagementRequest::TaskStopPreview {
-                    task_id: id.into(),
-                    baseline: expected(parent),
-                },
-            );
-            self.management.feedback.insert(
-                id.into(),
-                "중지 준비 중 · 전체 실행과 읽은 작업 버전 확인".into(),
-            );
-            self.flow.queued.push(Effect::AgentMonitor {
-                target: MonitorTarget::Task { task_id: id.into() },
-                token,
-            });
+            self.stop_native_task(parent);
             return;
         }
         let versions = native_expected(&row["expected"]);
@@ -7156,6 +6939,20 @@ impl Panes {
             action: RunControlAction::Stop,
             expected: versions,
             token,
+        });
+    }
+    fn stop_native_task(&mut self, task: &Record) {
+        if self.read_only || !live_task(task) || self.native_target_busy(&task.header.id) {
+            return;
+        }
+        let id = task.header.id.clone();
+        let token = self.management_token();
+        self.management.requests.insert(token.clone(), ManagementRequest::TaskStopPreview {
+            task_id: id.clone(), baseline: expected(task),
+        });
+        self.management.feedback.insert(id.clone(), "중지 준비 중 · 전체 실행과 읽은 작업 버전 확인".into());
+        self.flow.queued.push(Effect::AgentMonitor {
+            target: MonitorTarget::Task { task_id: id }, token,
         });
     }
     fn agent_monitor(
@@ -7811,6 +7608,50 @@ mod monitor_widget_tests {
     use super::native_management_tests::{record, snapshot};
     use super::*;
     #[test]
+    fn paused_task_stop_is_visible_without_a_current_run_and_preserves_cas_and_readonly() {
+        let task = record("tasks", json!({"name":"Paused task","status":"paused","paused":true}));
+        let s = snapshot(&[task.clone()]);
+        for readonly in [false, true] {
+            let ctx = egui::Context::default();
+            crate::theme::apply(&ctx);
+            let mut panes = Panes::default();
+            panes.set_read_only(readonly);
+            let mut pos = egui::Pos2::ZERO;
+            for frame in 0..3 {
+                let events = if frame == 0 {vec![]} else {vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton { pos, button:egui::PointerButton::Primary,
+                        pressed:frame==1, modifiers:Default::default() }]};
+                let out = ctx.run(egui::RawInput {
+                    screen_rect:Some(egui::Rect::from_min_size(egui::Pos2::ZERO,egui::vec2(1000.0,700.0))),
+                    events, ..Default::default()
+                }, |ctx| {egui::CentralPanel::default().show(ctx, |ui| {
+                    panes.tasks(ui, &s, Some(&task), &mut vec![]);
+                });});
+                if frame == 0 {
+                    pos = out.shapes.iter().find_map(|shape|match &shape.shape {
+                        egui::Shape::Text(text) if text.galley.text()=="작업 중지·정리" => Some(text.pos+text.galley.size()*0.5),
+                        _=>None }).expect("Paused tasks must show a stop action without a monitor row");
+                    panes.drain_effects();
+                }
+            }
+            let effects = panes.drain_effects();
+            assert_eq!(effects.len(), usize::from(!readonly));
+            if !readonly {
+                let token = match &effects[0] {
+                    Effect::AgentMonitor { target:MonitorTarget::Task{task_id}, token } => {
+                        assert_eq!(task_id, &task.header.id); token.clone()
+                    }, _=>panic!("Stop must use the typed task cleanup path") };
+                panes.stop_native_task(&task);
+                assert!(panes.drain_effects().is_empty());
+                panes.set_native_result(&token, &json!({"task_control_expected":[expected(&task)]}));
+                assert!(matches!(&panes.drain_effects()[0], Effect::RunControl {
+                    target:RunControlTarget::Task{task_id}, action:RunControlAction::Stop, expected:versions, ..
+                } if task_id==&task.header.id && versions==&vec![expected(&task)]));
+            }
+        }
+    }
+    #[test]
     fn actual_monitor_click_is_immediate_owned_pending_and_force_requires_owned_external_confirmation()
      {
         let agent = record("agents", json!({"key":"worker","name":"Actual worker"}));
@@ -7834,7 +7675,11 @@ mod monitor_widget_tests {
         let prime_monitor_read = |panes: &mut Panes| {
             panes.request_agent_monitor(true);
             let queued = panes.drain_effects();
-            assert_eq!(queued.len(), 1, "Fixture setup may only request one monitor read");
+            assert_eq!(
+                queued.len(),
+                1,
+                "Fixture setup may only request one monitor read"
+            );
             let Effect::AgentMonitor {
                 target: MonitorTarget::All,
                 token,
@@ -7842,7 +7687,10 @@ mod monitor_widget_tests {
             else {
                 panic!("Fixture setup may not mutate the selected run");
             };
-            assert_eq!(panes.management.monitor_latest.as_deref(), Some(token.as_str()));
+            assert_eq!(
+                panes.management.monitor_latest.as_deref(),
+                Some(token.as_str())
+            );
             assert!(matches!(
                 panes.management.requests.get(token),
                 Some(ManagementRequest::Monitor(page)) if page == "page:0"
