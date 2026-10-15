@@ -2,7 +2,7 @@
 
 [한국어](README.md) · [English](README.en.md) · **简体中文**
 
-GitHub：[froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop)。项目目前处于**公开 Windows 预览版分发阶段**。Windows `v0.2.0-preview.3` 预览版及其对应源代码已通过 Releases 提供，无需登录即可下载。根据[处理方针](docs/license-policy.md)，不将原版 README 的单独使用限制采纳为本派生项目的附加许可证条件。仓库已于 2026-10-15 转为公开。保存旧开发历史及 `preview.1` 的 GitHub 仓库已删除；GitHub 提供整理后的源码及已验证的 Windows 预览版。请参阅[仓库历史说明](docs/repository-history.md)。原版 ARTEX 的作者是 **Autumn-27**。请参阅[原作者、来源与修改说明](ARTEX_NOTICE.zh-CN.md)。
+GitHub：[froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop)。项目目前处于**公开 Windows 预览版分发阶段**。Windows `v0.2.0-preview.4` 预览版及其对应源代码已通过 Releases 提供，无需登录即可下载。根据[处理方针](docs/license-policy.md)，不将原版 README 的单独使用限制采纳为本派生项目的附加许可证条件。仓库已于 2026-10-15 转为公开。保存旧开发历史及 `preview.1` 的 GitHub 仓库已删除；GitHub 提供整理后的源码及已验证的 Windows 预览版。请参阅[仓库历史说明](docs/repository-history.md)。原版 ARTEX 的作者是 **Autumn-27**。请参阅[原作者、来源与修改说明](ARTEX_NOTICE.zh-CN.md)。
 
 当前开发目标是在单个 Rust 进程中运行的原生桌面应用。原生 UI、对象与文件存储、LLM 服务及工具执行服务都在同一应用内运行。基本界面的运行不需要 Go、Node/npm、WebView 或 PostgreSQL 服务器。Python、Nmap 等外部工具在使用相应功能时仍需单独准备。
 
@@ -47,7 +47,7 @@ GitHub：[froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop)。项
 
 ## 下载构建版本
 
-在 [Windows x64 预览版 v0.2.0-preview.3](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.3) 的 Assets 中下载 `ARTEX-Desktop-v0.2.0-preview.3-windows-x64.zip`。完整解压后运行 `ARTEX-Windows-x64/ARTEX.exe`。基本应用运行不需要源码构建工具。同一发布版本还提供对应的源码 ZIP 和 `SHA256SUMS.txt`。
+在 [Windows x64 预览版 v0.2.0-preview.4](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.4) 的 Assets 中下载 `ARTEX-Desktop-v0.2.0-preview.4-windows-x64.zip`。完整解压后运行 `ARTEX-Windows-x64/ARTEX.exe`。基本应用运行不需要源码构建工具。同一发布版本还提供对应的源码 ZIP 和 `SHA256SUMS.txt`。
 
 该版本为未签名的 Windows 预览版本，不包含安装程序或自动更新。目前尚未提供 macOS 和 Linux 可执行文件。请参阅[首次运行指南](docs/download-and-run.md)（韩语）。
 
