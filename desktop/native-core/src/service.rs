@@ -115,6 +115,17 @@ pub struct Service {
 }
 impl Service {
     pub fn spawn(config: ServiceConfig) -> Result<Self> {
+        Self::spawn_inner(config, None)
+    }
+    /// Share persistent model/general preferences within this app profile. Keeping
+    /// the profile explicit isolates tests and headless integrations from user data.
+    pub fn spawn_with_profile(config: ServiceConfig, profile: &std::path::Path) -> Result<Self> {
+        Self::spawn_inner(config, Some(profile.to_path_buf()))
+    }
+    fn spawn_inner(config: ServiceConfig, profile: Option<std::path::PathBuf>) -> Result<Self> {
+        let mut router = Router::new(BTreeMap::new());
+        router.enable_native();
+        if let Some(profile) = profile { router.native_share_settings(&profile)?; }
         let (tx, rx) = mpsc::sync_channel(64);
         let (priority_tx, priority_rx) = mpsc::sync_channel(1);
         let (interaction_tx, interaction_rx) = mpsc::sync_channel(16);
@@ -134,7 +145,7 @@ impl Service {
             .name("artex-native-writer".into())
             .spawn(move || {
                 if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    writer(rx, priority_rx, interaction_rx, h)
+                    writer(rx, priority_rx, interaction_rx, h, router)
                 }))
                 .is_err()
                 {
@@ -271,7 +282,7 @@ fn weight(action: &NativeAction) -> Result<usize> {
             .iter()
             .fold(bytes, |n, id| n.saturating_add(id.len()).saturating_add(16)),
         NativeAction::Query {
-            query: NativeQuery::Body { body },
+            query: NativeQuery::Body { body } | NativeQuery::BodyPage { body, .. },
             ..
         } => bounded_value_size(body)?,
         NativeAction::Query {
@@ -736,9 +747,8 @@ fn writer(
     priority_rx: Receiver<Work>,
     interaction_rx: Receiver<Work>,
     handle: ServiceHandle,
+    mut router: Router,
 ) {
-    let mut router = Router::new(BTreeMap::new());
-    router.enable_native();
     let mut workspace: Option<NativeWorkspace> = None;
     let mut gateway: Option<Arc<dyn HostGateway>> = None;
     let mut deferred = BTreeSet::new();
@@ -984,6 +994,16 @@ fn execute(
                     return Err(error);
                 }
             };
+            if let Some(profile) = router.native_shared_profile() {
+                match crate::shared_resources::prepare(profile, &opened.root) {
+                    Ok(root) if root == opened.resources_root => {}
+                    Ok(_) => {
+                        abort_open(router, handle)?;
+                        return Err(Error::new("PERMISSION_DENIED", "Shared resource capability changed during opening"));
+                    }
+                    Err(error) => { abort_open(router, handle)?; return Err(error); }
+                }
+            }
             if lock(&handle.shared).suspend_requested {
                 abort_open(router, handle)?;
                 return Err(Error::new(
@@ -2365,7 +2385,7 @@ mod tests {
         assert_eq!(h.status().phase, ServicePhase::Closed);
         assert!(h.view().is_none());
         assert!(
-            path.join("store/manifests").exists(),
+            path.join("store/workspace.sqlite3").exists(),
             "Interrupted opening preserved a durable recoverable workspace"
         );
         open(&h, &path, OpenMode::Existing, false);
@@ -3064,6 +3084,22 @@ mod tests {
             .unwrap();
         let report_text = wait(&h, &read).unwrap().value.as_str().unwrap().to_owned();
         assert!(report_text.contains(&text));
+        for heading in ["## 검사 내역", "## 발견 문제", "## 개선 우선순위", "## 미검증·실패·차단 항목"] {
+            assert!(report_text.contains(heading));
+        }
+        // Export the very same generated report Body, not a findings-only
+        // replacement. This includes its full large UTF-8 evidence in readonly mode.
+        let stage = h.try_submit(NativeAction::StageBody {
+            scope: scope.clone(), body: generated.clone(), name: "site-report.md".into(),
+        }).unwrap();
+        let staged_report = wait(&h, &stage).unwrap().value;
+        let report_destination = dir.path().join("site-report.md");
+        let save = h.try_submit(NativeAction::SaveFile {
+            scope: scope.clone(), token: staged_report["file_capability"].as_str().unwrap().into(),
+            destination: report_destination.clone(), command_id: artex_core::new_id("command"),
+        }).unwrap();
+        wait(&h, &save).unwrap();
+        assert_eq!(std::fs::read_to_string(report_destination).unwrap(), report_text);
         let export = h
             .try_submit(NativeAction::Query {
                 scope: scope.clone(),

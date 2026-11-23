@@ -200,7 +200,7 @@ pub(super) fn label(key: &str) -> &str {
         "context_window_k" => "문맥 크기 (천 토큰)",
         "streaming" => "스트리밍",
         "enabled" => "활성화",
-        "approval_bypass" => "Bypass · 도구 실행 승인 생략",
+        "approval_bypass" => "Bypass · 현재 작업 공간의 도구 승인 생략",
         "traffic_capture" => "트래픽 기록 저장",
         "agent_traffic_binding" => "에이전트 실행과 트래픽 연결",
         "llm_record" => "모델 요청·응답 기록 저장",

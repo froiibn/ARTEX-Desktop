@@ -3,11 +3,127 @@ use artex_core::{Error, Result};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeSet,
     fs,
     io::Read,
     path::{Component, Path},
 };
-const MATERIALIZED_LIMIT: usize = 64 * 1024 * 1024;
+/// A complete Skill is bounded identically for execution and profile migration.
+pub const MATERIALIZED_LIMIT: usize = 64 * 1024 * 1024;
+pub const SNAPSHOT_ENTRY_LIMIT: usize = 10_000;
+const SHARED_POLICY: &str = ".shared-skills-policy.v1.json";
+const DELETED_SKILLS: &str = ".skill-deletions.v1.json";
+
+/// Opt in only the native application's profile resource capability. Ordinary
+/// workspace/SDK fixtures retain their original filesystem layout and deletion.
+pub fn configure_shared_profile_resources(registry: &CapabilityRegistry, cap: &str) -> Result<()> {
+    if shared_profile(registry, cap)? {
+        return Ok(());
+    }
+    let path = metadata_path(registry, cap, SHARED_POLICY)?;
+    atomic_write(
+        &path,
+        &serde_json::to_vec(&json!({"format_version":1,"kind":"profile_skill_originals"}))?,
+    )
+}
+fn metadata_path(
+    registry: &CapabilityRegistry,
+    cap: &str,
+    name: &str,
+) -> Result<std::path::PathBuf> {
+    let path = registry.root(cap)?.join(name);
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) if linked(&metadata) || !metadata.is_file() => {
+            return Err(Error::new(
+                "PERMISSION_DENIED",
+                "Shared Skill metadata must be an ordinary file",
+            ));
+        }
+        Ok(_) => (),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(Error::io(error)),
+    }
+    registry.resolve(cap, name, true)
+}
+fn metadata_value(registry: &CapabilityRegistry, cap: &str, name: &str) -> Result<Option<Value>> {
+    let path = metadata_path(registry, cap, name)?;
+    let metadata = match fs::metadata(&path) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(Error::io(error)),
+    };
+    if metadata.len() > MATERIALIZED_LIMIT as u64 {
+        return Err(Error::new(
+            "SIZE_LIMIT",
+            "Shared Skill metadata exceeds snapshot budget",
+        ));
+    }
+    let mut bytes = Vec::new();
+    fs::File::open(path)
+        .map_err(Error::io)?
+        .take(MATERIALIZED_LIMIT as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(Error::io)?;
+    if bytes.len() > MATERIALIZED_LIMIT {
+        return Err(Error::new(
+            "SIZE_LIMIT",
+            "Shared Skill metadata grew beyond snapshot budget",
+        ));
+    }
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .map_err(|_| Error::new("CORRUPT_STORE", "Invalid shared Skill metadata"))
+}
+fn shared_profile(registry: &CapabilityRegistry, cap: &str) -> Result<bool> {
+    let Some(value) = metadata_value(registry, cap, SHARED_POLICY)? else {
+        return Ok(false);
+    };
+    if value["format_version"] != 1
+        || value["kind"] != "profile_skill_originals"
+        || value.as_object().is_none_or(|map| map.len() != 2)
+    {
+        return Err(Error::new("CORRUPT_STORE", "Invalid shared Skill policy"));
+    }
+    Ok(true)
+}
+/// This monotonic ledger blocks automatic legacy imports only. Explicit user or
+/// agent creation still creates a usable Skill, without erasing deletion history.
+pub fn deleted_skill_names(registry: &CapabilityRegistry, cap: &str) -> Result<BTreeSet<String>> {
+    if !shared_profile(registry, cap)? {
+        return Ok(BTreeSet::new());
+    }
+    let Some(value) = metadata_value(registry, cap, DELETED_SKILLS)? else {
+        return Ok(BTreeSet::new());
+    };
+    let names = value["names"]
+        .as_array()
+        .ok_or_else(|| Error::new("CORRUPT_STORE", "Invalid Skill deletion ledger"))?;
+    if value["format_version"] != 1 || value.as_object().is_none_or(|map| map.len() != 2) {
+        return Err(Error::new("CORRUPT_STORE", "Invalid Skill deletion ledger"));
+    }
+    names
+        .iter()
+        .map(|value| {
+            name(&json!({"name":value}), "name")
+                .map_err(|_| Error::new("CORRUPT_STORE", "Invalid deleted Skill identity"))
+        })
+        .collect()
+}
+fn record_skill_deletion(registry: &CapabilityRegistry, cap: &str, skill: &str) -> Result<()> {
+    if !shared_profile(registry, cap)? {
+        return Ok(());
+    }
+    let mut names = deleted_skill_names(registry, cap)?;
+    names.insert(skill.into());
+    let bytes = serde_json::to_vec(&json!({"format_version":1,"names":names}))?;
+    if bytes.len() > MATERIALIZED_LIMIT {
+        return Err(Error::new(
+            "SIZE_LIMIT",
+            "Skill deletion ledger exceeds snapshot budget",
+        ));
+    }
+    atomic_write(&metadata_path(registry, cap, DELETED_SKILLS)?, &bytes)
+}
 
 /// Private catalog used by the engine's admission preflight. No instructions,
 /// filesystem paths, credentials or file contents leave this metadata boundary.
@@ -41,12 +157,60 @@ pub fn catalog(registry: &CapabilityRegistry, cap: &str) -> Result<Value> {
     Ok(json!(entries))
 }
 
-struct SkillTree {
-    files: Vec<(String, Vec<u8>)>,
-    directories: Vec<String>,
-    digest: String,
+/// An owned, bounded read of a Skill tree. Capturing does not modify its source.
+pub struct SkillTree {
+    pub files: Vec<(String, Vec<u8>)>,
+    pub directories: Vec<String>,
+    pub digest: String,
+    /// Preserve helper executable/read-only modes when importing on this OS.
+    pub file_permissions: std::collections::BTreeMap<String, fs::Permissions>,
 }
-fn snapshot_tree(registry: &CapabilityRegistry, cap: &str, base: &str) -> Result<SkillTree> {
+/// SHA-256 namespace for stable source identities without storing raw paths.
+pub fn content_digest(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
+}
+fn linked(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    let reparse = {
+        use std::os::windows::fs::MetadataExt;
+        metadata.file_attributes() & 0x400 != 0
+    };
+    #[cfg(not(windows))]
+    let reparse = false;
+    metadata.file_type().is_symlink() || reparse
+}
+/// Capture ordinary files/directories only, retaining the existing execution
+/// hash and budgets. Links, including Windows junctions, never become imports.
+pub fn snapshot_tree(registry: &CapabilityRegistry, cap: &str, base: &str) -> Result<SkillTree> {
+    let mut lexical = registry.root(cap)?;
+    for component in Path::new(base).components() {
+        match component {
+            Component::Normal(part) => lexical.push(part),
+            Component::CurDir => continue,
+            _ => {
+                return Err(Error::new(
+                    "PERMISSION_DENIED",
+                    "Skill path must remain relative",
+                ));
+            }
+        }
+        let metadata = fs::symlink_metadata(&lexical).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Error::new("NOT_FOUND", "Skill directory does not exist")
+            } else {
+                Error::io(error)
+            }
+        })?;
+        if linked(&metadata) {
+            return Err(Error::new(
+                "PERMISSION_DENIED",
+                "Skill snapshots cannot contain links",
+            ));
+        }
+        if !metadata.is_dir() {
+            return Err(Error::new("NOT_FOUND", "Skill directory does not exist"));
+        }
+    }
     let directory = registry.resolve(cap, base, false)?;
     if !directory.is_dir() {
         return Err(Error::new("NOT_FOUND", "Skill directory does not exist"));
@@ -55,6 +219,7 @@ fn snapshot_tree(registry: &CapabilityRegistry, cap: &str, base: &str) -> Result
         files: Vec::new(),
         directories: Vec::new(),
         digest: String::new(),
+        file_permissions: Default::default(),
     };
     let mut remaining = MATERIALIZED_LIMIT;
     for entry in walkdir::WalkDir::new(&directory)
@@ -62,7 +227,8 @@ fn snapshot_tree(registry: &CapabilityRegistry, cap: &str, base: &str) -> Result
         .min_depth(1)
     {
         let entry = entry.map_err(|_| Error::new("IO_FAILURE", "Skill traversal failed"))?;
-        if entry.file_type().is_symlink() {
+        let metadata = fs::symlink_metadata(entry.path()).map_err(Error::io)?;
+        if linked(&metadata) {
             return Err(Error::new(
                 "PERMISSION_DENIED",
                 "Skill snapshots cannot contain links",
@@ -72,7 +238,8 @@ fn snapshot_tree(registry: &CapabilityRegistry, cap: &str, base: &str) -> Result
             .path()
             .strip_prefix(&directory)
             .map_err(|_| Error::new("PERMISSION_DENIED", "Skill path escaped source"))?
-            .to_string_lossy()
+            .to_str()
+            .ok_or_else(|| Error::new("INVALID_PARAMS", "Skill paths must be UTF-8"))?
             .replace('\\', "/");
         let path = registry.resolve(cap, &format!("{base}/{relative}"), false)?;
         if entry.file_type().is_dir() {
@@ -94,6 +261,8 @@ fn snapshot_tree(registry: &CapabilityRegistry, cap: &str, base: &str) -> Result
                 ));
             }
             remaining -= bytes.len();
+            tree.file_permissions
+                .insert(relative.clone(), metadata.permissions());
             tree.files.push((relative, bytes));
         } else {
             return Err(Error::new(
@@ -101,7 +270,7 @@ fn snapshot_tree(registry: &CapabilityRegistry, cap: &str, base: &str) -> Result
                 "Skill snapshots require ordinary files and directories",
             ));
         }
-        if tree.files.len() + tree.directories.len() > 10_000 {
+        if tree.files.len() + tree.directories.len() > SNAPSHOT_ENTRY_LIMIT {
             return Err(Error::new(
                 "SIZE_LIMIT",
                 "Skill snapshot file count exceeds budget",
@@ -169,11 +338,19 @@ fn load_scoped(
                     registry.resolve(execution_cap, &format!("{stage_relative}/{dir}"), true)?;
                 fs::create_dir_all(path).map_err(Error::io)?;
             }
-            for (path, bytes) in &tree.files {
-                let path =
-                    registry.resolve(execution_cap, &format!("{stage_relative}/{path}"), true)?;
+            for (relative, bytes) in &tree.files {
+                let path = registry.resolve(
+                    execution_cap,
+                    &format!("{stage_relative}/{relative}"),
+                    true,
+                )?;
                 fs::create_dir_all(path.parent().unwrap()).map_err(Error::io)?;
                 atomic_write(&path, bytes)?;
+                // Skill originals may contain directly invoked executable
+                // helpers. The owned snapshot must preserve their OS modes.
+                if let Some(permissions) = tree.file_permissions.get(relative) {
+                    fs::set_permissions(&path, permissions.clone()).map_err(Error::io)?;
+                }
             }
             match fs::rename(&stage, &target) {
                 Ok(()) => Ok(()),
@@ -404,6 +581,9 @@ pub fn execute(registry: &CapabilityRegistry, method: &str, input: &Value) -> Re
         }
         "skillFiles" => Ok(json!(files(&dir)?)),
         "deleteSkill" => {
+            // Persist import suppression before removing the tree. A failed or
+            // uncertain deletion must not later reactivate an old workspace copy.
+            record_skill_deletion(registry, cap, &n)?;
             remove(&dir)?;
             Ok(json!({"deleted":n}))
         }
@@ -470,6 +650,107 @@ fn remove(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    #[test]
+    fn materialized_skill_preserves_executable_helper_mode_and_actual_direct_execution() {
+        use std::os::unix::fs::PermissionsExt;
+        let resources = tempfile::tempdir().unwrap();
+        let execution = tempfile::tempdir().unwrap();
+        let registry = CapabilityRegistry::default();
+        let cap = registry.grant_directory(resources.path()).unwrap();
+        let execution_cap = registry.grant_directory(execution.path()).unwrap();
+        execute(&registry,"create_skill",&json!({"directory_capability":cap,"name":"inspect","description":"Executable helper fixture","instructions":"Execute ${SKILL_DIR}/helper.sh"})).unwrap();
+        let helper = resources.path().join("skills/inspect/helper.sh");
+        fs::write(&helper, b"#!/bin/sh\nprintf skill-executable-ok").unwrap();
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o755)).unwrap();
+        let loaded=execute(&registry,"Skill",&json!({"directory_capability":cap,"execution_directory_capability":execution_cap,"name":"inspect"})).unwrap();
+        let materialized = execution
+            .path()
+            .join(loaded["skill_dir"].as_str().unwrap())
+            .join("helper.sh");
+        assert_eq!(
+            fs::metadata(&materialized).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
+        let output = std::process::Command::new(&materialized)
+            .current_dir(execution.path())
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"skill-executable-ok");
+        assert_eq!(
+            fs::read(&helper).unwrap(),
+            b"#!/bin/sh\nprintf skill-executable-ok"
+        );
+    }
+    #[test]
+    fn profile_skill_deletion_ledger_preserves_plain_workspace_compatibility_and_explicit_recreation()
+     {
+        let directory = tempfile::tempdir().unwrap();
+        let registry = CapabilityRegistry::default();
+        let cap = registry.grant_directory(directory.path()).unwrap();
+        let input = json!({"directory_capability":cap,"name":"inspect","description":"Explicit fixture","instructions":"original"});
+        execute(&registry, "create_skill", &input).unwrap();
+        execute(&registry, "deleteSkill", &input).unwrap();
+        assert!(!directory.path().join(DELETED_SKILLS).exists());
+        assert!(!directory.path().join(SHARED_POLICY).exists());
+        configure_shared_profile_resources(&registry, &cap).unwrap();
+        execute(&registry, "create_skill", &input).unwrap();
+        execute(&registry, "deleteSkill", &input).unwrap();
+        assert_eq!(
+            deleted_skill_names(&registry, &cap).unwrap(),
+            BTreeSet::from(["inspect".into()])
+        );
+        let mut recreated = input;
+        recreated["instructions"] = json!("explicitly recreated");
+        execute(&registry, "create_skill", &recreated).unwrap();
+        let read = execute(
+            &registry,
+            "readSkillFile",
+            &json!({"directory_capability":cap,"name":"inspect","file":"SKILL.md"}),
+        )
+        .unwrap();
+        assert!(read.as_str().unwrap().contains("explicitly recreated"));
+        assert!(
+            deleted_skill_names(&registry, &cap)
+                .unwrap()
+                .contains("inspect")
+        );
+    }
+    #[test]
+    fn corrupt_or_unwritable_profile_skill_ledger_never_removes_the_original_tree() {
+        let directory = tempfile::tempdir().unwrap();
+        let registry = CapabilityRegistry::default();
+        let cap = registry.grant_directory(directory.path()).unwrap();
+        configure_shared_profile_resources(&registry, &cap).unwrap();
+        let input = json!({"directory_capability":cap,"name":"inspect","description":"Retain fixture","instructions":"do not remove"});
+        execute(&registry, "create_skill", &input).unwrap();
+        let path = directory.path().join("skills/inspect/SKILL.md");
+        let original = fs::read(&path).unwrap();
+        fs::write(directory.path().join(DELETED_SKILLS), b"invalid json").unwrap();
+        assert_eq!(
+            execute(&registry, "deleteSkill", &input).unwrap_err().code,
+            "CORRUPT_STORE"
+        );
+        assert_eq!(fs::read(&path).unwrap(), original);
+        fs::remove_file(directory.path().join(DELETED_SKILLS)).unwrap();
+        fs::create_dir(directory.path().join(DELETED_SKILLS)).unwrap();
+        assert_eq!(
+            execute(&registry, "deleteSkill", &input).unwrap_err().code,
+            "PERMISSION_DENIED"
+        );
+        assert_eq!(fs::read(&path).unwrap(), original);
+        fs::write(
+            directory.path().join(SHARED_POLICY),
+            b"{\"format_version\":999}",
+        )
+        .unwrap();
+        assert_eq!(
+            execute(&registry, "deleteSkill", &input).unwrap_err().code,
+            "CORRUPT_STORE"
+        );
+        assert_eq!(fs::read(&path).unwrap(), original);
+    }
     #[test]
     fn skill_yaml_and_paths() {
         let d = tempfile::tempdir().unwrap();

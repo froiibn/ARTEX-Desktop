@@ -3,6 +3,9 @@ use crate::*;
 use artex_core::Record;
 use artex_domain::{Planner, record, text};
 use artex_importer::{LegacyOptions, SecretOutcome, SecretSink};
+#[cfg(test)]
+#[path = "domain_ui_e2e_tests.rs"]
+mod domain_ui_e2e_tests;
 use std::collections::BTreeSet;
 use std::{fs, sync::Arc, time::Duration};
 
@@ -38,6 +41,7 @@ struct ReadyPackage {
     original_size: usize,
     counts: BTreeMap<String, usize>,
     owned_versions: BTreeMap<(String, String), String>,
+    aggregate_stats: Value,
 }
 fn task_owned_versions(s: &Snapshot, task_id: &str) -> Result<BTreeMap<(String, String), String>> {
     let task = record(s, "tasks", task_id)?;
@@ -114,6 +118,7 @@ fn prepare_archive_export(
     )?;
     cancelled(&cancel)?;
     let source = artex_importer::read_archive(&temporary, &format!("archive-verify:{archive_id}"))?;
+    let aggregate_stats = artex_domain::auxiliary_ui::archive_statistics(&source.tables, &task_id)?;
     cancelled(&cancel)?;
     let file_size = fs::metadata(&temporary)?.len();
     if file_size > 512 * 1024 * 1024 {
@@ -137,6 +142,7 @@ fn prepare_archive_export(
         original_size,
         counts,
         owned_versions,
+        aggregate_stats,
     }))
 }
 struct VaultSink {
@@ -436,6 +442,328 @@ mod tests {
         assert_eq!(result, json!({"removed":0}));
         assert_eq!(router.handle_gc(&r, &c).unwrap(), result);
     }
+    fn statistics(router: &mut Router, method: &str) -> Value {
+        if router.host_epoch.is_none() {
+            let hello=router.response(json!({"jsonrpc":"2.0","protocol":"artex-rpc/1.0","id":new_id("request"),"method":"system.hello","workspace_id":null,"engine_epoch":null,"command_id":null,"expected":[],"timeout_ms":5000,"params":{"versions":["artex-rpc/1.0"],"host_epoch":new_id("epoch"),"capabilities":[]}}));
+            assert!(hello.get("error").is_none(), "{hello}");
+        }
+        let s = router.snapshot().unwrap();
+        let response=router.response(json!({"jsonrpc":"2.0","protocol":"artex-rpc/1.0","id":new_id("request"),"workspace_id":s.workspace_id,"engine_epoch":router.engine_epoch,"command_id":null,"expected":[],"method":method,"params":{},"timeout_ms":5000}));
+        assert!(response.get("error").is_none(), "{response}");
+        response["result"].clone()
+    }
+    fn skill_catalog_statistics(router: &mut Router) -> Value {
+        let state = router
+            .archive_statistics_view("ui.skills", router.snapshot().unwrap())
+            .unwrap();
+        artex_domain::skills_ui::decorate_skills(
+            &json!([{"name":"fixture skill","files":["SKILL.md"]}]),
+            &state,
+        )
+        .unwrap()
+    }
+    #[test]
+    fn archived_totals_survive_old_preview_readonly_recovery_restart_and_restore() {
+        let (dir, mut router, task, _node) = seed();
+        let c = Context {
+            actor: Actor {
+                kind: "user".into(),
+                agent_id: None,
+                run_id: None,
+                engine_epoch: router.engine_epoch.clone(),
+            },
+            task_id: None,
+            intent_id: None,
+            conversation_id: None,
+        };
+        let b = artex_domain::tasks::plan(
+            "task.create",
+            &json!({"description":"live control task","goal":"local fixture"}),
+            &router.snapshot().unwrap(),
+            &c,
+        )
+        .unwrap();
+        let other = b.result["task_id"].as_str().unwrap().to_owned();
+        router.internal_commit(b).unwrap();
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.statistics.agent", &json!({}));
+        let agent = p
+            .insert(
+                "agents",
+                "agent",
+                json!({"key":"statistics_fixture","name":"Statistics fixture","role":"assistant"}),
+            )
+            .unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.statistics.tool", &json!({}));
+        p.insert("tools",artex_core::collection_prefix("tools").unwrap(),json!({"key":"fixture_tool","name":"Fixture tool","description":"Local statistics fixture"})).unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        for (id, tokens) in [(&task, 100), (&other, 50)] {
+            let mut scoped = c.clone();
+            scoped.task_id = Some(id.clone());
+            let b=artex_domain::findings::plan("report_finding",&json!({"vulnclass":"fixture class","severity":"high","summary":"local finding","evidence":"local proof"}),&router.snapshot().unwrap(),&scoped).unwrap();
+            router.internal_commit(b).unwrap();
+            let s = router.snapshot().unwrap();
+            let mut p = Planner::new(&s, "fixture.usage.run", &json!({}));
+            let run=p.insert("agent_runs","run",json!({"task_id":id,"agent_id":agent,"state":"completed","engine_epoch":router.engine_epoch,"finished_at":artex_core::now()})).unwrap();
+            router.internal_commit(p.done(json!({}))).unwrap();
+            router.record_model_turn(&run,&json!({"model":"fixture model","profile_name":"fixture profile","profile_id":null,"latency_ms":1,"record_enabled":false}),&Ok(artex_runtime::Turn{usage:json!({"input_tokens":tokens,"output_tokens":10,"cache_read_tokens":3,"cache_write_tokens":2}),..Default::default()})).unwrap();
+            let s = router.snapshot().unwrap();
+            let mut p = Planner::new(&s, "fixture.statistics.tools_skills", &json!({}));
+            for (skill, found) in [("fixture skill", true), ("missing fixture", false)] {
+                p.insert("skill_usage",artex_core::collection_prefix("skill_usage").unwrap(),json!({"task_id":id,"exploration_id":s.get("tasks",id).unwrap().data["exploration_id"],"skill":skill,"found":found,"agent_key":"statistics_fixture","ts":artex_core::now()})).unwrap();
+            }
+            p.insert("tool_usage",artex_core::collection_prefix("tool_usage").unwrap(),json!({"task_id":id,"exploration_id":s.get("tasks",id).unwrap().data["exploration_id"],"tool_key":"fixture_tool","agent_key":"statistics_fixture","ts":artex_core::now()})).unwrap();
+            router.internal_commit(p.done(json!({}))).unwrap();
+        }
+        // Imported metering task_id is an opaque registry key. Ownership also
+        // follows the task exploration, without rewriting that historical key.
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.legacy.metering", &json!({}));
+        p.insert("llm_usage","llmusage",json!({"task_id":"opaque-registry-key","exploration_id":s.get("tasks",&task).unwrap().data["exploration_id"],"profile_name":"legacy fixture","model":"fixture model","ts":artex_core::now(),"input_tokens":17,"output_tokens":2})).unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        let original_findings = statistics(&mut router, "ui.findingStats");
+        let original_usage = statistics(&mut router, "ui.usageStats");
+        let original_tools = statistics(&mut router, "ui.tools");
+        let original_missing = statistics(&mut router, "ui.missingSkills");
+        let original_skills = skill_catalog_statistics(&mut router);
+        assert_eq!(original_findings["total"], 2);
+        let b = artex_domain::auxiliary_ui::plan(
+            "ui.archiveTask",
+            &json!({"id":task}),
+            &router.snapshot().unwrap(),
+            &c,
+        )
+        .unwrap();
+        let archive = b.result["id"].as_str().unwrap().to_owned();
+        router.internal_commit(b).unwrap();
+        drain(&mut router);
+        assert_eq!(
+            router
+                .snapshot()
+                .unwrap()
+                .get("task_archives", &archive)
+                .unwrap()
+                .data["state"],
+            "ready"
+        );
+        assert_eq!(
+            router
+                .snapshot()
+                .unwrap()
+                .get("task_archives", &archive)
+                .unwrap()
+                .data["aggregate_stats"]["finding_stats"]["total"],
+            1
+        );
+        assert_eq!(
+            statistics(&mut router, "ui.findingStats")["total"],
+            original_findings["total"]
+        );
+        assert_eq!(statistics(&mut router, "ui.usageStats"), original_usage);
+        assert_eq!(statistics(&mut router, "ui.tools"), original_tools);
+        assert_eq!(
+            statistics(&mut router, "ui.missingSkills"),
+            original_missing
+        );
+        assert_eq!(skill_catalog_statistics(&mut router), original_skills);
+        // A previous preview stored only a table count. Recover from the verified
+        // immutable package in memory, including when its store is read-only.
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.old_preview", &json!({}));
+        let mut d = s.get("task_archives", &archive).unwrap().data.clone();
+        d["aggregate_stats"] = json!({"tables":3});
+        p.put("task_archives", &archive, d);
+        router.internal_commit(p.done(json!({}))).unwrap();
+        drop(router);
+        let root = dir.path().join("w");
+        let mut readonly = Router::new(BTreeMap::new());
+        readonly.store = Some(Store::open_read_only(&root).unwrap());
+        readonly.read_only = true;
+        let before = readonly.snapshot().unwrap();
+        for _ in 0..2 {
+            assert_eq!(statistics(&mut readonly, "ui.findingStats")["total"], 2);
+            assert_eq!(statistics(&mut readonly, "ui.usageStats"), original_usage);
+            assert_eq!(statistics(&mut readonly, "ui.tools"), original_tools);
+            assert_eq!(
+                statistics(&mut readonly, "ui.missingSkills"),
+                original_missing
+            );
+            assert_eq!(skill_catalog_statistics(&mut readonly), original_skills);
+        }
+        assert_eq!(readonly.archive_aggregates.len(), 1);
+        let after = readonly.snapshot().unwrap();
+        assert_eq!(before.commit_seq, after.commit_seq);
+        assert_eq!(before.collections, after.collections);
+        assert_eq!(
+            after.get("task_archives", &archive).unwrap().data["aggregate_stats"],
+            json!({"tables":3})
+        );
+        drop(after);
+        drop(before);
+        drop(readonly);
+        let mut restored = Router::new(BTreeMap::new());
+        restored.store = Some(Store::open(&root).unwrap());
+        let b = artex_domain::auxiliary_ui::plan(
+            "ui.restoreTaskArchive",
+            &json!({"id":archive}),
+            &restored.snapshot().unwrap(),
+            &c,
+        )
+        .unwrap();
+        restored.internal_commit(b).unwrap();
+        drain(&mut restored);
+        assert!(
+            restored
+                .snapshot()
+                .unwrap()
+                .get("task_archives", &archive)
+                .is_none()
+        );
+        assert_eq!(statistics(&mut restored, "ui.findingStats")["total"], 2);
+        assert_eq!(statistics(&mut restored, "ui.usageStats"), original_usage);
+        assert_eq!(statistics(&mut restored, "ui.tools"), original_tools);
+        assert_eq!(
+            statistics(&mut restored, "ui.missingSkills"),
+            original_missing
+        );
+        assert_eq!(skill_catalog_statistics(&mut restored), original_skills);
+    }
+    #[test]
+    fn native_v1_task_counts_recover_readonly_once_and_restore_opaque_ledgers_unchanged() {
+        let (dir, mut router, task, _) = seed();
+        let context = Context {
+            actor: Actor {
+                kind: "user".into(),
+                agent_id: None,
+                run_id: None,
+                engine_epoch: router.engine_epoch.clone(),
+            },
+            task_id: None,
+            intent_id: None,
+            conversation_id: None,
+        };
+        let s = router.snapshot().unwrap();
+        let exp = s.get("tasks", &task).unwrap().data["exploration_id"].clone();
+        let mut p = Planner::new(&s, "fixture.opaque.counts", &json!({}));
+        for key in ["registry-a", "registry-b"] {
+            p.insert("llm_usage", "llmusage", json!({"task_id":key,"exploration_id":exp,"profile_name":"fixture","ts":artex_core::now(),"input_tokens":3})).unwrap();
+        }
+        p.insert("skill_usage", artex_core::collection_prefix("skill_usage").unwrap(), json!({"task_id":null,"exploration_id":exp,"skill":"fixture skill","found":true,"ts":artex_core::now()})).unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        let batch = artex_domain::auxiliary_ui::plan(
+            "ui.archiveTask",
+            &json!({"id":task}),
+            &router.snapshot().unwrap(),
+            &context,
+        )
+        .unwrap();
+        let archive = batch.result["id"].as_str().unwrap().to_owned();
+        router.internal_commit(batch).unwrap();
+        drain(&mut router);
+        let s = router.snapshot().unwrap();
+        let mut archive_data = s.get("task_archives", &archive).unwrap().data.clone();
+        assert_eq!(
+            archive_data["aggregate_stats"]["native_statistics_version"],
+            artex_domain::auxiliary_ui::ARCHIVE_STATISTICS_VERSION
+        );
+        assert_eq!(
+            archive_data["aggregate_stats"]["token_profiles"][0]["tasks"],
+            1
+        );
+        assert_eq!(
+            archive_data["aggregate_stats"]["skill_stats"][0]["tasks"],
+            1
+        );
+        // Simulate the complete but incorrectly counted aggregate already written
+        // by native v1. Shape checks alone must not accept these historical totals.
+        archive_data["aggregate_stats"]["native_statistics_version"] = json!(1);
+        archive_data["aggregate_stats"]["token_profiles"][0]["tasks"] = json!(2);
+        archive_data["aggregate_stats"]["skill_stats"][0]["tasks"] = json!(0);
+        let old_stats = archive_data["aggregate_stats"].clone();
+        let mut p = Planner::new(&s, "fixture.native_v1", &json!({}));
+        p.put("task_archives", &archive, archive_data);
+        router.internal_commit(p.done(json!({}))).unwrap();
+        drop(router);
+        let root = dir.path().join("w");
+        let mut readonly = Router::new(BTreeMap::new());
+        readonly.store = Some(Store::open_read_only(&root).unwrap());
+        readonly.read_only = true;
+        let before = readonly.snapshot().unwrap();
+        for _ in 0..2 {
+            let stats = statistics(&mut readonly, "ui.usageStats");
+            assert_eq!(stats["by_profile"][0]["tasks"], 1);
+            assert_eq!(stats["by_profile"][0]["calls"], 2);
+            assert_eq!(stats["by_profile"][0]["input_tokens"], 6);
+            let view = readonly
+                .archive_statistics_view("ui.skills", readonly.snapshot().unwrap())
+                .unwrap();
+            let skills = artex_domain::auxiliary_ui::skill_statistics(&view, true).unwrap();
+            assert_eq!(skills[0]["tasks"], 1);
+            assert_eq!(skills[0]["calls"], 1);
+            assert_eq!(readonly.archive_aggregates.len(), 1);
+        }
+        let after = readonly.snapshot().unwrap();
+        assert_eq!(before.commit_seq, after.commit_seq);
+        assert_eq!(before.collections, after.collections);
+        assert_eq!(
+            after.get("task_archives", &archive).unwrap().data["aggregate_stats"],
+            old_stats
+        );
+        drop(after);
+        drop(before);
+        drop(readonly);
+        let mut restored = Router::new(BTreeMap::new());
+        restored.store = Some(Store::open(&root).unwrap());
+        let batch = artex_domain::auxiliary_ui::plan(
+            "ui.restoreTaskArchive",
+            &json!({"id":archive}),
+            &restored.snapshot().unwrap(),
+            &context,
+        )
+        .unwrap();
+        restored.internal_commit(batch).unwrap();
+        drain(&mut restored);
+        let snapshot = restored.snapshot().unwrap();
+        assert!(snapshot.get("task_archives", &archive).is_none());
+        let keys = snapshot
+            .records("llm_usage")
+            .iter()
+            .map(|r| text(&r.data, "task_id").to_owned())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            keys,
+            BTreeSet::from(["registry-a".into(), "registry-b".into()])
+        );
+        let skills = snapshot.records("skill_usage");
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].data["skill"], "fixture skill");
+        assert!(skills[0].data["task_id"].is_null());
+        let stats = statistics(&mut restored, "ui.usageStats");
+        assert_eq!(stats["by_profile"][0]["calls"], 2);
+        assert_eq!(stats["by_profile"][0]["input_tokens"], 6);
+        assert!(restored.archive_aggregates.is_empty());
+    }
+    #[test]
+    fn old_preview_statistics_fail_explicitly_when_package_is_unavailable() {
+        let (_d, mut router, task, _node) = seed();
+        let s = router.snapshot().unwrap();
+        let mut p = Planner::new(&s, "fixture.old_missing", &json!({}));
+        let mut d = s.get("tasks", &task).unwrap().data.clone();
+        d["archived_at"] = json!(artex_core::now());
+        p.put("tasks", &task, d);
+        p.insert("task_archives","archive",json!({"task_id":task,"state":"ready","archive_path":format!("blob:{}","a".repeat(64)),"sha256":"a".repeat(64),"aggregate_stats":{"tables":3}})).unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        let s = router.snapshot().unwrap();
+        assert_eq!(
+            router
+                .archive_statistics_view("ui.findingStats", s)
+                .unwrap_err()
+                .code,
+            "RECOVERY_REQUIRED"
+        );
+    }
 }
 impl SecretSink for VaultSink {
     fn reference_available(&mut self, reference: &Value) -> Result<bool> {
@@ -469,6 +797,120 @@ impl SecretSink for VaultSink {
     }
 }
 impl Router {
+    /// Old preview packages retained rows but omitted or miscounted compact totals.
+    /// Hydrate only the query view: read-only workspaces never receive a repair write.
+    pub(super) fn archive_statistics_view(
+        &mut self,
+        method: &str,
+        state: Arc<artex_store::ReadGeneration>,
+    ) -> Result<Arc<artex_store::ReadGeneration>> {
+        if ![
+            "ui.findingStats",
+            "ui.usageStats",
+            "ui.tools",
+            "ui.skills",
+            "ui.missingSkills",
+        ]
+        .contains(&method)
+        {
+            return Ok(state);
+        }
+        let archives = artex_domain::auxiliary_ui::archived_records(&state);
+        let active = archives
+            .iter()
+            .map(|a| {
+                format!(
+                    "{}:{}:{}",
+                    state.workspace_id,
+                    text(&a.data, "task_id"),
+                    text(&a.data, "sha256")
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        self.archive_aggregates
+            .retain(|key, _| active.contains(key));
+        let mut recovered = BTreeMap::new();
+        for archive in archives {
+            let current = &archive.data["aggregate_stats"];
+            // Version 1 counted opaque registry aliases/null FKs as tasks. Derive
+            // compatible totals from the verified immutable package once per blob;
+            // the query view and cache never repair the persisted ledger or store.
+            if current["native_statistics_version"]
+                == artex_domain::auxiliary_ui::ARCHIVE_STATISTICS_VERSION
+                && current["finding_stats"].is_object()
+                && current["token_profiles"].is_array()
+                && current["token_daily"].is_array()
+                && current["tools"].is_object()
+                && (current["skill_stats"].is_array() || current["skills"].is_object())
+            {
+                continue;
+            }
+            let task_id = text(&archive.data, "task_id");
+            let hash = text(&archive.data, "sha256");
+            let key = format!("{}:{task_id}:{hash}", state.workspace_id);
+            if !self.archive_aggregates.contains_key(&key) {
+                if text(&archive.data, "archive_path") != format!("blob:{hash}") {
+                    return Err(Error::new(
+                        "RECOVERY_REQUIRED",
+                        "Archived statistics package is unavailable",
+                    ));
+                }
+                let reference = self
+                    .store
+                    .as_ref()
+                    .ok_or_else(|| Error::new("WORKSPACE_NOT_OPEN", "Workspace closed"))?
+                    .existing_blob_ref(hash, "application/zip")?
+                    .ok_or_else(|| {
+                        Error::new(
+                            "RECOVERY_REQUIRED",
+                            "Archived statistics package is missing",
+                        )
+                    })?;
+                // The importer already imposes this package boundary. Never turn an
+                // unreadable/oversized package into a successful zero-statistics result.
+                let bytes = self.read_blob_bytes(&reference, 512 * 1024 * 1024)?;
+                let source = artex_importer::read_archive_bytes(
+                    &bytes,
+                    &format!("statistics:{}", archive.header.id),
+                )?;
+                if !source
+                    .tables
+                    .get("tasks")
+                    .into_iter()
+                    .flatten()
+                    .any(|t| t["id"] == task_id)
+                {
+                    return Err(Error::new(
+                        "CORRUPT_STORE",
+                        "Archived statistics task identity does not match",
+                    ));
+                }
+                let stats =
+                    artex_domain::auxiliary_ui::archive_statistics(&source.tables, task_id)?;
+                self.archive_aggregates.insert(key.clone(), stats);
+            }
+            recovered.insert(
+                archive.header.id.clone(),
+                self.archive_aggregates[&key].clone(),
+            );
+        }
+        if recovered.is_empty() {
+            return Ok(state);
+        }
+        let mut snapshot = state.snapshot.as_ref().clone();
+        for (id, stats) in recovered {
+            snapshot
+                .collections
+                .get_mut("task_archives")
+                .unwrap()
+                .get_mut(&id)
+                .unwrap()
+                .data["aggregate_stats"] = stats;
+        }
+        Ok(Arc::new(artex_store::ReadGeneration::new(Arc::new(
+            snapshot,
+        ))))
+    }
     pub(super) fn handle_archive(&mut self, r: &DispatchRequest, c: &Context) -> Result<Value> {
         if c.actor.kind != "user" {
             return Err(Error::new(
@@ -697,6 +1139,7 @@ impl Router {
             file_size,
             original_size,
             counts,
+            aggregate_stats,
             ..
         } = ready;
         let s = self.snapshot()?;
@@ -835,7 +1278,8 @@ impl Router {
         d["original_size"] = json!(original_size.to_string());
         d["archived_at"] = json!(artex_core::now());
         d["data_counts"] = json!(counts);
-        d["aggregate_stats"] = json!({"tables":manifest["tables"].as_array().unwrap().len()});
+        d["aggregate_stats"] = aggregate_stats;
+        d["aggregate_stats"]["tables"] = json!(manifest["tables"].as_array().unwrap().len());
         planner.put("task_archives", archive_id, d);
         self.internal_commit(planner.done(json!({"ready":true})))?;
         Ok(())

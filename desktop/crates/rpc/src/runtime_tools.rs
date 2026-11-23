@@ -148,10 +148,7 @@ impl Router {
             usize::try_from(length)
                 .map_err(|_| Error::new("SIZE_LIMIT", "Body exceeds platform address space"))?,
         );
-        self.store
-            .as_ref()
-            .ok_or_else(|| Error::new("WORKSPACE_NOT_OPEN", "Workspace closed"))?
-            .copy_blob_to(reference, &mut bytes)?;
+        self.configuration_body_store(reference)?.copy_blob_to(reference, &mut bytes)?;
         Ok(bytes)
     }
     /// Cached query bodies are scoped to the current open generation: close

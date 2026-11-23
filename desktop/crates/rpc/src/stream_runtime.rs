@@ -4,12 +4,11 @@ use super::*;
 use artex_domain::{Planner, record, text};
 use artex_runtime::{Cancellation, provider::StreamDelta};
 use std::{
+    collections::VecDeque,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
-        mpsc,
     },
-    time::Duration,
 };
 const CHUNK: usize = 16 * 1024;
 const QUEUE: usize = 64;
@@ -24,7 +23,7 @@ struct Pending {
     epoch: String,
     task: Option<String>,
     turn: String,
-    receiver: mpsc::Receiver<Packet>,
+    receiver: ProgressReceiver,
     cancel: Cancellation,
     rows: Vec<(String, String)>,
     total: usize,
@@ -44,9 +43,36 @@ struct Packet {
     _reservation: Reservation,
 }
 pub(super) struct StreamSink {
-    sender: mpsc::SyncSender<Packet>,
+    sender: ProgressSender,
     cancel: Cancellation,
     budget: Arc<AtomicUsize>,
+}
+#[derive(Default)]
+struct ProgressQueue {
+    packets: VecDeque<Packet>,
+    omitted: bool,
+    closed: bool,
+}
+struct ProgressSender(Arc<Mutex<ProgressQueue>>);
+struct ProgressReceiver(Arc<Mutex<ProgressQueue>>);
+fn progress_channel() -> (ProgressSender, ProgressReceiver) {
+    let queue = Arc::new(Mutex::new(ProgressQueue::default()));
+    (ProgressSender(queue.clone()), ProgressReceiver(queue))
+}
+impl ProgressReceiver {
+    fn try_recv(&self) -> std::result::Result<Packet, ()> {
+        self.0.lock().unwrap().packets.pop_front().ok_or(())
+    }
+    fn take_omitted(&self) -> bool {
+        std::mem::take(&mut self.0.lock().unwrap().omitted)
+    }
+}
+impl Drop for ProgressReceiver {
+    fn drop(&mut self) {
+        let mut queue = self.0.lock().unwrap();
+        queue.closed = true;
+        queue.packets.clear();
+    }
 }
 impl StreamSink {
     pub(super) fn emit(&self, delta: StreamDelta) -> Result<()> {
@@ -57,53 +83,52 @@ impl StreamSink {
         if bytes > CHUNK {
             return Err(Error::new("SIZE_LIMIT", "Stream progress exceeds 16 KiB"));
         }
-        let started = Instant::now();
-        let allocated = bytes + 256;
-        loop {
-            self.cancel.check()?;
-            let used = self.budget.load(Ordering::Acquire);
-            if used + allocated <= MAX_QUEUE_BYTES
-                && self
-                    .budget
-                    .compare_exchange_weak(
-                        used,
-                        used + allocated,
-                        Ordering::AcqRel,
-                        Ordering::Acquire,
-                    )
-                    .is_ok()
-            {
-                break;
-            }
-            if started.elapsed() > Duration::from_secs(5) {
-                return Err(Error::new("BUSY", "Aggregate stream queue exceeds 16 MiB"));
-            }
-            std::thread::sleep(Duration::from_millis(2));
+        self.cancel.check()?;
+        let mut queue = self.sender.0.lock().unwrap();
+        if queue.closed {
+            return Err(Error::new("CANCELLED", "Stream writer was closed"));
         }
-        let mut packet = Packet {
+        // Progress is display-only, never tool admission or replayable context.
+        // Coalesce tokens before the writer, rather than occupying one slot per
+        // token. A slow durable writer must not abort a valid provider turn.
+        if let Some(last) = queue.packets.back_mut() {
+            let target = match (&mut last.delta, &delta) {
+                (StreamDelta::Text(a), StreamDelta::Text(b))
+                | (StreamDelta::Thinking(a), StreamDelta::Thinking(b))
+                    if a.len() + b.len() <= CHUNK => Some((a, b)),
+                _ => None,
+            };
+            if let Some((target, next)) = target {
+                if self.reserve(bytes) {
+                    target.push_str(next);
+                    last._reservation.bytes += bytes;
+                } else {
+                    queue.omitted = true;
+                }
+                return Ok(());
+            }
+        }
+        let allocated = bytes + 256;
+        // Preserve both existing memory bounds. Congestion omits only transient
+        // progress with an explicit notice; the complete verified Turn still
+        // owns the final transcript, usage and all tool calls. No retry occurs.
+        if queue.packets.len() == QUEUE || !self.reserve(allocated) {
+            queue.omitted = true;
+            return Ok(());
+        }
+        queue.packets.push_back(Packet {
             delta,
             _reservation: Reservation {
                 budget: self.budget.clone(),
                 bytes: allocated,
             },
-        };
-        loop {
-            self.cancel.check()?;
-            match self.sender.try_send(packet) {
-                Ok(()) => return Ok(()),
-                Err(mpsc::TrySendError::Disconnected(_)) => {
-                    return Err(Error::new("CANCELLED", "Stream writer was closed"));
-                }
-                Err(mpsc::TrySendError::Full(value)) => packet = value,
-            }
-            if started.elapsed() > Duration::from_secs(5) {
-                return Err(Error::new(
-                    "BUSY",
-                    "Stream writer backpressure exceeded 5 seconds",
-                ));
-            }
-            std::thread::sleep(Duration::from_millis(2));
-        }
+        });
+        Ok(())
+    }
+    fn reserve(&self, bytes: usize) -> bool {
+        self.budget.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+            used.checked_add(bytes).filter(|next| *next <= MAX_QUEUE_BYTES)
+        }).is_ok()
     }
 }
 impl Router {
@@ -126,7 +151,7 @@ impl Router {
             .ok_or_else(|| Error::new("CANCELLED", "Runtime run was removed"))?
             .cancellation
             .clone();
-        let (sender, receiver) = mpsc::sync_channel(QUEUE);
+        let (sender, receiver) = progress_channel();
         self.stream_state.runs.insert(
             rid.into(),
             Pending {
@@ -187,6 +212,9 @@ impl Router {
             return Ok(());
         }
         let mut groups: Vec<StreamDelta> = vec![];
+        if p.receiver.take_omitted() {
+            groups.push(StreamDelta::Text("[진행 표시 일부 생략: 기록 대기열이 혼잡합니다. 최종 응답과 도구 결과는 별도로 검증·저장합니다.]\n".into()));
+        }
         for _ in 0..QUEUE {
             let Ok(packet) = p.receiver.try_recv() else {
                 break;
@@ -257,6 +285,9 @@ impl Router {
             } else {
                 "activity"
             };
+            // Tokens were coalesced by the producer. Keep a distinct committed
+            // sequence per fragment: random activity IDs cannot encode order
+            // when several fragments share a timestamp during crash recovery.
             self.internal_commit(batch)?;
             p.rows.push((collection.into(), id));
         }
@@ -486,6 +517,7 @@ impl Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{sync::mpsc, time::Duration};
     use artex_runtime::HostGateway;
     use std::{
         io::{Read, Write},
@@ -770,7 +802,7 @@ mod tests {
     }
     fn fixture_progress(router: &mut Router, run: &str, chunks: usize) -> (String, String) {
         let snapshot = router.snapshot().unwrap();
-        let (sender, receiver) = mpsc::sync_channel(QUEUE);
+        let (sender, receiver) = progress_channel();
         let turn = new_id("turn");
         let cancel = Cancellation::default();
         let sink = StreamSink {
@@ -907,10 +939,35 @@ mod tests {
         assert!(row.records("tool_invocations").is_empty());
     }
     #[test]
+    fn sqlite_recovery_keeps_distinct_progress_chunks_in_received_order() {
+        let (dir, mut router, rid, context) = crate::regression::seeded();
+        let snapshot=router.snapshot().unwrap();
+        let (sender, receiver)=progress_channel();
+        let cancel=Cancellation::default();
+        let sink=StreamSink{sender,cancel:cancel.clone(),budget:router.stream_state.budget.clone()};
+        router.stream_state.runs.insert(rid.clone(),Pending{workspace:snapshot.workspace_id.clone(),epoch:router.engine_epoch.clone(),task:None,turn:new_id("turn"),receiver,cancel,rows:vec![],total:0});
+        let chunks: Vec<_> = (0..8).map(|i|format!("{i}:{}\n", "observed".repeat(1500))).collect();
+        for chunk in &chunks { sink.emit(StreamDelta::Text(chunk.clone())).unwrap(); }
+        router.process_streams().unwrap();
+        router.stream_state = Default::default();
+        router.store.as_mut().unwrap().checkpoint().unwrap();
+        router.store = None;
+        router.store = Some(Store::open(&dir.path().join("store")).unwrap());
+        router.recover_streams().unwrap();
+        let response = query(&mut router, context.conversation_id.as_deref().unwrap(), None);
+        assert!(response["error"].is_null(), "{response}");
+        let snapshot = router.snapshot().unwrap();
+        let diagnostic = snapshot.records("conversation_activities").into_iter().find(|r|r.data["kind"]=="text" && r.data["is_error"]==true).unwrap();
+        let body: Value=serde_json::from_str(&router.body_text(&diagnostic.data["detail"]).unwrap()).unwrap();
+        assert_eq!(body["text"],chunks.join(""));
+        assert!(router.context_messages(&rid).unwrap().is_empty());
+        assert!(snapshot.records("tool_invocations").is_empty());
+    }
+    #[test]
     fn disabled_agent_terminalizes_confirmed_fragments_without_poisoning_writer() {
         let (_dir, mut router, rid, context) = crate::regression::seeded();
         let s = router.snapshot().unwrap();
-        let (sender, receiver) = mpsc::sync_channel(QUEUE);
+        let (sender, receiver) = progress_channel();
         let cancel = Cancellation::default();
         let turn = new_id("turn");
         let sink = StreamSink {
@@ -972,7 +1029,7 @@ mod tests {
     fn bounded_channel_cancels_and_stale_or_frozen_context_cannot_append() {
         let (_dir, mut router, rid, _) = crate::regression::seeded();
         let s = router.snapshot().unwrap();
-        let (sender, receiver) = mpsc::sync_channel(QUEUE);
+        let (sender, receiver) = progress_channel();
         let cancel = Cancellation::default();
         let budget = Arc::new(AtomicUsize::new(0));
         let sink = StreamSink {
@@ -980,14 +1037,16 @@ mod tests {
             cancel: cancel.clone(),
             budget: budget.clone(),
         };
+        // Alternating full chunks cannot coalesce and reproduce a stalled
+        // writer. Display overflow must not fail or retry provider execution.
         for _ in 0..QUEUE {
-            sink.emit(StreamDelta::Text("x".into())).unwrap();
+            sink.emit(StreamDelta::Text("x".repeat(CHUNK))).unwrap();
         }
-        let worker = std::thread::spawn(move || sink.emit(StreamDelta::Text("blocked".into())));
-        std::thread::sleep(Duration::from_millis(10));
+        sink.emit(StreamDelta::Text("omitted".into())).unwrap();
+        assert!(receiver.take_omitted());
         cancel.cancel();
-        assert_eq!(worker.join().unwrap().unwrap_err().code, "CANCELLED");
-        assert_eq!(budget.load(Ordering::Acquire), QUEUE * (1 + 256));
+        assert_eq!(sink.emit(StreamDelta::Text("cancelled".into())).unwrap_err().code, "CANCELLED");
+        assert_eq!(budget.load(Ordering::Acquire), QUEUE * (CHUNK + 256));
         let mut pending = Pending {
             workspace: s.workspace_id.clone(),
             epoch: new_id("epoch"),

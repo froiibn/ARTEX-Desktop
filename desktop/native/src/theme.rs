@@ -270,6 +270,40 @@ pub fn primary_button(ui: &mut Ui, label: &str) -> Response {
     })
     .inner
 }
+/// Keep list selection discoverable without framing every idle control.
+pub fn list_checkbox(ui: &mut Ui, checked: &mut bool) -> Response {
+    let p = palette(ui.visuals().dark_mode);
+    ui.scope(|ui| {
+        // egui paints an unchecked checkbox solely from bg_fill/bg_stroke.
+        // Our frameless idle widgets share the panel fill, so their checkbox
+        // disappeared until hover. Scope this outline to the selection control
+        // instead of restoring boxes to buttons, panels and other widgets.
+        let widgets = &mut ui.visuals_mut().widgets;
+        for visual in [&mut widgets.inactive, &mut widgets.noninteractive] {
+            visual.bg_fill = p.surface;
+            visual.bg_stroke = Stroke::new(1.25_f32, p.muted);
+            visual.corner_radius = CornerRadius::same(3);
+        }
+        for visual in [&mut widgets.hovered, &mut widgets.active, &mut widgets.open] {
+            visual.bg_stroke = Stroke::new(1.5_f32, p.accent);
+            visual.corner_radius = CornerRadius::same(3);
+        }
+        if *checked {
+            for visual in [
+                &mut widgets.inactive,
+                &mut widgets.noninteractive,
+                &mut widgets.hovered,
+                &mut widgets.active,
+                &mut widgets.open,
+            ] {
+                visual.bg_fill = p.selection;
+                visual.fg_stroke = Stroke::new(1.5_f32, p.selection_text);
+            }
+        }
+        ui.add(egui::Checkbox::without_text(checked))
+    })
+    .inner
+}
 pub fn secondary_button(ui: &mut Ui, label: &str) -> Response {
     let p = palette(ui.visuals().dark_mode);
     ui.add(
@@ -280,6 +314,10 @@ pub fn secondary_button(ui: &mut Ui, label: &str) -> Response {
             .corner_radius(8),
     )
 }
+
+#[cfg(test)]
+#[path = "theme_checkbox_tests.rs"]
+mod checkbox_tests;
 #[cfg(test)]
 pub fn quiet_button(ui: &mut Ui, label: &str) -> Response {
     ui.scope(|ui| {

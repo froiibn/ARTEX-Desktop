@@ -28,10 +28,14 @@ mod result_contract_tests;
 mod runtime_tool_tests;
 mod runtime_tools;
 mod scopesentry;
+mod shared_configuration;
+mod shared_settings;
 mod side_runtime;
 mod skill_runtime;
 mod stream_runtime;
 mod task_delete_runtime;
+#[cfg(test)]
+mod tool_e2e_tests;
 mod traffic_runtime;
 
 use artex_core::{
@@ -121,6 +125,9 @@ pub struct Router {
     workspace_generation: String,
     pub shutting_down: bool,
     store: Option<Store>,
+    shared_settings: Option<shared_settings::SharedSettings>,
+    shared_settings_root: Option<PathBuf>,
+    shared_settings_view: Option<std::sync::Arc<artex_store::ReadGeneration>>,
     read_only: bool,
     host_epoch: Option<String>,
     capabilities: BTreeMap<String, PathBuf>,
@@ -138,6 +145,8 @@ pub struct Router {
     ephemeral_blobs: HashMap<String, (std::sync::Arc<Vec<u8>>, Instant)>,
     notification_work: Option<notifications::PendingSend>,
     archive_work: Option<archives::PendingArchive>,
+    // Cold archive content is immutable; reuse decoded statistics across reads.
+    archive_aggregates: BTreeMap<String, Value>,
     traffic: traffic_runtime::TrafficState,
     deleting_tasks: std::collections::BTreeSet<String>,
     lifecycle: native_lifecycle::LifecycleState,
@@ -157,6 +166,9 @@ impl Router {
             workspace_generation: new_id("open"),
             shutting_down: false,
             store: None,
+            shared_settings: None,
+            shared_settings_root: None,
+            shared_settings_view: None,
             read_only: false,
             host_epoch: None,
             capabilities,
@@ -174,6 +186,7 @@ impl Router {
             ephemeral_blobs: HashMap::new(),
             notification_work: None,
             archive_work: None,
+            archive_aggregates: BTreeMap::new(),
             traffic: Default::default(),
             deleting_tasks: Default::default(),
             lifecycle: Default::default(),
@@ -187,6 +200,9 @@ impl Router {
         }
     }
     pub fn snapshot(&self) -> Result<std::sync::Arc<artex_store::ReadGeneration>> {
+        if self.store.is_some() {
+            if let Some(view) = &self.shared_settings_view { return Ok(view.clone()); }
+        }
         Ok(self
             .store
             .as_ref()
@@ -194,6 +210,7 @@ impl Router {
             .read_generation())
     }
     pub fn maintain(&mut self) -> Result<()> {
+        self.recover_shared_settings()?;
         self.read_only = self.effective_read_only();
         if !self.read_only && self.deleting_tasks.is_empty() && !self.native_lifecycle_busy() {
             if let Some(store) = self.store.as_mut() {
@@ -627,12 +644,16 @@ impl Router {
                         self.internal_commit(recovery)?;
                     }
                     self.recover_streams()?;
-                    let seed = artex_domain::bootstrap_plan(self.snapshot()?.as_ref(), &context)?;
-                    if !seed.changes.is_empty() {
-                        let mut seed = seed;
-                        self.externalize_batch(&mut seed)?;
-                        seed.command_id = new_id("command");
-                        self.store.as_mut().unwrap().commit(seed)?;
+                    // Once the profile owns configuration, reseeding a workspace
+                    // would revive deliberately deleted agents/MCP definitions.
+                    if !self.shared_configuration_initialized() {
+                        let seed = artex_domain::bootstrap_plan(self.snapshot()?.as_ref(), &context)?;
+                        if !seed.changes.is_empty() {
+                            let mut seed = seed;
+                            self.externalize_batch(&mut seed)?;
+                            seed.command_id = new_id("command");
+                            self.store.as_mut().unwrap().commit(seed)?;
+                        }
                     }
                 }
                 let mut info = self.store.as_ref().unwrap().info();
@@ -901,7 +922,7 @@ impl Router {
                             .min(offset + p["length"].as_u64().unwrap() as usize)]
                         .to_vec()
                 } else {
-                    self.store.as_ref().unwrap().blob_read(
+                    self.configuration_body_store(&reference)?.blob_read(
                         &reference,
                         offset,
                         p["length"].as_u64().unwrap() as usize,
@@ -1030,6 +1051,7 @@ impl Router {
                     return self.handle_archive(&request, &context);
                 }
                 let state = self.snapshot()?;
+                let state = self.archive_statistics_view(m, state)?;
                 let query = facade::query_with_blob_reader(m, p, &state, &context, &|reference| {
                     self.read_blob_bytes(reference, 64 * 1024 * 1024)
                 });
@@ -1153,7 +1175,7 @@ impl Router {
         b.normalized_params = r.params.clone();
         b.expected = r.expected.clone();
         self.externalize_batch(b)?;
-        let value = self.store.as_mut().unwrap().commit(b.clone())?;
+        let value = self.commit_with_shared_settings(b.clone())?;
         let result = self.hydrate_result(&value.result)?;
         self.approval_committed(r);
         Ok(result)

@@ -87,7 +87,7 @@ impl NativeGateway {
         secrets: Arc<SecretVault>,
         profile: &std::path::Path,
     ) -> Result<Self> {
-        let gateway = Self::open_inner(workspace, secrets, false)?;
+        let gateway = Self::open_inner(workspace, secrets, false, Some(profile))?;
         gateway.inner.bridge.runtime.files.set_effect_profile(
             profile,
             &workspace.scope.workspace_id,
@@ -105,14 +105,16 @@ impl NativeGateway {
         Ok(gateway)
     }
     pub fn open(workspace: &NativeWorkspace, secrets: Arc<SecretVault>) -> Result<Self> {
-        Self::open_inner(workspace, secrets, true)
+        Self::open_inner(workspace, secrets, true, None)
     }
     fn open_inner(
         workspace: &NativeWorkspace,
         secrets: Arc<SecretVault>,
         workspace_logs: bool,
+        profile: Option<&std::path::Path>,
     ) -> Result<Self> {
         let root = workspace.root.canonicalize().map_err(Error::io)?;
+        let lexical_root = std::path::absolute(&workspace.root).map_err(Error::io)?;
         let bridge = HostBridge::new(secrets);
         for (token, path) in [
             (&workspace.execution_capability, &workspace.work_root),
@@ -122,10 +124,22 @@ impl NativeGateway {
                 continue;
             }
             let canonical = path.canonicalize().map_err(Error::io)?;
-            if !canonical.starts_with(&root) || canonical == root {
+            let lexical = std::path::absolute(path).map_err(Error::io)?;
+            let workspace_child = lexical.starts_with(&lexical_root)
+                && lexical != lexical_root
+                && canonical.starts_with(&root)
+                && canonical != root;
+            let shared_resources = token == &workspace.resource_capability
+                && profile.is_some_and(|profile| {
+                    crate::shared_resources::validate_root(profile, path).is_ok()
+                });
+            // Execution stays inside its workspace. Only the trusted resource
+            // token may reach the exact profile-owned originals; import backups
+            // and other profile data are not executable/file capabilities.
+            if !workspace_child && !shared_resources {
                 return Err(Error::new(
                     "PERMISSION_DENIED",
-                    "Native capability must be a workspace child directory",
+                    "Native capability requires a workspace child or explicit shared resource root",
                 ));
             }
             bridge
@@ -911,6 +925,150 @@ mod tests {
             conversation_id: None,
         };
         (dir, workspace, gateway, context)
+    }
+    #[test]
+    fn shared_profile_resource_capability_is_explicit_while_execution_stays_workspace_owned() {
+        let (_dir, mut workspace, old, context) = fixture();
+        old.retire(Duration::from_secs(5)).unwrap();
+        let profile = tempfile::tempdir().unwrap();
+        let skill = workspace.resources_root.join("skills/inspect");
+        std::fs::create_dir_all(skill.join("empty")).unwrap();
+        std::fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: inspect\ndescription: Shared fixture\n---\nRead ${SKILL_DIR}/data.bin\n",
+        )
+        .unwrap();
+        std::fs::write(skill.join("data.bin"), [0, 255, 1, 128]).unwrap();
+        workspace.resources_root =
+            crate::shared_resources::prepare(profile.path(), &workspace.root).unwrap();
+        assert_eq!(
+            NativeGateway::open(&workspace, Arc::new(SecretVault::default()))
+                .err()
+                .unwrap()
+                .code,
+            "PERMISSION_DENIED"
+        );
+        let gateway = NativeGateway::open_with_profile(
+            &workspace,
+            Arc::new(SecretVault::default()),
+            profile.path(),
+        )
+        .unwrap();
+        let result=gateway.request(&workspace.scope.workspace_id,&context,"tool.execute",json!({"name":"Skill","input":{"name":"inspect","directory_capability":workspace.resource_capability,"execution_directory_capability":workspace.execution_capability}}),Duration::from_secs(10)).unwrap();
+        let relative = result["skill_dir"].as_str().unwrap();
+        assert!(relative.starts_with(".artex-skills/inspect/"));
+        let scoped_work = workspace
+            .work_root
+            .join("tasks")
+            .join(context.task_id.as_ref().unwrap());
+        assert_eq!(
+            std::fs::read(scoped_work.join(relative).join("data.bin")).unwrap(),
+            [0, 255, 1, 128]
+        );
+        assert!(scoped_work.join(relative).join("empty").is_dir());
+        assert_eq!(
+            std::fs::read(workspace.resources_root.join("skills/inspect/data.bin")).unwrap(),
+            [0, 255, 1, 128]
+        );
+        gateway.retire(Duration::from_secs(5)).unwrap();
+        let allowed = workspace.resources_root.clone();
+        workspace.resources_root = profile.path().join("shared-resource-imports");
+        assert_eq!(
+            NativeGateway::open_with_profile(
+                &workspace,
+                Arc::new(SecretVault::default()),
+                profile.path()
+            )
+            .err()
+            .unwrap()
+            .code,
+            "PERMISSION_DENIED"
+        );
+        workspace.resources_root = allowed;
+        workspace.work_root = workspace.resources_root.clone();
+        assert_eq!(
+            NativeGateway::open_with_profile(
+                &workspace,
+                Arc::new(SecretVault::default()),
+                profile.path()
+            )
+            .err()
+            .unwrap()
+            .code,
+            "PERMISSION_DENIED"
+        );
+    }
+    #[test]
+    fn readonly_shared_skill_catalog_and_file_reads_work_but_profile_effects_remain_blocked() {
+        let (_dir, mut workspace, old, mut context) = fixture();
+        old.retire(Duration::from_secs(5)).unwrap();
+        let profile = tempfile::tempdir().unwrap();
+        let root = crate::shared_resources::prepare(profile.path(), &workspace.root).unwrap();
+        let skill = root.join("skills/inspect");
+        std::fs::create_dir_all(&skill).unwrap();
+        std::fs::write(skill.join("SKILL.md"),"---\nname: inspect\ndescription: Shared read-only fixture\n---\nPrivate instructions\n").unwrap();
+        workspace.resources_root = root;
+        workspace.read_only = true;
+        let gateway = NativeGateway::open_with_profile(
+            &workspace,
+            Arc::new(SecretVault::default()),
+            profile.path(),
+        )
+        .unwrap();
+        let catalog = gateway
+            .request(
+                &workspace.scope.workspace_id,
+                &context,
+                "skill.catalog",
+                json!({"directory_capability":workspace.resource_capability}),
+                Duration::from_secs(5),
+            )
+            .unwrap();
+        assert_eq!(catalog[0]["name"], "inspect");
+        assert!(!catalog.to_string().contains("Private instructions"));
+        context.actor.kind = "user".into();
+        context.actor.agent_id = None;
+        context.actor.run_id = None;
+        context.task_id = None;
+        let params = json!({"directory_capability":workspace.resource_capability,"path":"skills/inspect/SKILL.md"});
+        let read = gateway
+            .request(
+                &workspace.scope.workspace_id,
+                &context,
+                "native.file.read",
+                params.clone(),
+                Duration::from_secs(5),
+            )
+            .unwrap();
+        assert!(
+            read["content"]
+                .as_str()
+                .unwrap()
+                .contains("Private instructions")
+        );
+        let mut write = params;
+        write["content"] = json!("must not write");
+        write["expected_sha256"] = read["sha256"].clone();
+        write["command_id"] = json!(new_id("command"));
+        assert_eq!(
+            gateway
+                .request(
+                    &workspace.scope.workspace_id,
+                    &context,
+                    "native.file.write",
+                    write,
+                    Duration::from_secs(5)
+                )
+                .unwrap_err()
+                .code,
+            "READ_ONLY"
+        );
+        assert!(
+            std::fs::read_to_string(skill.join("SKILL.md"))
+                .unwrap()
+                .contains("Private instructions")
+        );
+        gateway.retire(Duration::from_secs(5)).unwrap();
     }
     #[test]
     fn scoped_upload_is_readable_by_its_conversation_and_not_another() {

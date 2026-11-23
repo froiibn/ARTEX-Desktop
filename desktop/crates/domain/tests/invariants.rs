@@ -1371,12 +1371,23 @@ fn retest_is_conversation_bound_and_fixed_disposition_is_atomic() {
     );
     let mut rc = c.clone();
     rc.conversation_id = Some(rt["conversation_id"].as_str().unwrap().into());
+    raw_patch(&mut st, "finding_retests", rt["retest_id"].as_str().unwrap(), json!({"status":"running"}));
     apply(
         &mut st,
         "record_finding_retest_result",
         json!({"verdict":"fixed","summary":"blocked now","evidence":"403 on same request"}),
         &rc,
     );
+    let staged = st.snapshot();
+    assert_eq!(staged.get("findings", fid).unwrap().data["status"], "pending");
+    assert_eq!(staged.get("finding_retests", rt["retest_id"].as_str().unwrap()).unwrap().data["status"], "running");
+    let agent = raw_put(&mut st, "agents", "agent", json!({"key":"retester","enabled":true}));
+    let run = raw_put(&mut st, "agent_runs", "run", json!({"agent_id":agent,"conversation_id":rt["conversation_id"],"engine_epoch":rc.actor.engine_epoch,"state":"running"}));
+    // The run result and triage must share one durable transaction, rather
+    // than treating the verdict tool's earlier return as successful execution.
+    let mut finish = artex_domain::conversation::finish_run(&st.snapshot(), &rc, &run, "completed", &body("Verified completion"), None).unwrap();
+    finish.command_id = new_id("command");
+    st.commit(finish).unwrap();
     let s = st.snapshot();
     assert_eq!(s.get("findings", fid).unwrap().data["status"], "fixed");
     let re = s

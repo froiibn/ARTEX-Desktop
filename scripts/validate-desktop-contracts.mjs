@@ -83,6 +83,39 @@ invalid(entities.$defs.UInt64,'18446744073709551616',entities.$defs,'uint64 over
 valid(entities.$defs.UInt64,'18446744073709551615',entities.$defs,'uint64 maximum');
 valid(rpc.methods['ui.renameTaskCategory'],{id:'category_'+'1'.repeat(32),name:'분류'},rpc.$defs,'typed UI category');
 invalid(rpc.methods['ui.renameTaskCategory'],{id:42,name:'분류'},rpc.$defs,'legacy numeric UI category');
+// A deleted profile remains an identity, just like the other desktop delete
+// results. Never satisfy this contract by returning an invented numeric count.
+valid(rpc.results['ui.deleteLLMProfile'],{deleted:'profile_'+'1'.repeat(32)},rpc.$defs,'deleted profile identity');
+for(const deleted of [1,'task_'+'1'.repeat(32),'profile_'+'g'.repeat(32)]) {
+ invalid(rpc.results['ui.deleteLLMProfile'],{deleted},rpc.$defs,'reject invalid deleted profile identity');
+}
+const profileDeleteOverrides=read('ui-wire-overrides.v1.json').identity_fields.filter(field=>field.method==='ui.deleteLLMProfile'&&field.role==='result'&&field.field==='deleted');
+assert.equal(profileDeleteOverrides.length,1);
+assert.equal(profileDeleteOverrides[0].prefix,'profile');
+valid(rpc.results['ui.deleteMcpServer'],{deleted:'mcp_'+'1'.repeat(32)},rpc.$defs,'deleted MCP identity');
+for(const deleted of [1,'task_'+'1'.repeat(32),'mcp_'+'g'.repeat(32)]) {
+ invalid(rpc.results['ui.deleteMcpServer'],{deleted},rpc.$defs,'reject invalid deleted MCP identity');
+}
+const mcpDeleteOverrides=read('ui-wire-overrides.v1.json').identity_fields.filter(field=>field.method==='ui.deleteMcpServer'&&field.role==='result'&&field.field==='deleted');
+assert.equal(mcpDeleteOverrides.length,1);
+assert.equal(mcpDeleteOverrides[0].prefix,'mcp');
+// A nonempty mention result must carry the typed identity of its actual kind;
+// empty search pages cannot catch a leftover numeric Source DTO contract.
+const mentionResult=rpc.results['ui.chatMentions'];
+const mentionPage=rpc.$defs[mentionResult.$ref.split('/').at(-1)];
+const mentionItem=rpc.$defs[mentionPage.properties.items.items.$ref.split('/').at(-1)];
+assert.deepEqual(mentionItem.properties.id,{anyOf:['company','finding','asset'].map(prefix=>({type:'string',pattern:'^'+prefix+'_[0-9a-f]{32}$'}))});
+for(const kind of ['company','finding','asset','root_domain','subdomain','ip','service','app','endpoint']) {
+ const prefix=kind==='company'||kind==='finding'?kind:'asset';
+ const item={kind,id:prefix+'_'+'1'.repeat(32),label:'Fixture',description:'Local fixture'};
+ valid(mentionResult,{items:[item]},rpc.$defs,'typed '+kind+' mention');
+ for(const id of [1,'task_'+'1'.repeat(32),prefix+'_'+'g'.repeat(32),...['company','finding','asset'].filter(value=>value!==prefix).map(value=>value+'_'+'1'.repeat(32))]) {
+  invalid(mentionResult,{items:[{...item,id}]},rpc.$defs,'mention identity must match '+kind);
+ }
+}
+const mentionOverrides=read('ui-wire-overrides.v1.json').identity_fields.filter(field=>field.method==='ui.chatMentions'&&field.role==='result'&&field.field==='id');
+assert.equal(mentionOverrides.length,1);
+assert.equal(mentionOverrides[0].prefix,'company|finding|asset');
 valid(rpc.methods['ui.conversationMsgDetail'],{id:'conversation_'+'1'.repeat(32),seq:'conversationactivity_'+'1'.repeat(32)},rpc.$defs,'conversation activity identity');
 invalid(rpc.methods['ui.conversationMsgDetail'],{id:'conversation_'+'1'.repeat(32),seq:'activity_'+'1'.repeat(32)},rpc.$defs,'task activity used in conversation');
 // Interception histories can belong to a task or a conversation. Both the

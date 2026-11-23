@@ -100,6 +100,13 @@ impl Store {
     }
     pub fn begin_checkpoint(&mut self) -> Result<CheckpointTicket> {
         self.writable()?;
+        if self.database.is_some() {
+            if self.sqlite_checkpoint.is_some() { return Err(Error::new("BUSY", "Checkpoint already running")); }
+            let (ticket, result) = self.database.as_mut().unwrap().checkpoint(self.state.commit_seq)?;
+            self.generation = parse_u64(&ticket.generation)?;
+            self.sqlite_checkpoint = Some((ticket.clone(), result));
+            return Ok(ticket);
+        }
         if self.checkpoint_job.is_some() {
             return Err(Error::new("BUSY", "Checkpoint already running"));
         }
@@ -147,6 +154,9 @@ impl Store {
         Ok(ticket)
     }
     pub fn poll_checkpoint(&mut self) -> Result<Option<Value>> {
+        if self.database.is_some() {
+            return if self.sqlite_checkpoint.is_some() { self.wait_checkpoint().map(Some) } else { Ok(None) };
+        }
         if self
             .checkpoint_job
             .as_ref()
@@ -158,9 +168,16 @@ impl Store {
         }
     }
     pub fn checkpoint_status(&self) -> Option<CheckpointTicket> {
+        if self.database.is_some() { return self.sqlite_checkpoint.as_ref().map(|(ticket,_)|ticket.clone()); }
         self.checkpoint_job.as_ref().map(|j| j.ticket.clone())
     }
     pub fn wait_checkpoint(&mut self) -> Result<Value> {
+        if self.database.is_some() {
+            let (ticket, result) = self.sqlite_checkpoint.take().ok_or_else(||Error::new("NOT_FOUND", "No checkpoint job"))?;
+            self.valid_generations.insert(0, ticket.generation);
+            self.valid_generations.truncate(2);
+            return Ok(result);
+        }
         let job = self
             .checkpoint_job
             .take()
@@ -174,6 +191,7 @@ impl Store {
     }
     pub fn maintenance(&mut self, options: GcOptions) -> Result<GcReport> {
         self.writable()?;
+        if self.database.is_some() { return self.sqlite_maintenance(options); }
         if options.orphan_grace < Duration::from_secs(86400) {
             return Err(Error::new(
                 "INVALID_PARAMS",
@@ -450,97 +468,9 @@ impl Store {
         Ok(report)
     }
     pub fn export_recovery_copy(&self, destination: &Path) -> Result<Value> {
-        reject_links(destination)?;
-        let source_absolute = fs::canonicalize(&self.path)?;
-        let destination_absolute =
-            fs::canonicalize(destination.parent().ok_or_else(|| {
-                Error::new("INVALID_PARAMS", "Recovery destination parent missing")
-            })?)?
-            .join(destination.file_name().ok_or_else(|| {
-                Error::new("INVALID_PARAMS", "Recovery destination filename missing")
-            })?);
-        if destination_absolute.starts_with(&source_absolute) {
-            return Err(Error::new(
-                "INVALID_PARAMS",
-                "Recovery copy must be outside source workspace",
-            ));
-        }
-        if destination.exists() && fs::read_dir(destination)?.next().is_some() {
-            return Err(Error::new(
-                "VERSION_CONFLICT",
-                "Recovery destination must be empty",
-            ));
-        }
-        let staging = destination
-            .parent()
-            .unwrap()
-            .join(format!(".artex-recovery-{}", artex_core::new_id("cmd")));
-        let mut target = Store::create(&staging, &format!("{} (recovery copy)", self.name))?;
-        let mut hashes = BTreeSet::new();
-        collect_hashes(&serde_json::to_value(&self.state)?, &mut hashes);
-        let mut required = BTreeSet::new();
-        required_blob_hashes(&serde_json::to_value(&self.state)?, &mut required);
-        for sha in hashes {
-            let path = self.path.join("objects/blobs").join(&sha[..2]).join(&sha);
-            if required.contains(&sha) && !path.is_file() {
-                return Err(Error::new(
-                    "RECOVERY_REQUIRED",
-                    "Recovery copy requires a missing referenced blob",
-                ));
-            }
-            if path.exists() {
-                reject_links(&path)?;
-                if digest_file(&path)? != sha {
-                    return Err(Error::new(
-                        "CORRUPT_STORE",
-                        "Recovery references a damaged blob",
-                    ));
-                }
-                let dest = target.path.join("objects/blobs").join(&sha[..2]);
-                fs::create_dir_all(&dest)?;
-                let dest = dest.join(&sha);
-                fs::copy(path, &dest)?;
-                if digest_file(&dest)? != sha {
-                    return Err(Error::new(
-                        "CORRUPT_STORE",
-                        "Blob changed during recovery copy",
-                    ));
-                }
-                OpenOptions::new().write(true).open(&dest)?.sync_all()?;
-                sync_directory(dest.parent().unwrap())?;
-            }
-        }
-        let copy_id = target.state.workspace_id.clone();
-        target.state = self.state.clone();
-        target.state.workspace_id = copy_id;
-        *target.read_cache.lock().unwrap() = None;
-        target.tombstones = self.tombstones.clone();
-        target.last_hash = self.last_hash;
-        target.journal.take();
-        for (_, p) in list_numbered(&target.path.join("store/journal"), "jnl")? {
-            fs::remove_file(p)?;
-        }
-        target.journal_path = PathBuf::new();
-        target.rotate_journal()?;
-        target.checkpoint()?;
-        target.checkpoint()?;
-        let report = json!({"format":"artex-recovery-copy","format_version":1,"source_workspace_id":self.state.workspace_id,"last_valid_seq":self.state.commit_seq.to_string(),"recovery":self.recovery(),"copy_workspace_id":target.state.workspace_id,"source_unchanged":true});
-        atomic_new(
-            &target.path.join("backups/recovery-report.json"),
-            &serde_json::to_vec(&report)?,
-        )?;
-        // Publish only after both complete generations and all referenced blobs
-        // are durable. Failure leaves an explicit staging copy, never a usable
-        // empty destination masquerading as a completed recovery workspace.
-        target.check_blobs(&serde_json::to_value(&target.state)?)?;
-        sync_directory(&target.path)?;
-        drop(target);
-        if destination.exists() {
-            fs::remove_dir(destination)?;
-        }
-        artex_platform::install_new(&staging, destination)?;
-        Ok(report)
+        self.export_sqlite_recovery_copy(destination)
     }
+
 }
 impl Drop for Store {
     fn drop(&mut self) {
@@ -561,27 +491,6 @@ fn digest_file(path: &Path) -> Result<String> {
         h.update(&buf[..n]);
     }
     Ok(hex::encode(h.finalize()))
-}
-fn required_blob_hashes(value: &Value, set: &mut BTreeSet<String>) {
-    match value {
-        Value::Object(o) => {
-            if o.contains_key("sha256") && o.contains_key("length") && o.contains_key("media_type")
-            {
-                if let Some(h) = o["sha256"].as_str() {
-                    set.insert(h.into());
-                }
-            }
-            for v in o.values() {
-                required_blob_hashes(v, set);
-            }
-        }
-        Value::Array(a) => {
-            for v in a {
-                required_blob_hashes(v, set);
-            }
-        }
-        _ => {}
-    }
 }
 fn visit_journal(path: &Path, mut visitor: impl FnMut(&Value) -> Result<()>) -> Result<()> {
     let mut file = File::open(path)?;
@@ -738,7 +647,7 @@ mod tests {
     fn compacted_chain_recovers_from_both_generations_and_retains_receipts() {
         let t = tempfile::tempdir().unwrap();
         let p = t.path().join("w");
-        let mut s = Store::create(&p, "gc").unwrap();
+        let mut s = Store::create_legacy(&p, "gc").unwrap();
         let id = new_id("company");
         for i in 0..5 {
             put(&mut s, &id, &format!("name{i}"));
@@ -752,12 +661,12 @@ mod tests {
         assert_eq!(s.snapshot().records("command_receipts").len(), 5);
         let latest = parse_u64(&report.retained_generations[0]).unwrap();
         drop(s);
-        let reopened = Store::open(&p).unwrap();
+        let reopened = Store::open_legacy_test(&p).unwrap();
         assert!(!reopened.read_only(), "{:?}", reopened.recovery());
         assert_eq!(reopened.snapshot().collections, expected.collections);
         drop(reopened);
         fs::write(p.join(format!("store/manifests/{latest:020}.json")), b"bad").unwrap();
-        let recovered = Store::open(&p).unwrap();
+        let recovered = Store::open_legacy_test(&p).unwrap();
         assert!(!recovered.read_only(), "{:?}", recovered.recovery());
         assert_eq!(recovered.snapshot().collections, expected.collections);
     }

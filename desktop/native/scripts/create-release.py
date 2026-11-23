@@ -465,18 +465,22 @@ def runtime_archive(payload: Path, archive: Path, files: dict[str, Path]):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package-result", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path,
+                        help="Must match desktop/dist/releases/v<verified-version>; omitted uses that location")
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[3])
     args = parser.parse_args()
-    output = args.output.resolve()
+    output = None
     created_output = False
     try:
         repo = args.repo.resolve()
+        report_path = args.package_result.resolve()
+        report, bundle, commit, version = verify_package(repo, report_path)
+        standard_output = (repo / "desktop/dist/releases" / ("v" + version)).resolve()
+        output = args.output.resolve() if args.output else standard_output
+        require(output == standard_output, "Release output must use desktop/dist/releases/v<verified-version>")
         require((output != repo and repo not in output.parents) or output.is_relative_to(repo / "desktop/dist"),
                 "Release output inside source must be under ignored desktop/dist")
         require(not output.exists() or output.is_dir() and not any(output.iterdir()), "Release output must be new or empty")
-        report_path = args.package_result.resolve()
-        report, bundle, commit, version = verify_package(repo, report_path)
         require(output != bundle and bundle not in output.parents and output not in bundle.parents,
                 "Release output must not overlap the verified package input")
         slug = github_slug(repo)

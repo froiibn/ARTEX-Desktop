@@ -10,6 +10,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[path = "dashboard.rs"]
 mod dashboard;
+#[path = "task_creation.rs"]
+mod task_creation;
+#[path = "site_report.rs"]
+mod site_report;
+#[cfg(test)]
+#[path = "chat_column_tests.rs"]
+mod chat_column_tests;
 
 pub enum Effect {
     AgentMonitor {
@@ -79,6 +86,10 @@ pub enum Effect {
         token: String,
     },
     ExportBase64Body {
+        name: String,
+        body: Value,
+    },
+    ExportBody {
         name: String,
         body: Value,
     },
@@ -184,7 +195,9 @@ pub struct Panes {
     pub profile_id: Option<String>,
     pub selected_profiles: Vec<String>,
     pub selected_sources: Vec<String>,
+    creation: task_creation::TaskCreation,
     pub task_tab: usize,
+    site_report: site_report::SiteReportState,
     pub scope_kind: String,
     pub scope_value: String,
     pub scope_reason: String,
@@ -201,6 +214,7 @@ pub struct Panes {
     pub new_directory: String,
     pub sync_search: String,
     read_only: bool,
+    pub(crate) engine_epoch: String,
     management: ManagementState,
     flow: FlowState,
 }
@@ -459,7 +473,9 @@ impl Default for Panes {
             profile_id: None,
             selected_profiles: Vec::new(),
             selected_sources: Vec::new(),
+            creation: task_creation::TaskCreation::default(),
             task_tab: 0,
+            site_report: site_report::SiteReportState::default(),
             scope_kind: "subdomain".into(),
             scope_value: String::new(),
             scope_reason: String::new(),
@@ -476,6 +492,7 @@ impl Default for Panes {
             new_directory: String::new(),
             sync_search: String::new(),
             read_only: false,
+            engine_epoch: String::new(),
             management: ManagementState::default(),
             flow: FlowState::default(),
         }
@@ -636,6 +653,7 @@ impl Panes {
         }
     }
     pub fn retire_async_operations(&mut self) {
+        self.retire_site_report();
         self.read_only = true;
         self.management.requests.clear();
         self.management.monitor_latest = None;
@@ -678,6 +696,9 @@ impl Panes {
         self.flow.error=Some("실행 세대가 종료되었습니다. 미저장 초안과 읽은 버전은 유지됩니다. 파일·결과를 명시적으로 다시 불러와 확인하세요.".into());
     }
     pub fn set_projection_error(&mut self, method: &str, token: &str, code: &str, message: &str) {
+        if self.site_report_error(method, token, code, message) {
+            return;
+        }
         if self.flow.latest.get(method).is_some_and(|v| v == token)
             || self.flow.bodies.remove(token).is_some()
         {
@@ -1058,7 +1079,7 @@ impl Panes {
         self.projection.insert(method.into(), value);
     }
     pub fn overview(&mut self, ui: &mut egui::Ui, snapshot: &Snapshot, effects: &mut Vec<Effect>) {
-        dashboard::show(ui, snapshot, effects);
+        dashboard::show(ui, snapshot, &self.engine_epoch, effects);
     }
     pub fn tasks(
         &mut self,
@@ -1068,49 +1089,7 @@ impl Panes {
         effects: &mut Vec<Effect>,
     ) {
         let Some(task) = selected else {
-            ui.heading("새 작업");
-            crate::theme::field_row(ui, "이름", |ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.title).desired_width(f32::INFINITY));
-            });
-            multiline(ui, "설명", &mut self.description, 3);
-            multiline(ui, "목표와 허용 범위", &mut self.goal, 4);
-            ui.strong("모델 실행 순서");
-            for profile in snapshot.records("llm_profiles") {
-                let mut checked = self.selected_profiles.contains(&profile.header.id);
-                if ui.checkbox(&mut checked, display_name(profile)).changed() {
-                    if checked {
-                        self.selected_profiles.push(profile.header.id.clone());
-                    } else {
-                        self.selected_profiles.retain(|p| p != &profile.header.id);
-                    }
-                }
-            }
-            ui.collapsing("정보를 공유할 직접 원본 작업", |ui| {
-                for source in snapshot.records("tasks") {
-                    let mut checked = self.selected_sources.contains(&source.header.id);
-                    if ui.checkbox(&mut checked, display_name(source)).changed() {
-                        if checked && self.selected_sources.len() < 8 {
-                            self.selected_sources.push(source.header.id.clone());
-                        } else {
-                            self.selected_sources.retain(|id| id != &source.header.id);
-                        }
-                    }
-                }
-            });
-            if ui
-                .add_enabled(
-                    !self.description.trim().is_empty() && !self.goal.trim().is_empty(),
-                    egui::Button::new("작업 만들기"),
-                )
-                .clicked()
-            {
-                command(
-                    effects,
-                    "ui.createTask",
-                    json!({"input":{"name":self.title,"description":self.description,"goal":self.goal,"llmProfileIds":self.selected_profiles,"sourceTaskIds":self.selected_sources}}),
-                    vec![],
-                );
-            }
+            self.new_task(ui, snapshot, effects);
             return;
         };
         ui.horizontal_wrapped(|ui| {
@@ -1190,7 +1169,7 @@ impl Panes {
         });
         ui.separator();
         ui.horizontal_wrapped(|ui| {
-            for (i, label) in [(0, "개요"), (5, "에이전트"), (3, "발견 사항"), (4, "증거")]
+            for (i, label) in [(0, "개요"), (5, "에이전트"), (3, "발견 사항"), (4, "증거"), (6, "종합 보고서")]
             {
                 if crate::theme::tab(
                     ui,
@@ -1216,7 +1195,14 @@ impl Panes {
             ui.add_space(8.0);
         }
         let exploration = text(&task.data, "exploration_id");
+        // Keep task controls and navigation above the evidence card even in
+        // minimum-height windows; the existing outer pane owns scrolling.
+        crate::analysis_status::show_card(
+            ui,
+            &crate::analysis_status::project(snapshot, task, &self.engine_epoch),
+        );
         match self.task_tab {
+            6 => self.show_site_report(ui, snapshot, task, effects),
             0 => {
                 ui.strong("설명");
                 ui.label(body_text(&task.data["description"]));
@@ -1413,6 +1399,33 @@ impl Panes {
         task: Option<&str>,
         effects: &mut Vec<Effect>,
     ) {
+        // Center one shared reading column, including the composer and the new
+        // conversation form. Narrow windows keep their full available width;
+        // the original height measurement and scrolling still own vertical space.
+        let available = ui.available_rect_before_wrap();
+        const READING_COLUMN_WIDTH: f32 = 860.0;
+        let width = available.width().min(READING_COLUMN_WIDTH);
+        let column = egui::Rect::from_min_max(
+            egui::pos2(available.center().x - width / 2.0, available.top()),
+            egui::pos2(available.center().x + width / 2.0, available.bottom()),
+        );
+        let mut content = ui.new_child(
+            egui::UiBuilder::new()
+                .id_salt("chat-reading-column")
+                .max_rect(column)
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+        );
+        self.chat_contents(&mut content, snapshot, selected, task, effects);
+        ui.advance_cursor_after_rect(content.min_rect());
+    }
+    fn chat_contents(
+        &mut self,
+        ui: &mut egui::Ui,
+        snapshot: &Snapshot,
+        selected: Option<&Record>,
+        task: Option<&str>,
+        effects: &mut Vec<Effect>,
+    ) {
         if selected.is_none() && task.is_none() {
             ui.heading("새 대화");
             crate::theme::field_row(ui, "에이전트", |ui| {
@@ -1438,7 +1451,9 @@ impl Panes {
                 ui.add(egui::TextEdit::singleline(&mut self.title).desired_width(f32::INFINITY));
             });
             profile_selector(ui, snapshot, &mut self.profile_id);
-            if ui.button("대화 만들기").clicked() {
+            if ui.add_enabled_ui(!self.read_only, |ui| {
+                crate::theme::primary_button(ui, "대화 만들기")
+            }).inner.clicked() {
                 command(
                     effects,
                     "ui.createConversation",
@@ -1512,6 +1527,15 @@ impl Panes {
             .filter(|r| text(&r.data, "state") == "waiting")
             .count();
         ui.horizontal_wrapped(|ui| {
+            if let Some(conversation) = selected {
+                let (headline, detail) = crate::analysis_status::conversation_status(
+                    snapshot, conversation, &self.engine_epoch,
+                );
+                ui.strong(headline).on_hover_text(detail);
+            } else if let Some(task) = task.and_then(|id| snapshot.get("tasks", id)) {
+                let status = crate::analysis_status::project(snapshot, task, &self.engine_epoch);
+                ui.strong(status.headline).on_hover_text(status.detail);
+            }
             ui.small(format!("관련 실행 {running} · 응답 대기 {waiting}"));
             if let Some(conversation) = selected {
                 ui.small(text(&conversation.data, "agent_key"));
@@ -2727,6 +2751,9 @@ impl Panes {
     pub fn set_context(&mut self, section: Section, selected: Option<&str>) {
         let next = selected.map(str::to_owned);
         if self.flow.context_section != Some(section) || self.flow.context_selected != next {
+            // A report and its pending body belong to one task selection. A
+            // late reply must not restore another site's export after navigation.
+            self.retire_site_report();
             if self.flow.context_section == Some(Section::Chat) {
                 let key = self
                     .flow
@@ -2825,6 +2852,9 @@ impl Panes {
         value: Value,
         read_versions: Vec<Expected>,
     ) -> bool {
+        if method == "native.report.page" {
+            return self.receive_report_page(token, &value);
+        }
         if method == "ui.conversationHistory" {
             let Some(id) = self.flow.history_requests.remove(token) else {
                 return false;
@@ -2885,6 +2915,9 @@ impl Panes {
             }
         }
         self.flow.versions.insert(method.into(), read_versions);
+        if method == "ui.report" {
+            self.site_report.received();
+        }
         self.set_projection(method, result);
         true
     }
@@ -6046,8 +6079,7 @@ impl Panes {
         }
         let batch = self.management.batches.entry(section).or_default();
         let mut checked = batch.contains(&row.header.id);
-        if ui
-            .checkbox(&mut checked, "")
+        if crate::theme::list_checkbox(ui, &mut checked)
             .on_hover_text("여러 항목 선택")
             .changed()
         {

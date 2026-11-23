@@ -673,6 +673,16 @@ impl Forms {
             self.editors.remove(&key);
             return out;
         }
+        if matches!(
+            collection,
+            "llm_profiles" | "settings" | "agents" | "tools" | "mcp_servers"
+                | "notification_channels" | "intercept_rules"
+        ) {
+            ui.weak("모델·일반 설정·에이전트·도구·MCP·스킬·전역 정책·알림 채널은 모든 작업 공간에서 공통으로 사용합니다.");
+            if collection == "settings" {
+                ui.weak("도구 승인 생략(Bypass)은 현재 작업 공간에만 적용됩니다.");
+            }
+        }
         if collection == "llm_profiles" {
             crate::theme::group(ui, "모델 사용 상태", |ui| {
                 if let Some(current) = snapshot

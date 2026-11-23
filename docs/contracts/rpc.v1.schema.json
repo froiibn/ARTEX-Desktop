@@ -20110,7 +20110,20 @@
           ]
         },
         "id": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^company_[0-9a-f]{32}$"
+            },
+            {
+              "type": "string",
+              "pattern": "^finding_[0-9a-f]{32}$"
+            },
+            {
+              "type": "string",
+              "pattern": "^asset_[0-9a-f]{32}$"
+            }
+          ]
         },
         "label": {
           "type": "string"
@@ -20126,7 +20139,77 @@
         "description"
       ],
       "additionalProperties": false,
-      "x-source-type": "ChatMention"
+      "x-source-type": "ChatMention",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "company"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^company_[0-9a-f]{32}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "finding"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^finding_[0-9a-f]{32}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "asset",
+                  "root_domain",
+                  "subdomain",
+                  "ip",
+                  "service",
+                  "app",
+                  "endpoint"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^asset_[0-9a-f]{32}$"
+              }
+            }
+          }
+        }
+      ]
     },
     "W341": {
       "type": "object",
@@ -20576,7 +20659,8 @@
       "type": "object",
       "properties": {
         "deleted": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^profile_[0-9a-f]{32}$"
         }
       },
       "required": [
@@ -23627,7 +23711,8 @@
       "type": "object",
       "properties": {
         "deleted": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^mcp_[0-9a-f]{32}$"
         }
       },
       "required": [
@@ -41756,7 +41841,10 @@
           "type": "string"
         },
         "format_version": {
-          "const": 1
+          "enum": [
+            1,
+            2
+          ]
         },
         "commit_seq": {
           "type": "string",
@@ -41798,7 +41886,10 @@
           "type": "string"
         },
         "format_version": {
-          "const": 1
+          "enum": [
+            1,
+            2
+          ]
         },
         "commit_seq": {
           "type": "string",
@@ -41840,7 +41931,10 @@
           "type": "string"
         },
         "format_version": {
-          "const": 1
+          "enum": [
+            1,
+            2
+          ]
         },
         "commit_seq": {
           "type": "string",

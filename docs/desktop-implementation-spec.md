@@ -1,10 +1,26 @@
+# SQLite 저장 전환 적용
+
+2026-11-24 사용자 변경: 영속 저장의 현재 명세는 [SQLite 저장·이전 명세](sqlite-storage.md)다. 이 문서의 자체 저널·체크포인트 파일 형식은 기존 v1 호환 입력이며 새 쓰기 대상이 아니다. 객체·RPC·메시지·도구의 업무 의미는 유지한다.
+
 # ARTEX 데스크톱 상세 구현 명세 v1.0
 
+2026-10-20 공통 설정: LLM 프로필·기본 모델과 일반/재시도/정책 설정 30개 키·에이전트·도구/MCP·알림 채널·전역 승인 규칙 구성의 진본은 앱 프로필의 `shared-settings` Store 카탈로그에 둔다. 스킬 원본은 프로필의 `shared-resources`에 둔다. 공간에는 같은 ProfileId 및 기존 로컬 구성 ID를 유지한 참조 투영을 만들고 읽기 전용 공간은 메모리 세대에만 투영한다. 공통 pending 의도·공간 명령 영수증·공통 확정으로 저장 중단을 복구한다. 기존 값 이전·충돌 원본 보존·프롬프트 Blob·트리거 별칭·삭제 목록·비밀 참조·편집 제약과 수락 기준은 [공통 설정 상세](shared-application-settings.md)를 따른다. Bypass·현재 작업·실행 커서·세션·상태는 공통 설정이 아니다.
+
 현재 앱 구조는 [Rust 통합형 데스크톱 앱 설계](desktop-native-architecture.md)를 따른다. 이 문서의 파일 저장·도메인·도구 계약은 유지하되 React·Tauri·별도 엔진 및 UI용 파이프 RPC 항목은 이전 구현 기록이다. 새 앱의 UI와 내부 명령은 Rust 타입·같은 프로세스의 채널로 구현한다.
+
+2026-10-17 종단 간 보완: [기능별 수락표](e2e-feature-verification.md)를 기준으로 공개 복원 DTO는 풍부한 내부 집계의 정확한 Source 요약을 반환하고 내부 통계는 보존한다. 모델 삭제 결과의 `deleted`도 profile typed ID이며 해당 wire overlay를 명시한다. 공급자 출력 상한은 확정된 부분 답변 뒤 최대 3회 같은 논리 turn의 이어쓰기를 허용한다. 자체 실행 마감은 공급자 장애로 집계하지 않는다. 세부 수정·계층/연결 검사와 제약은 [수정·검증 기록](e2e-corrections-20261017.md)을 따른다.
+
+2026-10-17 연결 경계 보완: PTY의 모델용 ShellId와 실행 원장의 ExecutionId를 분리하며 같은 실행의 재시도는 같은 세션을 사용한다. UI 그래프 간선은 원본 EdgeDTO의 `src/dst/rel`로 투영하고 저장 `src_id/dst_id`는 유지한다. 대화 참조 검색은 `kind`에 맞는 company/finding/asset typed ID를 반환한다. 새 알림 채널 생성에는 기존 자격 증명의 전송 대상 변경 확인을 적용하지 않으며 업데이트와 비밀 참조 보호는 유지한다.
+
+2026-10-17 재검증 보완: 공급자 요청은 확정된 도구 호출·결과 쌍만 포함하는 view로 인코딩하되 저장 원장이나 외부 종료 증명을 바꾸지 않는다. MCP legacy SSE는 세션 수명과 개별 응답 대기 예산을 구분하며, 정상 JSON-RPC 오류는 연결 손상으로 보지 않는다. 부분 LLM 답변·관측 사용량은 실제 상태와 함께 보존하고 취소·세대 경계를 유지한다. 보관 집계의 내부 `native_statistics_version=2`는 한 논리 작업을 집계하며, 이전 version 1/preview는 검증된 Blob에서 읽기 전용으로 재산출한다. 기존 업무 DTO·계약·원장 ID는 변경하지 않는다. 구현·회귀 근거는 [재검증 수정 기록](revalidation-fixes-20261017.md)을 따른다.
 
 2026-10-12 확정. Rust 엔진·Tauri 2 호스트·기존 React 화면을 구현하는 규범 명세다. PostgreSQL 및 SQLite 없이 객체 그래프와 파일 저장으로 기존 업무 기능을 제공한다. 이 명세의 확정은 Rust 구현이나 세 OS의 배포 검증 완료를 의미하지 않는다.
 
 이 문서와 `contracts/`를 함께 적용한다. 충돌 시 이 문서의 명시적 변경 규칙, `tools.v1.json`의 데스크톱 스키마, 생성된 원본 계약 순으로 우선한다. 원본 Go 코드의 스키마·핸들러·DTO·상태 검증은 아래 변경 사항을 제외하고 호환 기준으로 고정한다. 기존 아키텍처의 미정 표현은 이 문서의 v1 값으로 대체한다.
+
+## 사이트 분석 종합 결과 보고서
+
+2026-10-20 사용자 요청에 따라 작업 단위의 종합 보고서·전용 native 탭·전체 Markdown 내보내기를 추가한다. 기존 `ui.report({task}) → Body`를 유지하며 해당 작업의 계획·실제 실행·발견·기존 개선안·우선순위·미검증을 저장 세대에서 읽어 결정적으로 구성한다. 다른 작업의 전체 자산 수를 사용하지 않는다. 완료/부분 판정은 남은 실행·도구·복구 상태를 포함하며 새 모델 호출이나 저장 스키마를 추가하지 않는다. 내부 `NativeQuery::BodyPage`로 기존 청크 정책과 무결성·UTF-8 경계를 유지한 페이지를 읽고 기존 StageBody/SaveFile로 전체 원문을 내보낸다. 상세 수락 기준은 [사이트 분석 보고서](site-assessment-report.md)를 따른다.
 
 ## 고정한 원본과 산출물
 
@@ -105,6 +121,8 @@ edge rel은 spawns/derived_from/yields/proves/covers. src≠dst, ID 존재와 �
 
 Task.status는 created/running/paused/done/failed/timeout, Exploration.status는 open/achieved/failed다. paused/queued·queued_at/queue_mode는 서로 모순되지 않게 명령에서 같이 갱신한다. pause는 실행 중 도구의 취소/정리를 완료한 뒤 paused로 확정하며 불확실한 외부 효과는 run.recovery_required로 남긴다. timeout은 마감 이후 신규 작업 도구 실행을 막고 설정된 wrapup만 허용한다. 완료/취소 이벤트와 completed_at은 같은 변경에 포함한다. 순번·시계는 engine epoch마다 새로 연결하며 절전 복귀 시 UTC deadline과 대조한다.
 
+deadline wrapup은 부모 intent와 승인 모드를 유지하며 `purpose`·`parent_run_id`를 저장한다. 이미 확인한 사실·자산·취약점·목표 판단의 그래프 기록 및 기존 문맥 읽기만 허용하고 새 의도·외부 도구·네트워크 실행을 거부한다. 정상 role/binding/승인 검사도 계속 적용해 plan 모드를 승격하지 않는다. 부모와 마무리 실행의 최종 intent 상태는 exhausted다. 이 필드와 제한은 체크포인트 재열기 뒤에도 유지한다.
+
 task_runtime은 task별 하나다. 새 작업은 timeout_policy=active_elapsed, 가져온 작업은 legacy_absolute와 기존 deadline_at을 보존한다. active_elapsed는 task.running 동안 OS별 절전 제외 단조 시계로 누적하며 queued/사용자 pause/절전 시간은 제외한다. 실행 중 협업 응답 대기는 active에 포함한다. 시작·정지·도구 경계 및 최대 5초 간격으로 누적 시간을 저장한다. 재시작 시 last_active_clock을 다른 epoch의 시계에 연결하지 않고 accounting_state를 대조한다. 미확정 실행 구간의 시간이 불명확하면 recovery_required로 표시해 확인 후 재개한다. 표시 deadline_at은 활성 상태의 남은 예산에서 계산하며 원본 절대 마감 정책과 구분한다. 메시지의 UTC deadline은 작업 pause로 연장되지 않는다.
 
 새 작업의 plan_heartbeat_seconds는 **max(입력,600)**, 미지정/0/음수도 600이다. SQL 기본 300과 실제 Go 보정 600의 차이는 새 Go 동작을 따른다. 가져온 기존 값을 일괄 변경하지 않는다. agent.run_seconds 기본 1200, max_turns=0은 원본 무제한 의미를 유지한다. source_task_ids는 중복 제거 후 최대 8, 자기 참조 금지, 원본 존재·삭제/보관 상태 검사. parent_ref는 표시 관계이며 공유 권한을 추가하지 않는다. 회사 개수·각 핸들러 페이지/입력 제한은 고정된 Go 검증을 유지한다.
@@ -117,6 +135,8 @@ Finding.status는 pending/in_progress/confirmed/resolved/fixed/false_positive/ig
 
 증거 파일을 먼저 저장·동기화하고 finding/node/anchors/bindings/evidence_version/이벤트를 한 트랜잭션으로 확정한다. 증거 변경마다 evidence_version 증가, update_finding_report는 해당 버전을 **필수**로 비교하고 report_evidence_version에 저장한다. 새 증거 이후의 낡은 보고서 저장은 EVIDENCE_CONFLICT다. 동일 증거의 재바인딩은 기존 note/role을 조용히 덮어쓰지 않는다. capture 삭제가 증거 파일을 삭제하지 않는다. GC는 모든 바인딩·보관·두 체크포인트 세대·재생 저널 참조를 검사한다.
 
+재검증 도구는 running 재검증의 verdict·summary·evidence만 임시 저장한다. 같은 결론의 재전송은 허용하고 다른 결론의 덮어쓰기는 거부한다. 소유 실행의 정상 종료와 재검증 확정·fixed 상태 변경은 같은 writer 트랜잭션에서 처리한다. 취소·실패·결론 없는 종료는 fixed를 확정하지 않는다. 취약점 검색·필터 export와 명령 통계 검색은 inline/Blob 표현에 관계없이 해당 본문을 읽으며 필요한 읽기 오류를 빈 결과로 숨기지 않는다.
+
 원본 TrafficSnapshotID의 64자리 해시를 legacy_key로 보존한다. 가져온 스냅샷의 원본 정규화·해시를 검증하되 새 EntityId와 내용 BlobRef 해시를 구분한다. 표시용 UTF-8 정제와 원본 바이너리 보존을 분리한다. 새 캡처 원본을 DB의 텍스트 제약에 맞추려고 손실 변환하지 않는다.
 
 재검증은 Finding별 pending/running 최대 하나, conversation 고유 연결, 시작 시 finding/evidence/현재 제약의 스냅샷을 저장한다. 도구는 엔진이 주입한 conversation/run에서만 대상을 얻는다. 입력으로 다른 취약점으로 전환할 수 없다. verdict=reproduced/fixed/inconclusive와 비어 있지 않은 summary/evidence를 저장한다. 완료 fixed는 Finding.status=fixed와 같은 변경이고 다른 판정은 기존 status 유지. 중단/대화 삭제/장애는 stopped/failed 및 종료 시각을 저장한다.
@@ -128,6 +148,8 @@ Finding.status는 pending/in_progress/confirmed/resolved/fixed/false_positive/ig
 사용량은 성공·실패 모두 ledger로 기록하며 원본처럼 best-effort 실패를 별도 진단한다. 확정 응답 후 보존을 보장하는 업무 변경과 사용량 best-effort를 구분한다. 원본 사용량·기록의 과거 task/profile 정보는 삭제 후에도 조회할 수 있다. 상세 요청/응답 수집 스위치·토큰 집계 기준·캐시 토큰 의미는 유지한다. 오래된 prompt/detail은 큰 본문 파일로 분리한다.
 
 툴 제공 집합은 실행 role에 조립된 도구 ∩ enabled/agent binding ∩ 기능 활성화 ∩ MCP/Skill visibility다. 권한은 input까지 검사한 뒤 승인→실행 직전에 다시 검사한다. 기본 도구 정의의 사용자 편집은 설명과 스칼라 기본값만 바꾸고 핸들러·필드 타입·required·ID 종류는 변경하지 않는다. 원본의 누락/빈 문자열/null 스칼라 default 주입 의미를 유지하며 객체/배열은 default 주입하지 않는다. 일반 RPC PATCH의 null 규칙과 도구 default 규칙을 구분한다.
+
+MCP 연결은 run/epoch/서버별로 재사용하고 승인 설정·디렉터리·네트워크 설정이 바뀌거나 소유 실행이 종료되면 폐기한다. UI 검색/연결 시험은 명령 종료 때 닫는 임시 연결이다. 응답의 `isError`를 도구 실패로 유지하며 불확실한 호출은 자동 재실행하지 않는다. SSE의 응답 대기 예산과 프레임 한도는 유지하되 정상 연결 수명 전체를 한 응답으로 합산하지 않는다.
 
 ## RPC 프레임과 공통 처리
 
@@ -243,6 +265,8 @@ seq=N의 불변 상태를 빌려 각 컬렉션 NDJSON을 id의 UTF-8 바이트 �
 GC는 active state·두 snapshot·필요 저널·ready archive·참조 evidence의 reachability를 합산한다. 준비됐으나 미참조 blob은 유예 24시간 후 수거한다. 삭제 계획을 저장하고 대상 hash를 재확인해 unlink하며 삭제 실패는 재시도 기록으로 남긴다. cache 삭제는 정규 상태를 바꾸지 않는다. capture 삭제와 evidence 삭제의 소유권을 합치지 않는다.
 
 작업 보관은 paused/terminal, queue 해제, 직접 live dependent가 없음을 확인한다. 여러 작업 보관은 dependents부터 순서대로 예약하고 cycles는 의존성 오류다. artex-task/1 패키지는 ZIP의 manifest+NDJSON+blob 목록과 해시를 포함하며 키/CA 개인 키를 제외한다. 원본 v1~v3 아카이브의 actual format_version을 확인한다. SQL 기본 2만 보고 최신 Go 형식 3을 누락하지 않는다. 복원은 원본 보관 파일을 변경하지 않는 staging 검증과 한 명령의 참조 교체이며 진행 실패를 ready로 오인하지 않는다.
+
+hot 행을 제거하기 전에 작업 소유 취약점·모델 사용량·도구·스킬의 집계를 보관하고 전체 통계에 합산한다. 원장 소유는 task_id와 exploration_id를 따르며 opaque 출처 키를 임의 ID로 바꾸지 않는다. 이전 preview의 집계 없는 메타데이터는 불변 패키지를 동일 importer 경계로 검증해 조회 뷰에서만 보완한다. 읽기 전용 저장소에 쓰지 않으며 손상·누락을 0건 통계로 반환하지 않는다. 상세 수정/회귀 근거는 [2026-10-17 기록](stability-fixes-20261017.md)을 따른다.
 
 ## 에이전트 공유와 저장된 활성화
 

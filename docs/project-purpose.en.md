@@ -12,18 +12,18 @@ The central purpose is to let **non-developers and everyday users use ARTEX like
 
 The intended workflow is to download the executable, open the application, configure a workspace and LLM model, and begin work through the interface. The original agent workflows and tool contracts are retained while reducing setup and administration and bringing conversations, tasks, and execution results into one program.
 
-**Reduce installation and administration.** Basic application operation excludes the need to install, configure, or administer Docker, containers, a web server, or PostgreSQL. Storage is redesigned as an object graph with file persistence suited to local desktop workspaces. Agents continue to share information through object relationships, permissions, and durable storage. The basis for this choice is simpler operation on a personal computer.
+**Reduce installation and administration.** Basic application operation excludes the need to install, configure, or administer Docker, containers, a web server, or PostgreSQL. Storage is redesigned as an object graph with bundled SQLite persistence suited to local desktop workspaces. Agents continue to share information through object relationships, permissions, and durable storage. The basis for this choice is simpler operation on a personal computer.
 
 **Bring work and execution control into one interface.** Conversations, task lists, agent activity, tool approvals, stopping execution, and results are visible within the application. Local files and external programs run on the user's computer, so execution status and termination are managed with the application's lifecycle.
 
-**Adapt data and credentials to the local environment.** Conversations, assets, findings, and evidence are linked in file-based workspaces. API keys use the operating system's credential store wherever possible. Model calls and remote tools communicate with the configured services.
+**Adapt data and credentials to the local environment.** Conversations, assets, findings, and execution records are stored in SQLite, with large evidence linked as workspace files. API keys use the operating system's credential store wherever possible. Model calls and remote tools communicate with the configured services.
 
 **Unify the UI and application services in Rust.** The UI, storage, agents, and execution services run in the same process, avoiding a separate server and connections between service processes for basic operation. Storage, approvals, cancellation, and shutdown are managed within one application structure, with a shared development and verification foundation for Windows, macOS, and Arch Linux. Packaging and actual operation must still be verified on each operating system.
 
 | Component | Original ARTEX | Current ARTEX Desktop |
 | --- | --- | --- |
 | Basic execution | Go web server and Next.js interface | Native UI and application services in the same Rust process |
-| Workspace information | PostgreSQL-based sharing | Object graph and durable file storage; sharing through explicit object relationships and permissions |
+| Workspace information | PostgreSQL-based sharing | Object graph and SQLite persistence; sharing through explicit object relationships and permissions |
 | Getting started | Deploy server and database using Docker Compose or another method, then access the web interface | Download the executable, launch the application, and create or open a local workspace |
 | Tool execution | External programs in the server environment | Run and supervise programs on the user's computer when needed |
 | Credentials | Server configuration and storage | Prefer the OS credential store and retain references in objects |

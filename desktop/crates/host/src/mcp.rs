@@ -7,14 +7,189 @@ use crate::{
 use artex_core::{Context, Error, Result};
 use futures_util::{StreamExt, stream::BoxStream};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     io::{BufRead, Read, Write},
     process::{Child, Command, Stdio},
-    sync::{atomic::Ordering, mpsc},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
     time::{Duration, Instant},
 };
+// Keep the existing MCP response-wait budget without assigning that deadline
+// to the lifetime of a retained legacy SSE response body.
+const RESPONSE_WAIT: Duration = Duration::from_secs(30);
+async fn response_deadline<F: std::future::Future>(future: F) -> Result<F::Output> {
+    tokio::time::timeout(RESPONSE_WAIT, future)
+        .await
+        .map_err(|_| Error::new("TIMEOUT", "MCP response deadline exceeded"))
+}
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct SessionKey {
+    epoch: String,
+    owner: String,
+    server: String,
+}
+struct Slot {
+    fingerprint: String,
+    retired: AtomicBool,
+    client: Mutex<Option<Client>>,
+}
+/// A run owns its MCP connections, as in the original ToolAugment cleanup.
+/// Calls on one connection serialize; unrelated runs/servers never share state.
+#[derive(Default)]
+pub(crate) struct SessionPool {
+    sessions: Mutex<HashMap<SessionKey, Arc<Slot>>>,
+}
+impl SessionPool {
+    pub(crate) fn stop(&self, run: Option<&str>, epoch: &str) {
+        let retired = {
+            let mut sessions = self.sessions.lock().unwrap();
+            let keys: Vec<_> = sessions
+                .keys()
+                .filter(|key| key.epoch == epoch && run.is_none_or(|run| key.owner == run))
+                .cloned()
+                .collect();
+            keys.into_iter()
+                .filter_map(|key| sessions.remove(&key))
+                .collect::<Vec<_>>()
+        };
+        for slot in retired {
+            slot.retired.store(true, Ordering::SeqCst);
+            // The caller marks run cancellation first, so in-flight calls leave
+            // their owned I/O before teardown acquires this connection lock.
+            slot.client.lock().unwrap().take();
+        }
+    }
+    fn slot(&self, key: SessionKey, fingerprint: String) -> Arc<Slot> {
+        let (slot, retired) = {
+            let mut sessions = self.sessions.lock().unwrap();
+            if let Some(slot) = sessions
+                .get(&key)
+                .filter(|slot| slot.fingerprint == fingerprint)
+            {
+                return slot.clone();
+            }
+            let slot = Arc::new(Slot {
+                fingerprint,
+                retired: AtomicBool::new(false),
+                client: Mutex::new(None),
+            });
+            let previous = sessions.insert(key, slot.clone());
+            if let Some(previous) = &previous {
+                previous.retired.store(true, Ordering::SeqCst);
+            }
+            (slot, previous)
+        };
+        // A changed approved definition retires its old connection, not just
+        // its cache key. Queued calls on that retired connection cannot run.
+        if let Some(retired) = retired {
+            retired.client.lock().unwrap().take();
+        }
+        slot
+    }
+}
+enum Transport {
+    Stdio(Process),
+    Http(Http),
+    Sse(Http, reqwest::Url, Events),
+}
+struct Client {
+    transport: Transport,
+    runtime: tokio::runtime::Runtime,
+    next_id: u64,
+}
+impl Client {
+    fn connect(host: &HostRuntime, input: &Value, context: &Context) -> Result<Self> {
+        let server = &input["server"];
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(Error::io)?;
+        let init = json!({"jsonrpc":"2.0","id":"initialize","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ARTEX Desktop","version":"0.1.0"}}});
+        let ready = json!({"jsonrpc":"2.0","method":"notifications/initialized"});
+        let transport = match server["transport"].as_str() {
+            Some("stdio") => {
+                let cap = input["directory_capability"].as_str().ok_or_else(|| {
+                    Error::new("PERMISSION_DENIED", "MCP process capability required")
+                })?;
+                let process =
+                    Process::spawn(server, &host.capabilities.root(cap)?, host, context, input)?;
+                process.call(init, host, context)?;
+                process.notify(ready)?;
+                Transport::Stdio(process)
+            }
+            Some("http") => {
+                let mut http = Http::new(server, input)?;
+                runtime.block_on(async {
+                    http.post(&init, host, context).await?;
+                    http.post(&ready, host, context).await
+                })?;
+                Transport::Http(http)
+            }
+            Some("sse") => {
+                let http = Http::new(server, input)?;
+                let (endpoint, mut events) =
+                    runtime.block_on(http.legacy_connect(host, context))?;
+                runtime.block_on(async {
+                    http.legacy_post(&endpoint, &mut events, &init, host, context)
+                        .await?;
+                    http.legacy_post(&endpoint, &mut events, &ready, host, context)
+                        .await
+                })?;
+                Transport::Sse(http, endpoint, events)
+            }
+            _ => return Err(Error::new("INVALID_PARAMS", "Unknown MCP transport")),
+        };
+        Ok(Self {
+            transport,
+            runtime,
+            next_id: 0,
+        })
+    }
+    fn call(
+        &mut self,
+        host: &HostRuntime,
+        context: &Context,
+        method: &str,
+        params: Value,
+    ) -> Result<Value> {
+        self.next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or_else(|| Error::new("SIZE_LIMIT", "MCP request id exhausted"))?;
+        let frame = json!({"jsonrpc":"2.0","id":self.next_id,"method":method,"params":params});
+        match &mut self.transport {
+            Transport::Stdio(process) => process.call(frame, host, context),
+            Transport::Http(http) => self.runtime.block_on(http.post(&frame, host, context)),
+            Transport::Sse(http, endpoint, events) => self
+                .runtime
+                .block_on(http.legacy_post(endpoint, events, &frame, host, context)),
+        }
+    }
+}
+impl Drop for Client {
+    fn drop(&mut self) {
+        // Closing the retained SSE body cancels its stream. Streamable HTTP's
+        // DELETE is best effort, bounded by the native process cleanup budget;
+        // a response here is never used as external execution cleanup proof.
+        if let Transport::Http(http) = &self.transport {
+            if http.session.is_some() {
+                let _ = self.runtime.block_on(async {
+                    tokio::time::timeout(
+                        Duration::from_secs(2),
+                        http.request(reqwest::Method::DELETE, &http.url).send(),
+                    )
+                    .await
+                });
+            }
+        }
+    }
+}
 struct Process {
     child: Child,
     group: ProcessGroup,
@@ -258,8 +433,19 @@ impl Drop for Process {
 }
 fn response(frame: Value) -> Result<Value> {
     if let Some(error) = frame.get("error") {
+        if frame.get("result").is_some()
+            || error["code"].as_i64().is_none()
+            || !error["message"].is_string()
+        {
+            return Err(Error::new(
+                "EXTERNAL_FAILURE",
+                "Malformed MCP error response",
+            ));
+        }
         let mut result = Error::new("EXTERNAL_FAILURE", "MCP server returned an error");
-        result.details = json!({"rpc_code":error["code"]});
+        // This marker is attached only after matching the request ID and fully
+        // decoding an RPC error. Such an error does not poison the transport.
+        result.details = json!({"rpc_code":error["code"],"mcp_response_received":true});
         return Err(result);
     }
     frame
@@ -353,16 +539,23 @@ impl Events {
         context: &Context,
         id: &Value,
     ) -> Result<Value> {
-        loop {
-            let (event, data) = self.next(host, context).await?;
-            if event != "message" {
-                continue;
+        // Retained legacy SSE streams span many tool calls. The stream budget
+        // bounds one response wait, not the lifetime of an otherwise healthy
+        // run session; the independent frame/buffer limit remains in next().
+        self.total = 0;
+        response_deadline(async {
+            loop {
+                let (event, data) = self.next(host, context).await?;
+                if event != "message" {
+                    continue;
+                }
+                let frame: Value = serde_json::from_str(&data)?;
+                if frame["id"] == *id {
+                    return response(frame);
+                }
             }
-            let frame: Value = serde_json::from_str(&data)?;
-            if frame["id"] == *id {
-                return response(frame);
-            }
-        }
+        })
+        .await?
     }
 }
 struct Http {
@@ -390,7 +583,6 @@ impl Http {
         }
         let mut builder = reqwest::Client::builder()
             .no_proxy()
-            .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(10))
             .danger_accept_invalid_certs(server["insecure"].as_bool().unwrap_or(false));
         if let Some(proxy) = input["network_config"]["proxy"]
@@ -451,6 +643,7 @@ impl Http {
             host,
             context,
             self.request(reqwest::Method::POST, &self.url)
+                .timeout(RESPONSE_WAIT)
                 .json(value)
                 .send(),
         )
@@ -499,62 +692,70 @@ impl Http {
         }
         crate::mcp::response(frame)
     }
-    async fn legacy(
+    async fn legacy_connect(
         &self,
-        init: Value,
-        ready: Value,
-        call: Value,
+        host: &HostRuntime,
+        context: &Context,
+    ) -> Result<(reqwest::Url, Events)> {
+        // The GET stream belongs to the run and may remain idle between calls.
+        // Bound handshake/endpoint discovery instead of its whole body lifetime.
+        response_deadline(async {
+            let response = cancellable(
+                host,
+                context,
+                self.request(reqwest::Method::GET, &self.url).send(),
+            )
+            .await?
+            .map_err(external)?;
+            if !response.status().is_success() {
+                return Err(Error::new("EXTERNAL_FAILURE", "MCP SSE connection failed"));
+            }
+            let mut events = Events::new(response);
+            loop {
+                let (event, data) = events.next(host, context).await?;
+                if event == "endpoint" {
+                    let endpoint = self
+                        .url
+                        .join(&data)
+                        .map_err(|_| Error::new("EXTERNAL_FAILURE", "Invalid MCP endpoint"))?;
+                    if endpoint.origin() != self.url.origin() {
+                        return Err(Error::new(
+                            "PERMISSION_DENIED",
+                            "MCP SSE endpoint changed authority",
+                        ));
+                    }
+                    return Ok((endpoint, events));
+                }
+            }
+        })
+        .await?
+    }
+    async fn legacy_post(
+        &self,
+        endpoint: &reqwest::Url,
+        events: &mut Events,
+        frame: &Value,
         host: &HostRuntime,
         context: &Context,
     ) -> Result<Value> {
         let response = cancellable(
             host,
             context,
-            self.request(reqwest::Method::GET, &self.url).send(),
+            self.request(reqwest::Method::POST, endpoint)
+                .timeout(RESPONSE_WAIT)
+                .json(frame)
+                .send(),
         )
         .await?
         .map_err(external)?;
         if !response.status().is_success() {
-            return Err(Error::new("EXTERNAL_FAILURE", "MCP SSE connection failed"));
+            return Err(Error::new("EXTERNAL_FAILURE", "MCP SSE POST failed"));
         }
-        let mut events = Events::new(response);
-        let endpoint = loop {
-            let (event, data) = events.next(host, context).await?;
-            if event == "endpoint" {
-                let endpoint = self
-                    .url
-                    .join(&data)
-                    .map_err(|_| Error::new("EXTERNAL_FAILURE", "Invalid MCP endpoint"))?;
-                if endpoint.origin() != self.url.origin() {
-                    return Err(Error::new(
-                        "PERMISSION_DENIED",
-                        "MCP SSE endpoint changed authority",
-                    ));
-                }
-                break endpoint;
-            }
-        };
-        for frame in [init, ready, call] {
-            let response = cancellable(
-                host,
-                context,
-                self.request(reqwest::Method::POST, &endpoint)
-                    .json(&frame)
-                    .send(),
-            )
-            .await?
-            .map_err(external)?;
-            if !response.status().is_success() {
-                return Err(Error::new("EXTERNAL_FAILURE", "MCP SSE POST failed"));
-            }
-            if frame.get("id").is_some() {
-                let value = events.matching(host, context, &frame["id"]).await?;
-                if frame["id"] == "action" {
-                    return Ok(value);
-                }
-            }
+        if frame.get("id").is_some() {
+            events.matching(host, context, &frame["id"]).await
+        } else {
+            Ok(Value::Null)
         }
-        Err(Error::new("EXTERNAL_FAILURE", "MCP SSE action missing"))
     }
 }
 pub fn refresh(host: &HostRuntime, input: &Value, context: &Context) -> Result<Value> {
@@ -583,44 +784,132 @@ fn invoke(
     if host.context_cancelled(context) {
         return Err(Error::new("CANCELLED", "MCP epoch/run ended"));
     }
-    let server = &input["server"];
-    let init = json!({"jsonrpc":"2.0","id":"initialize","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ARTEX Desktop","version":"0.1.0"}}});
-    let ready = json!({"jsonrpc":"2.0","method":"notifications/initialized"});
-    let call = json!({"jsonrpc":"2.0","id":"action","method":method,"params":params});
-    match server["transport"].as_str() {
-        Some("stdio") => {
-            let cap = input["directory_capability"].as_str().ok_or_else(|| {
-                Error::new("PERMISSION_DENIED", "MCP process capability required")
-            })?;
-            let client =
-                Process::spawn(server, &host.capabilities.root(cap)?, host, context, input)?;
-            let _ = client.call(init, host, context)?;
-            client.notify(ready)?;
-            client.call(call, host, context)
+    let owner = context
+        .actor
+        .run_id
+        .clone()
+        .or_else(|| input["command_id"].as_str().map(|id| format!("ui_{id}")))
+        .ok_or_else(|| {
+            Error::new(
+                "PERMISSION_DENIED",
+                "MCP requires an owned run or UI command",
+            )
+        })?;
+    // UI discovery/test commands have no agent run lifetime to retire a pool
+    // entry. Their temporary connection closes when the command completes.
+    if context.actor.kind != "agent" || context.actor.run_id.is_none() {
+        let mut owned = context.clone();
+        owned.actor.run_id = Some(owner);
+        if host.context_cancelled(&owned) {
+            return Err(Error::new("CANCELLED", "MCP UI command ended"));
         }
-        Some("http" | "sse") => {
-            let mut client = Http::new(server, input)?;
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(Error::io)?;
-            runtime.block_on(async {
-                if server["transport"] == "sse" {
-                    client.legacy(init, ready, call, host, context).await
-                } else {
-                    let _ = client.post(&init, host, context).await?;
-                    let _ = client.post(&ready, host, context).await?;
-                    client.post(&call, host, context).await
-                }
-            })
-        }
-        _ => Err(Error::new("INVALID_PARAMS", "Unknown MCP transport")),
+        return Client::connect(host, input, &owned)?.call(host, &owned, method, params);
     }
+    let server = &input["server"];
+    let root = input["directory_capability"]
+        .as_str()
+        .map(|cap| host.capabilities.root(cap))
+        .transpose()?;
+    let fingerprint = hex::encode(Sha256::digest(serde_json::to_vec(&(
+        server,
+        &input["network_config"],
+        root,
+    ))?));
+    let identity = server["id"]
+        .as_str()
+        .or_else(|| server["name"].as_str())
+        .unwrap_or(&fingerprint)
+        .to_owned();
+    let key = SessionKey {
+        epoch: context.actor.engine_epoch.clone(),
+        owner,
+        server: identity,
+    };
+    let slot = host.mcp_sessions.slot(key, fingerprint);
+    let mut client = slot.client.lock().unwrap();
+    if slot.retired.load(Ordering::SeqCst) || host.context_cancelled(context) {
+        return Err(Error::new("CANCELLED", "MCP connection was retired"));
+    }
+    if client.is_none() {
+        *client = Some(Client::connect(host, input, context)?);
+    }
+    let result = client.as_mut().unwrap().call(host, context, method, params);
+    // A matched RPC error is a completed response, as in norma Client.wrap;
+    // preserve its healthy stateful session. Transport/protocol failures may
+    // leave an uncertain request outstanding: discard and never retry here.
+    if result
+        .as_ref()
+        .err()
+        .is_some_and(|error| error.details["mcp_response_received"] != true)
+    {
+        client.take();
+    }
+    result
 }
 #[cfg(test)]
 mod supervision_tests {
     use super::*;
     use artex_core::{Actor, new_id};
+    #[test]
+    fn retained_sse_budget_is_per_response_wait_not_session_lifetime() {
+        fn events(ids: impl IntoIterator<Item = &'static str>) -> Events {
+            let padding = "x".repeat(512 * 1024);
+            let chunks = ids
+                .into_iter()
+                .map(|id| {
+                    Ok(format!(
+                        "event: message\ndata: {}\n\n",
+                        json!({"id":id,"result":{"padding":padding}})
+                    )
+                    .into_bytes())
+                })
+                .collect::<Vec<Result<Vec<u8>>>>();
+            Events {
+                stream: futures_util::stream::iter(chunks).boxed(),
+                buffer: vec![],
+                total: 0,
+            }
+        }
+        let host = HostRuntime::default();
+        let context = Context {
+            actor: Actor {
+                kind: "agent".into(),
+                agent_id: Some(new_id("agent")),
+                run_id: Some(new_id("run")),
+                engine_epoch: new_id("epoch"),
+            },
+            task_id: None,
+            intent_id: None,
+            conversation_id: None,
+        };
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        // Each wait is below 8 MiB; their combined bytes exceed that limit.
+        let mut retained = events(
+            std::iter::repeat_n("other", 8)
+                .chain(["first"])
+                .chain(std::iter::repeat_n("other", 8))
+                .chain(["second"]),
+        );
+        runtime
+            .block_on(retained.matching(&host, &context, &json!("first")))
+            .unwrap();
+        runtime
+            .block_on(retained.matching(&host, &context, &json!("second")))
+            .unwrap();
+        // An individual wait still cannot consume an unbounded notification
+        // stream while waiting for its own response.
+        let mut oversized = events(std::iter::repeat_n("other", 17).chain(["target"]));
+        assert_eq!(
+            runtime
+                .block_on(oversized.matching(&host, &context, &json!("target")))
+                .unwrap_err()
+                .code,
+            "SIZE_LIMIT"
+        );
+    }
     #[test]
     fn stdio_mcp_is_owned_force_stoppable_and_monitor_redacts_inputs() {
         let directory = tempfile::tempdir().unwrap();

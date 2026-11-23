@@ -537,9 +537,12 @@ impl HostBridge {
                 result["accepted"] = json!(true);
                 Ok(result)
             }
-            Some("host.events") => Ok(
-                json!({"events":self.runtime.ptys.drain_events(context.actor.run_id.as_deref().unwrap(),&epoch)}),
-            ),
+            Some("host.events") => {
+                let run = context.actor.run_id.as_deref().unwrap();
+                let mut events = self.runtime.ptys.drain_events(run, &epoch);
+                events.extend(self.runtime.executions.drain_events(run, &epoch));
+                Ok(json!({"events":events}))
+            }
             Some("secret.resolve") => Ok(
                 json!({"value":self.secrets.resolve(params["secret_ref"].as_str().ok_or_else(|| Error::new("INVALID_PARAMS", "Secret reference required"))?)?}),
             ),

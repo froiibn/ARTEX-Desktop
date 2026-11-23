@@ -47,7 +47,7 @@ macOS의 Mach clock, IOKit/CoreFoundation 절전 분기, UI 스레드의 AppKit 
 cargo test --locked --manifest-path desktop/native-core/Cargo.toml
 cargo test --locked --manifest-path desktop/native/Cargo.toml
 cargo test --locked --manifest-path desktop/Cargo.toml --workspace
-cargo build --release --locked --manifest-path desktop/native/Cargo.toml
+python desktop/native/scripts/build.py
 ```
 
 macOS는 Xcode Command Line Tools와 Apple SDK·링커가 필요하다. Intel/Apple Silicon을 각각 검증한 후 필요하면 universal artifact를 묶는다. 일반 다운로드 배포는 앱 번들, Developer ID 서명·hardened runtime·entitlements, notarytool·stapler 및 실제 Gatekeeper 실행을 확인한다. [Apple 서명 안내](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/), [Apple 공증 안내](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).

@@ -54,6 +54,17 @@ pub(crate) fn append_code_owned_with_reader(
         .ok_or_else(|| Error::new("NOT_FOUND", "Runtime agent does not exist"))?;
     let role = agent.data["key"].as_str().unwrap_or("");
     system.push_str("\n\n<code-owned-runtime-guidance>\nThe following runtime rules are supplied by the application and remain applicable regardless of edits to the agent template.");
+    // The compatibility tool name is not the executable. Supply the actual
+    // host contract after editable prompts; never translate arbitrary shell
+    // commands or silently install tools on the user's computer.
+    system.push_str(&format!("\n\n**Native execution environment**: OS={}, architecture={}. File tools (LS/Read/Write/Edit) accept paths relative to the working directory below, not its absolute path. Use LS(path=\".\") to inspect that directory.", std::env::consts::OS, std::env::consts::ARCH));
+    if has(tools, "Bash") || has(tools, "Monitor") {
+        if cfg!(windows) {
+            system.push_str(" The Bash and Monitor tools execute powershell.exe -NoProfile -NonInteractive -Command on Windows. They do not execute a Unix shell. Use PowerShell syntax: Get-Command to check program availability, $null for discarded output, and curl.exe explicitly for curl options (curl is an Invoke-WebRequest alias in Windows PowerShell). Do not use /dev/null, which, Unix pipelines or assume dig/host/whois/nmap/python are installed. Check Resolve-DnsName or nslookup availability for DNS. Use an external tool only if available; report a missing prerequisite instead of claiming its check succeeded. When a native executable fails, inspect its exit code and captured output; an HTTP response alone does not prove the command succeeded.");
+        } else {
+            system.push_str(" The Bash and Monitor tools execute bash -c on this host. Check command -v before relying on external programs; security tools and Python are not guaranteed to be installed. Use paths relative to the working directory and report missing prerequisites.");
+        }
+    }
     if role == "worker" {
         system.push_str(&format!("\n\n**Intermediate artifact output protocol**: Write scripts, payloads, captured response bodies and temporary data only in the task-scoped working directory: {work_dir}. This is the actual default CWD; use relative paths for file tools. Do not write to /tmp or other absolute locations. Workers share the task directory: use this run's ID {} or assigned intent ID in unique relative file names to avoid collisions, and do not overwrite another worker's artifacts.", run.header.id));
         system.push_str("\n\n**Assigned intent and situational awareness**: Perform only the assigned intent, produce facts, and stop when it is complete. Any global graph overview, other workers' discoveries and historical coverage are read-only context for avoiding duplication and understanding relationships; they do not assign another job or authorize chasing uncovered areas. Do not execute another worker's intent or expand your own scope. Think deeply about relationships, but hand valuable cross-asset or exploit-chain clues back to the planner rather than acting on them.");

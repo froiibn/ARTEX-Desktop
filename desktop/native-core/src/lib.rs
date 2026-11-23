@@ -4,6 +4,7 @@
 pub mod gateway;
 pub mod lifecycle;
 pub mod service;
+pub mod shared_resources;
 pub use artex_rpc::native::*;
 pub use service::{
     HostFactory, NativeEvent, NativeEventBatch, Service, ServiceConfig, ServiceHandle,

@@ -3,6 +3,12 @@ use crate::*;
 use artex_core::collection_prefix;
 use chrono::{Duration, Utc};
 use std::collections::{BTreeMap, BTreeSet};
+#[path = "archive_statistics.rs"]
+mod archive_statistics;
+pub use archive_statistics::{
+    ARCHIVE_STATISTICS_VERSION, archive_statistics, archived_records, skill_statistics,
+    tool_usage_counts,
+};
 pub const QUERIES: &[&str] = &[
     "ui.taskArchives",
     "ui.taskArchive",
@@ -119,6 +125,29 @@ fn page(input: &Value, size_name: &str, default_size: u64) -> Result<(u64, u64)>
     }
     Ok((page, size))
 }
+fn statistics_cutoff(input: &Value, default_days: i64) -> Result<chrono::DateTime<Utc>> {
+    // Source UsageDaily/TokenDailyAll treat nonpositive days as their default,
+    // and positive periods as elapsed days rather than today's calendar bucket.
+    let days = input["days"]
+        .as_i64()
+        .filter(|days| *days > 0)
+        .unwrap_or(default_days);
+    Duration::try_days(days)
+        .and_then(|period| Utc::now().checked_sub_signed(period))
+        .ok_or_else(|| {
+            Error::new(
+                "INVALID_PARAMS",
+                "Statistics period exceeds the timestamp range",
+            )
+        })
+}
+fn statistics_at_or_after(value: &Value, cutoff: &chrono::DateTime<Utc>) -> Result<bool> {
+    let timestamp = value
+        .as_str()
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .ok_or_else(|| Error::new("CORRUPT_STORE", "Statistics timestamp is invalid"))?;
+    Ok(timestamp >= *cutoff)
+}
 pub fn archive_wire(d: &Value, s: &Snapshot) -> Result<Value> {
     let mut out = json!({});
     for key in [
@@ -146,6 +175,7 @@ pub fn archive_wire(d: &Value, s: &Snapshot) -> Result<Value> {
     ] {
         out[key] = d[key].clone();
     }
+    out["aggregate_stats"] = archive_statistics::public_summary(&d["aggregate_stats"])?;
     out["remaining_timeout_seconds"] = count(
         text(d, "remaining_timeout_seconds")
             .parse()
@@ -233,6 +263,20 @@ impl Tokens {
     }
 }
 pub fn query(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<Value> {
+    query_with_reader(m, p, s, _c, &|_| {
+        Err(Error::new(
+            "FEATURE_DISABLED",
+            "Command search requires a blob reader",
+        ))
+    })
+}
+pub fn query_with_reader(
+    m: &str,
+    p: &Value,
+    s: &Snapshot,
+    _c: &Context,
+    reader: &crate::traffic_ui::BlobReader,
+) -> Result<Value> {
     match m {
         "ui.taskArchive" => archive_wire(&record(s, "task_archives", required(p, "id")?)?.data, s),
         "ui.taskArchives" => {
@@ -339,25 +383,7 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<Value> {
                 .collect::<Result<Vec<_>>>()?;
             Ok(json!({"deliveries":deliveries,"total":total,"page":page,"page_size":size}))
         }
-        "ui.findingStats" => {
-            let rows = s.records("findings");
-            let mut result = json!({"total":rows.len(),"pending":rows.iter().filter(|r|r.data["status"]=="pending").count(),"vulnclasses":rows.iter().map(|r|text(&r.data,"vulnclass").to_owned()).collect::<BTreeSet<_>>(),"tasks":[]});
-            for severity in ["critical", "high", "medium", "low"] {
-                result[severity] = json!(
-                    rows.iter()
-                        .filter(|r| r.data["severity"] == severity)
-                        .count()
-                );
-            }
-            let mut tasks = BTreeMap::<String, u64>::new();
-            for row in &rows {
-                if let Some(id) = row.data["task_id"].as_str() {
-                    *tasks.entry(id.into()).or_default() += 1;
-                }
-            }
-            result["tasks"]=json!(tasks.into_iter().filter_map(|(id,n)|s.get("tasks",&id).map(|task|json!({"id":id,"name":task.data["name"],"description":task.data["description"],"count":n}))).collect::<Vec<_>>());
-            Ok(result)
-        }
+        "ui.findingStats" => archive_statistics::global_finding_stats(s),
         "ui.stats" => {
             let task = active_task(p, s)?;
             let mut result = json!({"assets":s.records("assets").len(),"engine_mode":"idle","llm_configured":s.records("llm_profiles").iter().any(|r|r.data["pool_exclude"]!=true),"roe_enabled":setting(s,"roe.enabled","false")=="true","findings_confirmed":s.records("findings").iter().filter(|r|r.data["status"]=="confirmed").count()});
@@ -430,10 +456,7 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<Value> {
             Ok(json!({"workers":workers,"sessions":sessions,"total":total.wire()?}))
         }
         "ui.tokenDaily" => {
-            let days = p["days"].as_u64().unwrap_or(30).clamp(1, 3650);
-            let cutoff = (Utc::now() - Duration::days(days as i64 - 1))
-                .format("%Y-%m-%d")
-                .to_string();
+            let cutoff = statistics_cutoff(p, 30)?;
             let mut buckets = BTreeMap::<String, Tokens>::new();
             for r in s
                 .records("activity")
@@ -441,7 +464,7 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<Value> {
                 .filter(|r| r.data["kind"] == "result")
             {
                 let date = text(&r.data, "created_at").get(..10).unwrap_or("");
-                if date >= cutoff.as_str() {
+                if statistics_at_or_after(&r.data["created_at"], &cutoff)? {
                     buckets
                         .entry(date.into())
                         .or_default()
@@ -459,52 +482,7 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<Value> {
                     .collect::<Result<Vec<_>>>()?
             ))
         }
-        "ui.usageStats" => {
-            let days = p["days"].as_u64().unwrap_or(365).clamp(1, 3650);
-            let cutoff = (Utc::now() - Duration::days(days as i64 - 1))
-                .format("%Y-%m-%d")
-                .to_string();
-            let mut totals = BTreeMap::<String, (u64, BTreeSet<String>, Tokens)>::new();
-            let mut daily = BTreeMap::<(String, String), Tokens>::new();
-            for row in s.records("llm_usage") {
-                let d = &row.data;
-                let profile = text(d, "profile_name");
-                let entry = totals.entry(profile.into()).or_default();
-                entry.0 += 1;
-                if let Some(task) = d["task_id"].as_str().filter(|t| !t.is_empty()) {
-                    entry.1.insert(task.into());
-                }
-                entry.2.add(d, true)?;
-                let date = text(d, "ts").get(..10).unwrap_or("");
-                if date >= cutoff.as_str() {
-                    daily
-                        .entry((profile.into(), date.into()))
-                        .or_default()
-                        .add(d, true)?;
-                }
-            }
-            let by_profile = totals
-                .into_iter()
-                .map(|(profile, (calls, tasks, tokens))| {
-                    let mut v = tokens.wire()?;
-                    v["profile_name"] = json!(profile);
-                    v["calls"] = count(calls)?;
-                    v["tasks"] = count(tasks.len() as u64)?;
-                    Ok(v)
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let daily = daily
-                .into_iter()
-                .map(|((profile, date), t)| {
-                    let mut v = t.wire()?;
-                    v.as_object_mut().unwrap().remove("cache_write_tokens");
-                    v["profile_name"] = json!(profile);
-                    v["date"] = json!(date);
-                    Ok(v)
-                })
-                .collect::<Result<Vec<_>>>()?;
-            Ok(json!({"by_profile":by_profile,"daily":daily}))
-        }
+        "ui.usageStats" => archive_statistics::global_usage_stats(s, p),
         "ui.commandStats" => {
             let p = &p["params"];
             let task = text(p, "task");
@@ -521,11 +499,15 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<Value> {
                         .as_ref()
                         .is_none_or(|exp| r.data["exploration_id"] == *exp)
             }) {
-                if !q.is_empty()
-                    && !text(&r.data, "tool").to_lowercase().contains(&q)
-                    && !text(&r.data, "detail").to_lowercase().contains(&q)
-                {
-                    continue;
+                if !q.is_empty() && !text(&r.data, "tool").to_lowercase().contains(&q) {
+                    // Source ToolStats and ListCommands share the same input filter.
+                    // Body text must be read just as it is by ui.commands.
+                    let bytes = crate::traffic_ui::body_bytes(&r.data["detail"], reader)?;
+                    let input = std::str::from_utf8(&bytes)
+                        .map_err(|_| Error::new("CORRUPT_STORE", "Command input is not UTF-8"))?;
+                    if !input.to_lowercase().contains(&q) {
+                        continue;
+                    }
                 }
                 let tool = text(&r.data, "tool");
                 let tool = if tool.is_empty() { "-" } else { tool };
@@ -555,7 +537,12 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<Value> {
     }
 }
 
-fn merge_config(kind: &str, stored: &Value, incoming: &Value) -> Result<Value> {
+fn merge_config(
+    kind: &str,
+    stored: &Value,
+    incoming: &Value,
+    require_destination_confirmation: bool,
+) -> Result<Value> {
     let mut config = stored.clone();
     let keys = secret_keys(kind);
     let destinations: &[&str] = match kind {
@@ -570,7 +557,10 @@ fn merge_config(kind: &str, stored: &Value, incoming: &Value) -> Result<Value> {
             v != &stored[*key] && !v.as_str().is_some_and(|s| s.starts_with("__masked__"))
         })
     });
-    if changed {
+    // Source notifyCreateChannel stores a new config without the update-only
+    // destination guard: there is no existing credential to redirect. Masked
+    // values and secret references are still validated below for both paths.
+    if require_destination_confirmation && changed {
         for key in keys {
             if incoming.get(*key).is_none_or(|v| {
                 v.as_str().is_some_and(|s| s.starts_with("__masked__")) || v == &stored[*key]
@@ -686,7 +676,7 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, _c: &Context) -> Result<CommandBat
                 } else {
                     json!({})
                 };
-                d["config"] = merge_config(&kind, &stored, config)?;
+                d["config"] = merge_config(&kind, &stored, config, m != "ui.notifyCreateChannel")?;
             } else if old_kind != kind {
                 d["config"] = json!({});
             }

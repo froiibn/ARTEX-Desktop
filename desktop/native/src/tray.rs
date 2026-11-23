@@ -68,6 +68,13 @@ impl NativeTray {
             stop: None,
         }
     }
+    #[cfg(all(test, windows))]
+    pub(crate) fn dormant_for_test(wake: Arc<dyn Fn() + Send + Sync>) -> Self {
+        // Headless app-pipeline tests must not register OS tray/global handlers.
+        let mut tray = Self::new(wake);
+        tray.started = true;
+        tray
+    }
     pub fn poll(&mut self) -> Vec<TrayAction> {
         if !self.started {
             self.started = true;

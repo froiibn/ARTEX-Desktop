@@ -11,7 +11,7 @@ use crate::{
 use artex_core::{Record, Snapshot};
 use eframe::egui::{self, RichText};
 
-pub(super) fn show(ui: &mut egui::Ui, snapshot: &Snapshot, effects: &mut Vec<Effect>) {
+pub(super) fn show(ui: &mut egui::Ui, snapshot: &Snapshot, epoch: &str, effects: &mut Vec<Effect>) {
     let tasks = snapshot
         .records("tasks")
         .into_iter()
@@ -99,11 +99,11 @@ pub(super) fn show(ui: &mut egui::Ui, snapshot: &Snapshot, effects: &mut Vec<Eff
     ui.add_space(8.0);
     if ui.available_width() >= 760.0 {
         ui.columns(2, |uis| {
-            tasks_panel(&mut uis[0], snapshot, effects);
+            tasks_panel(&mut uis[0], snapshot, epoch, effects);
             approvals_panel(&mut uis[1], snapshot, effects);
         });
     } else {
-        tasks_panel(ui, snapshot, effects);
+        tasks_panel(ui, snapshot, epoch, effects);
         ui.add_space(14.0);
         approvals_panel(ui, snapshot, effects);
     }
@@ -230,7 +230,7 @@ fn state(ui: &mut egui::Ui, status: &str) {
     });
 }
 
-fn tasks_panel(ui: &mut egui::Ui, snapshot: &Snapshot, effects: &mut Vec<Effect>) {
+fn tasks_panel(ui: &mut egui::Ui, snapshot: &Snapshot, epoch: &str, effects: &mut Vec<Effect>) {
     let width = ui.available_width();
     panel(ui).show(ui, |ui| {
         ui.set_width((width - 32.0).max(1.0));
@@ -255,6 +255,9 @@ fn tasks_panel(ui: &mut egui::Ui, snapshot: &Snapshot, effects: &mut Vec<Effect>
                 theme::surface_frame(ui.style()).show(ui, |ui| {
                     ui.set_width((width - 64.0).max(1.0));
                     state(ui, text(&task.data, "status"));
+                    let analysis = crate::analysis_status::project(snapshot, task, epoch);
+                    ui.strong(analysis.headline);
+                    ui.add(egui::Label::new(&analysis.detail).wrap());
                     if ui
                         .add(
                             egui::Button::new(

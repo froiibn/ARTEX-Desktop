@@ -52,7 +52,9 @@ pub fn node(r: &Record, s: &Snapshot, task: &str) -> Value {
     out
 }
 pub fn edge(r: &Record) -> Value {
-    json!({"from":r.data["src_id"],"to":r.data["dst_id"],"rel":r.data["rel"]})
+    // Source EdgeDTO names endpoints src/dst. Keep storage and agent tool
+    // edges unchanged; only these UI projections share this mapper.
+    json!({"src":r.data["src_id"],"dst":r.data["dst_id"],"rel":r.data["rel"]})
 }
 pub fn activity(r: &Record, s: &Snapshot, task: &str, detail: bool) -> Value {
     let d = &r.data;

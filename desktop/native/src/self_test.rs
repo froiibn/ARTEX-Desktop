@@ -547,10 +547,10 @@ pub fn run(path: PathBuf) -> Result<()> {
             &factory_profile,
         )?))
     });
-    let service = Service::spawn(ServiceConfig {
+    let service = Service::spawn_with_profile(ServiceConfig {
         host_factory: Some(factory),
         wake_ui: None,
-    })?;
+    }, &host_profile)?;
     let handle = service.handle();
     action(
         &handle,

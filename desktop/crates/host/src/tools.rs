@@ -20,6 +20,7 @@ pub struct HostRuntime {
     pub(crate) receipt_lock: Mutex<()>,
     pub ptys: crate::pty::PtySupervisor,
     pub traffic: crate::traffic::TrafficManager,
+    pub(crate) mcp_sessions: crate::mcp::SessionPool,
     pub(crate) scoped_runs: Mutex<HashMap<(String, String), HashSet<String>>>,
     pub(crate) quarantined_scopes: Mutex<HashMap<(String, String), String>>,
     pub logs: crate::logs::NativeLogs,
@@ -113,11 +114,13 @@ impl HostRuntime {
             .insert((run.into(), epoch.into()));
         self.executions.stop_run(run, epoch);
         self.ptys.stop_run(run, epoch);
+        self.mcp_sessions.stop(Some(run), epoch);
     }
     pub fn stop_epoch(&self, epoch: &str) {
         self.closed_epochs.lock().unwrap().insert(epoch.into());
         self.executions.stop_epoch(epoch);
         self.ptys.stop_epoch(epoch);
+        self.mcp_sessions.stop(None, epoch);
         self.traffic.stop_epoch(epoch);
     }
     pub fn epoch_active(&self, epoch: &str) -> bool {
@@ -312,6 +315,13 @@ impl HostRuntime {
                     ));
                 }
             }
+            self.executions.background(
+                &execution_id,
+                run,
+                epoch,
+                if name == "Monitor" { "monitor" } else { "bash" },
+                input["description"].as_str().unwrap_or(command),
+            )?;
             let status = self.executions.status(&execution_id, run, epoch)?;
             return Ok(
                 json!({"execution_id":execution_id,"task_id":execution_id,"state":status.state,"output":status.output,"output_path":status.output_path,"first_cursor":status.first_cursor,"last_cursor":status.last_cursor,"truncated":status.truncated,"capture_error":status.capture_error}),
@@ -341,32 +351,16 @@ impl HostRuntime {
                 let mut reader = std::io::BufReader::new(fs::File::open(path).map_err(Error::io)?);
                 let mut output = String::new();
                 for line_number in 1..offset.saturating_add(limit) {
-                    let mut bytes = Vec::new();
-                    let size = reader
-                        .by_ref()
-                        .take(65537)
-                        .read_until(b'\n', &mut bytes)
-                        .map_err(Error::io)?;
-                    if size == 0 {
+                    if self.context_cancelled(context) {
+                        return Err(Error::new("CANCELLED", "Run stopped during file read"));
+                    }
+                    let Some(line) =
+                        read_text_line(&mut reader, || self.context_cancelled(context))?
+                    else {
                         break;
-                    }
-                    if size > 65536 {
-                        return Err(Error::new("SIZE_LIMIT", "File line exceeds 64 KiB"));
-                    }
-                    if bytes.contains(&0) {
-                        return Err(Error::new(
-                            "INVALID_PARAMS",
-                            "Binary file requires blob transfer",
-                        ));
-                    }
-                    let line = std::str::from_utf8(&bytes)
-                        .map_err(|_| Error::new("INVALID_PARAMS", "File is not UTF-8 text"))?;
+                    };
                     if line_number >= offset {
-                        output.push_str(&format!(
-                            "{}\t{}\n",
-                            line_number,
-                            line.trim_end_matches(['\n', '\r'])
-                        ));
+                        output.push_str(&format!("{}\t{}\n", line_number, line));
                         if output.len() > 65536 {
                             return Err(Error::new(
                                 "SIZE_LIMIT",
@@ -390,6 +384,14 @@ impl HostRuntime {
                 Ok(json!({"entries":entries}))
             }
             "Write" => {
+                // norma runWrite creates parents too. Resolve again after creation
+                // so the capability's existing-link checks still guard installation.
+                fs::create_dir_all(
+                    path.parent()
+                        .ok_or_else(|| Error::new("PERMISSION_DENIED", "No parent path"))?,
+                )
+                .map_err(Error::io)?;
+                let path = self.capabilities.resolve(cap, relative, true)?;
                 atomic_write(&path, text(input, "content")?.as_bytes())?;
                 Ok(json!({"written":true}))
             }
@@ -443,6 +445,75 @@ impl HostRuntime {
             )),
         }
     }
+}
+// norma runRead truncates selected long lines rather than making subsequent
+// offsets unreachable. Scan a line with bounded buffers (including skipped
+// lines), validate its text, and retain only the original 2000-byte preview.
+fn read_text_line(
+    reader: &mut impl BufRead,
+    cancelled: impl Fn() -> bool,
+) -> Result<Option<String>> {
+    const MAX_LINE_BYTES: usize = 2000;
+    let mut prefix = Vec::new();
+    let mut pending = Vec::new();
+    let mut total = 0usize;
+    let mut last = [0u8; 2];
+    loop {
+        if cancelled() {
+            return Err(Error::new("CANCELLED", "Run stopped during file read"));
+        }
+        let mut segment = Vec::new();
+        let size = reader
+            .by_ref()
+            .take(8192)
+            .read_until(b'\n', &mut segment)
+            .map_err(Error::io)?;
+        if size == 0 {
+            break;
+        }
+        if segment.contains(&0) {
+            return Err(Error::new(
+                "INVALID_PARAMS",
+                "Binary file requires blob transfer",
+            ));
+        }
+        prefix.extend(
+            segment
+                .iter()
+                .take((MAX_LINE_BYTES + 4).saturating_sub(prefix.len())),
+        );
+        total += size;
+        for byte in &segment {
+            last = [last[1], *byte];
+        }
+        pending.extend_from_slice(&segment);
+        match std::str::from_utf8(&pending) {
+            Ok(_) => pending.clear(),
+            Err(error) if error.error_len().is_none() => {
+                pending.drain(..error.valid_up_to());
+            }
+            Err(_) => return Err(Error::new("INVALID_PARAMS", "File is not UTF-8 text")),
+        }
+        if segment.last() == Some(&b'\n') {
+            break;
+        }
+    }
+    if !pending.is_empty() {
+        return Err(Error::new("INVALID_PARAMS", "File is not UTF-8 text"));
+    }
+    if total == 0 {
+        return Ok(None);
+    }
+    let length = total - usize::from(last[1] == b'\n') - usize::from(last == [b'\r', b'\n']);
+    let mut end = length.min(MAX_LINE_BYTES);
+    if let Err(error) = std::str::from_utf8(&prefix[..end]) {
+        end = error.valid_up_to();
+    }
+    let mut line = std::str::from_utf8(&prefix[..end]).unwrap().to_owned();
+    if length > MAX_LINE_BYTES {
+        line.push_str("… [line truncated]");
+    }
+    Ok(Some(line))
 }
 fn text<'a>(v: &'a Value, key: &str) -> Result<&'a str> {
     v.get(key)
@@ -544,6 +615,21 @@ unsafe extern "system" {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn read_long_line_scanning_observes_cancellation_between_bounded_reads() {
+        let mut reader = std::io::Cursor::new(vec![b'x'; 70000]);
+        let checks = std::cell::Cell::new(0);
+        let error = read_text_line(&mut reader, || {
+            checks.set(checks.get() + 1);
+            checks.get() == 3
+        })
+        .unwrap_err();
+        assert_eq!(error.code, "CANCELLED");
+        assert!(
+            reader.position() < 70000,
+            "cancelled scanning must stop before reading the whole long line"
+        );
+    }
     #[test]
     fn selected_file_copy_is_atomic_and_preserves_target_on_limit_failure() {
         let dir = tempfile::tempdir().unwrap();

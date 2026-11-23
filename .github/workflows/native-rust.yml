@@ -39,9 +39,11 @@ jobs:
       - name: Native service tests
         if: runner.os != 'Windows'
         run: cargo test --locked --manifest-path desktop/native-core/Cargo.toml
-      - name: Durable storage and path-security regression
+      # Provider/controller result-contract regressions live in the shared
+      # workspace too; storage-only checks would miss them on macOS/Arch.
+      - name: Shared workspace regression
         if: runner.os != 'Windows'
-        run: cargo test --locked --manifest-path desktop/Cargo.toml -p artex-store
+        run: cargo test --locked --manifest-path desktop/Cargo.toml --workspace
       - name: Native host tests
         if: runner.os != 'Windows'
         run: cargo test --locked --manifest-path desktop/Cargo.toml -p artex-host --no-default-features
@@ -57,10 +59,12 @@ jobs:
         shell: pwsh
         run: desktop/native/scripts/verify.ps1 -FullRegression -SoftwareOpenGlDirectory (Join-Path $env:RUNNER_TEMP 'artex-ci-opengl')
       - name: Build native application
-        run: cargo build --locked --release --manifest-path desktop/native/Cargo.toml
+        run: |
+          python -m unittest discover -s desktop/native/scripts -p test_build.py -v
+          python desktop/native/scripts/build.py
       - name: Actual service and LLM fixture (macOS)
         if: runner.os == 'macOS'
-        run: desktop/target/release/artex-native --self-test --workspace "$RUNNER_TEMP/artex-native-$GITHUB_RUN_ID"
+        run: desktop/dist/ARTEX-macOS/artex-native --self-test --workspace "$RUNNER_TEMP/artex-native-$GITHUB_RUN_ID"
       - name: Isolated window failure logs (Windows)
         if: failure() && runner.os == 'Windows'
         shell: pwsh
@@ -87,16 +91,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Native service and UI tests
         run: |
+          python -m unittest discover -s desktop/native/scripts -p test_build.py -v
           cargo test --locked --manifest-path desktop/native-core/Cargo.toml
-          cargo test --locked --manifest-path desktop/Cargo.toml -p artex-store
+          cargo test --locked --manifest-path desktop/Cargo.toml --workspace
           cargo test --locked --manifest-path desktop/Cargo.toml -p artex-host --no-default-features
           cargo test --locked --manifest-path desktop/native/Cargo.toml
       - name: Arch application build and actual native window
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
-          cargo build --locked --release --manifest-path desktop/native/Cargo.toml
-          desktop/target/release/artex-native --self-test --workspace /tmp/artex-native-fixture
-          xvfb-run -a desktop/target/release/artex-native --workspace /tmp/artex-native-fixture --profile /tmp/artex-native-profile --smoke --screenshot /tmp/artex-native-window.png
+          python desktop/native/scripts/build.py
+          desktop/dist/ARTEX-Linux/artex-native --self-test --workspace /tmp/artex-native-fixture
+          xvfb-run -a desktop/dist/ARTEX-Linux/artex-native --workspace /tmp/artex-native-fixture --profile /tmp/artex-native-profile --smoke --screenshot /tmp/artex-native-window.png
           test -s /tmp/artex-native-window.png
           python -c 'import json; r=json.load(open("/tmp/artex-native-profile/native-window-smoke.json")); assert r["orderly_shutdown"] and r["screenshot_received"] and not r["error"]'

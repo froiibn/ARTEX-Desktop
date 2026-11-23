@@ -9549,35 +9549,74 @@
       "additionalProperties": false
     },
     "Project": {
-      "type": "object",
-      "properties": {
-        "format": {
-          "const": "artex-workspace"
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "format": {
+              "const": "artex-workspace"
+            },
+            "format_version": {
+              "const": 1
+            },
+            "workspace_id": {
+              "type": "string",
+              "pattern": "^workspace_[0-9a-f]{32}$"
+            },
+            "name": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          },
+          "required": [
+            "format",
+            "format_version",
+            "workspace_id",
+            "name",
+            "created_at"
+          ],
+          "additionalProperties": false
         },
-        "format_version": {
-          "const": 1
-        },
-        "workspace_id": {
-          "type": "string",
-          "pattern": "^workspace_[0-9a-f]{32}$"
-        },
-        "name": {
-          "type": "string"
-        },
-        "created_at": {
-          "type": "string",
-          "format": "date-time",
-          "pattern": "Z$"
+        {
+          "type": "object",
+          "properties": {
+            "format": {
+              "const": "artex-workspace"
+            },
+            "format_version": {
+              "const": 2
+            },
+            "workspace_id": {
+              "type": "string",
+              "pattern": "^workspace_[0-9a-f]{32}$"
+            },
+            "name": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "storage": {
+              "const": "sqlite-v1"
+            }
+          },
+          "required": [
+            "format",
+            "format_version",
+            "workspace_id",
+            "name",
+            "created_at",
+            "storage"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "format",
-        "format_version",
-        "workspace_id",
-        "name",
-        "created_at"
-      ],
-      "additionalProperties": false
+      ]
     },
     "Manifest": {
       "type": "object",

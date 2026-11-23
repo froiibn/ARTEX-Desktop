@@ -1,0 +1,175 @@
+{
+  "as_of_local_date": "2026-10-20",
+  "scope": "Local source and retained verification evidence review; no product execution or GUI automation in this reporting task",
+  "head": "a585764e9a88f5b3e4f39c5a787e4080b6b4c610",
+  "source_worktree_dirty": true,
+  "build_info": {
+    "kind": "local-development-build",
+    "distribution_ready": false,
+    "profile": "release",
+    "platform": "win32",
+    "built_utc": "2026-10-19T16:04:24.584318+00:00",
+    "executable": "ARTEX.exe",
+    "executable_sha256": "6dbf74ce19351de584e0f70654385f295f2a21ec63edee5015f3dfceeb00b395",
+    "source_commit": "a585764e9a88f5b3e4f39c5a787e4080b6b4c610",
+    "source_worktree_dirty": true
+  },
+  "executable_bytes": 59427102,
+  "executable_sha256": "6dbf74ce19351de584e0f70654385f295f2a21ec63edee5015f3dfceeb00b395",
+  "matrix": {
+    "counts_by_kind": {
+      "route": {
+        "출처 대응": 259,
+        "대응 확인 필요": 2
+      },
+      "ui": {
+        "미검증": 132,
+        "부분 경로 통과": 121,
+        "변경점 통과": 1,
+        "E2E 통과": 4
+      },
+      "tool": {
+        "부분 경로 통과": 76,
+        "E2E 통과": 5
+      }
+    },
+    "required": 339,
+    "qualified": 10,
+    "remaining": 329,
+    "qualified_rows": [
+      {
+        "id": "UI008",
+        "function": "ui.createTask",
+        "status": "변경점 통과"
+      },
+      {
+        "id": "UI030",
+        "function": "ui.restoreTaskArchive",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "UI150",
+        "function": "ui.deleteLLMProfile",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "UI163",
+        "function": "ui.createConversation",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "UI173",
+        "function": "ui.sendConversationMessage",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "TOOL64",
+        "function": "Read",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "TOOL73",
+        "function": "WebFetch",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "TOOL76",
+        "function": "shell_list",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "TOOL77",
+        "function": "shell_open",
+        "status": "E2E 통과"
+      },
+      {
+        "id": "TOOL78",
+        "function": "shell_read",
+        "status": "E2E 통과"
+      }
+    ]
+  },
+  "current_source_matches_feedback_native_inputs": {
+    "matched": 27,
+    "total": 27,
+    "mismatches": []
+  },
+  "current_source_matches_opening_fix_store_inputs": {
+    "desktop/crates/store/src/lib.rs": true,
+    "desktop/crates/store/src/replay_logs.rs": true
+  },
+  "verification_records": {
+    "historical_full_suite": {
+      "path": "desktop/native/test-results/c023d6f2bce54d7f95b50afd1193856e/verification-result.json",
+      "sha256": "5ffc93d6c8f2147090e40e743309171be7892d1d2993c218f99c2b631d787818",
+      "recorded_passed": true
+    },
+    "workspace_open_fix": {
+      "path": "../.organization/open-loading-20261017-ccdf3f96/result.json",
+      "sha256": "914822fda0fe792325ad2e5fe14f0552452f351fc339d38fbf619b0a1529b583",
+      "recorded_passed": null
+    },
+    "feedback_fix": {
+      "path": "../.organization/test-feedback-20261020-88707427d15149a69640e32b7855cc36/result.json",
+      "sha256": "a85e2952776dd16dbd3a4056001ed80bfc5024601035544ecf234739ca4ff202",
+      "recorded_passed": true
+    },
+    "standard_build": {
+      "path": "../.organization/build-output-20261020-7c56baeba95c40b49192fd09bd28ae21/result.json",
+      "sha256": "ebdc5243e2ad340fd68fafd54281279957ee3de0844ce3f986937b6863e159e6",
+      "recorded_passed": true
+    }
+  },
+  "matrix_checks": [
+    {
+      "command": "node scripts/validate-e2e-feature-matrix.mjs",
+      "exit_code": 0,
+      "stdout": "{\n  \"inventory_valid\": true,\n  \"routes\": 261,\n  \"ui_operations\": 258,\n  \"tools\": 81,\n  \"qualification_entries\": 339,\n  \"e2e_complete\": 10,\n  \"remaining\": 329,\n  \"note\": \"Overlapping inventories; counts are not independent features. Static/partial coverage is not E2E.\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": "node scripts/validate-e2e-feature-matrix.mjs --require-complete",
+      "exit_code": 1,
+      "stdout": "{\n  \"inventory_valid\": true,\n  \"routes\": 261,\n  \"ui_operations\": 258,\n  \"tools\": 81,\n  \"qualification_entries\": 339,\n  \"e2e_complete\": 10,\n  \"remaining\": 329,\n  \"note\": \"Overlapping inventories; counts are not independent features. Static/partial coverage is not E2E.\"\n}\n",
+      "stderr": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: E2E qualification incomplete; do not declare full original-feature parity\n\n329 !== 0\n\n    at file:///D:/Artex/ARTEX-Desktop/scripts/validate-e2e-feature-matrix.mjs:71:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 329,\n  expected: 0,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v24.14.1\n"
+    }
+  ],
+  "retained_feedback_evidence_hash_checks": {
+    "native-ui-final-v4.log": true,
+    "feedback-v3.log": true,
+    "release-build-v1.log": true,
+    "release-self-test-v2-result.json": true,
+    "feature-matrix-final.log": true,
+    "final-native-input-hashes.json": true
+  },
+  "historical_log_totals": {
+    "native-core.log": {
+      "passed": 27,
+      "failed": 0,
+      "scope": "historical frozen source; overlapping suites must not be added as unique test totals"
+    },
+    "native-host.log": {
+      "passed": 77,
+      "failed": 0,
+      "scope": "historical frozen source; overlapping suites must not be added as unique test totals"
+    },
+    "native-ui.log": {
+      "passed": 129,
+      "failed": 0,
+      "scope": "historical frozen source; overlapping suites must not be added as unique test totals"
+    },
+    "shared-regression.log": {
+      "passed": 410,
+      "failed": 0,
+      "scope": "historical frozen source; overlapping suites must not be added as unique test totals"
+    }
+  },
+  "document_review": {
+    "checked_local_report_links": 43,
+    "missing_links": [],
+    "product_source_changed": false,
+    "default_git_diff_check_exit_code": 2,
+    "crlf_aware_git_diff_check_exit_code": 0,
+    "whitespace_note": "Default check reports existing CRLF lines in workflow/generator; unchanged by this reporting task. CRLF-aware check passes without product source/config edits."
+  }
+}

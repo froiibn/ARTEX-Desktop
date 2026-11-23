@@ -1861,6 +1861,18 @@ impl NativeApp {
                 }
             });
         }
+        if let Some(notice) = self.analysis_notice.clone() {
+            egui::TopBottomPanel::top("analysis_state_notification")
+                .frame(theme::toolbar_frame(&ctx.style()))
+                .show(ctx, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add(egui::Label::new(RichText::new(notice).strong()).wrap());
+                        if ui.small_button("알림 닫기").clicked() {
+                            self.analysis_notice = None;
+                        }
+                    });
+                });
+        }
         egui::TopBottomPanel::bottom("desktop_status_bar")
             .frame(theme::status_frame(&ctx.style()))
             .show(ctx, |ui| {
@@ -1876,8 +1888,13 @@ impl NativeApp {
                     ui.small(phase);
                     if let Some(view) = &view {
                         ui.separator();
-                        ui.small(format!("저장 세대 {}", view.generation.commit_seq))
-                            .on_hover_text("로컬 저장 기록 번호입니다. 복구·설정·기록 저장도 포함하며 에이전트 실행 횟수가 아닙니다.");
+                        let generation_label = if view.workspace.read_only {
+                            "읽기 전용 조회".into()
+                        } else {
+                            format!("저장 세대 {}", view.generation.commit_seq)
+                        };
+                        ui.small(generation_label)
+                            .on_hover_text("쓰기 공간의 번호는 로컬 저장 기록 번호입니다. 읽기 전용 조회에는 공통 설정의 메모리 투영이 포함될 수 있으며 디스크를 변경하지 않습니다. 에이전트 실행 횟수가 아닙니다.");
                         let active = view.generation.snapshot.records("agent_runs").iter().filter(|run| {
                             run.data["engine_epoch"] == view.workspace.scope.engine_epoch
                                 && matches!(run.data["state"].as_str(), Some("queued" | "running" | "waiting"))
@@ -1965,6 +1982,9 @@ impl NativeApp {
                 let scroll = drawer_scroll(ui, self.drawer.tab, |ui| match self.drawer.tab {
                     DrawerTab::Activity => {
                         if let Some(error) = &self.error {
+                            if let Some(operation) = error.details["native_operation"].as_str() {
+                                ui.small(format!("오류 발생 작업: {operation}"));
+                            }
                             ui.add(
                                 egui::Label::new(
                                     RichText::new(format!("{}: {}", error.code, error.message))

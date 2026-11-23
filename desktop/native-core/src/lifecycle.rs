@@ -473,8 +473,7 @@ mod tests {
             );
             thread::sleep(Duration::from_millis(5));
         }
-        let manifests = path.join("store/manifests");
-        let before = std::fs::read_dir(&manifests).unwrap().count();
+        assert!(path.join("store/workspace.sqlite3").is_file());
         let power = NativePower::start(handle.clone(), Arc::new(|| {}));
         let end = Instant::now() + Duration::from_secs(5);
         while !power.available() {
@@ -507,7 +506,8 @@ mod tests {
             thread::sleep(Duration::from_millis(5));
         }
         assert_eq!(handle.status().phase, ServicePhase::Closed);
-        assert!(std::fs::read_dir(manifests).unwrap().count() > before);
+        let saved = artex_store::Store::open_read_only(&path).unwrap();
+        assert!(saved.recovery()["valid_generations"].as_array().unwrap().iter().any(|g|g.as_str().unwrap().parse::<u64>().unwrap()>0));
         drop(power);
         let shutdown = handle.try_submit(NativeAction::Shutdown).unwrap();
         let end = Instant::now() + Duration::from_secs(10);

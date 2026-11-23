@@ -28,6 +28,8 @@ tray-icon = { version = "=0.26.0", default-features = false, features = ["ksni"]
 zbus = { version = "4.4", default-features = false, features = ["blocking", "async-io"] }
 
 [dev-dependencies]
+# Local fixture gateways intercept synthetic secrets without touching OS credentials.
+artex-runtime = { path = "../crates/runtime" }
 tempfile = "3"
 
 [profile.release]

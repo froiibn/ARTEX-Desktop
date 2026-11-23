@@ -24,10 +24,13 @@ $rustVersion = (& rustc -vV) -join "`n"
 if ($rustVersion -notmatch '(?m)^host: x86_64-pc-windows-gnu$') { throw 'This package recipe requires the Windows GNU Rust toolchain; other targets need their own runtime provenance' }
 $target = 'x86_64-pc-windows-gnu'
 $runId = [guid]::NewGuid().ToString('N')
-$artifactRoot = Join-Path $repoRoot "desktop/dist/native-windows-$Version-$runId"
+$artifactRoot = Join-Path $repoRoot "desktop/dist/packages/$Version"
+# Each release version has one location. Never overwrite a verified package or
+# leave indistinguishable UUID-named distribution directories after rebuilding.
+if (Test-Path -LiteralPath $artifactRoot) { throw "Package output already exists: $artifactRoot" }
 $package = Join-Path $artifactRoot 'ARTEX-Windows-x64'
 $audit = Join-Path $artifactRoot 'audit'
-if (-not $LicenseCache) { $LicenseCache = Join-Path $repoRoot 'desktop/dist/license-cache' }
+if (-not $LicenseCache) { $LicenseCache = Join-Path $repoRoot 'desktop/target/license-cache' }
 New-Item -ItemType Directory -Path $package,$audit | Out-Null
 function ConvertTo-NativeArgument([string]$value) {
     $escaped = [regex]::Replace($value, '(\\*)"', { param($match) $match.Groups[1].Value + $match.Groups[1].Value + '\"' })

@@ -75,7 +75,7 @@ fn plaintext_credentials_never_reach_journal_and_unavailable_keys_disable_config
         s.snapshot().records("notification_channels")[0].data["enabled"],
         false
     );
-    for file in fs::read_dir(p.join("store/journal")).unwrap() {
+    for file in fs::read_dir(p.join("store")).unwrap().filter(|entry|entry.as_ref().is_ok_and(|e|e.file_type().is_ok_and(|t|t.is_file()))) {
         let bytes = fs::read(file.unwrap().path()).unwrap();
         assert!(!String::from_utf8_lossy(&bytes).contains("TOP_SECRET_LITERAL"));
     }
@@ -162,6 +162,10 @@ fn portable_archive_restores_fk_blob_and_source_is_preserved() {
     export_archive(&source, &archive).unwrap();
     let before = fs::read(&archive).unwrap();
     let export = read_archive(&archive, "portable/source").unwrap();
+    assert_eq!(
+        serde_json::to_value(&export).unwrap(),
+        serde_json::to_value(read_archive_bytes(&before, "portable/source").unwrap()).unwrap()
+    );
     let dest = t.path().join("restored");
     let report = migrate_new(
         &dest,
@@ -203,6 +207,13 @@ fn legacy_archive_versions_streamed_tables_and_traffic_import() {
         let encoder = tar.into_inner().unwrap();
         encoder.finish().unwrap();
         let x = read_archive(&path, "archive/source").unwrap();
+        assert_eq!(
+            serde_json::to_value(&x).unwrap(),
+            serde_json::to_value(
+                read_archive_bytes(&fs::read(&path).unwrap(), "archive/source").unwrap()
+            )
+            .unwrap()
+        );
         assert_eq!(x.tables["companies"].len(), 1);
         assert_eq!(
             x.tables["exchange_bodies"][0]["req_body"]["legacy_bytes"],
@@ -223,10 +234,22 @@ fn archive_rejects_traversal_duplicate_case_and_checksum_corruption() {
         let p = t.path().join(name);
         zip_fixture(&p, entries);
         assert_eq!(read_archive(&p, "source").unwrap_err().code, "PARSE_ERROR");
+        assert_eq!(
+            read_archive_bytes(&fs::read(&p).unwrap(), "source")
+                .unwrap_err()
+                .code,
+            "PARSE_ERROR"
+        );
     }
     let p = t.path().join("checksum");
     zip_fixture(&p,vec![("manifest.json",serde_json::to_vec(&json!({"format":"artex-task/1","tables":[{"collection":"companies","path":"companies.ndjson","sha256":"wrong","count":0}],"blobs":[]})).unwrap()),("companies.ndjson",vec![])]);
     assert_eq!(read_archive(&p, "source").unwrap_err().code, "PARSE_ERROR");
+    assert_eq!(
+        read_archive_bytes(&fs::read(&p).unwrap(), "source")
+            .unwrap_err()
+            .code,
+        "PARSE_ERROR"
+    );
 }
 #[test]
 fn new_workspace_is_only_published_after_all_bounded_fk_batches() {

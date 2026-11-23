@@ -50,3 +50,19 @@
 정리 전 소스와 이력은 commit `7d09ee2a0bd8a24ed50d1ceba3570afd9433f443`, 로컬 Git bundle·소스 ZIP에 보존했다. 이전 앱/웹의 로컬 산출물도 저장소 밖 `.organization`의 복구 백업으로 이동했다. 기존 사용자 작업 공간·키·배포 산출물을 재귀 삭제하지 않았다.
 
 필요한 파일만 과거 commit에서 꺼내 별도로 검토할 수 있다. 현재 변경을 되돌리는 전체 reset이나 과거 저장 파일을 사용자 작업 공간에 덮어쓰는 방식은 사용하지 않는다. Git 이력을 다시 쓰지 않았으므로 작업 트리에서 제거한 과거 코드와 관련 라이선스의 공개 범위는 여전히 별도 검토 대상이다.
+
+## 2026-10-20 빌드 산출물 정리
+
+이번 사용자 요청은 위의 과거 코드 정리와 구분되는 **로컬 실행 파일·패키지·중복 캐시 제거 및 출력 위치 통일**이다. 현재 소스의 미커밋 변경은 유지했다. 최신 실행 파일은 `desktop/dist/ARTEX-Windows/ARTEX.exe`에 보존했으며 SHA-256은 `6dbf74ce19351de584e0f70654385f295f2a21ec63edee5015f3dfceeb00b395`다. 기존 사용자 작업 공간·앱 프로필·키·원본 소스·Git/소스 백업·원격 릴리스는 변경하지 않았다.
+
+일반 빌드는 `python desktop/native/scripts/build.py` 하나로 통일했다. 실제 Cargo가 보고한 실행 파일만 표준 경로에 완성된 바이트로 교체하고, 출처 고지·LICENSE와 실제 실행 파일 해시 및 로컬 개발 빌드 구분을 함께 둔다. 실패한 컴파일이나 누락된 산출물을 오래된 캐시 복사로 성공 처리하지 않는다. 잠긴 실행 파일은 삭제하지 않고 실패한다. `.cargo/config.toml` 및 명시적 `--target-dir`로 중간 파일을 `desktop/target`에 모으므로 중첩 workspace에서도 별도의 native/target을 만들지 않는다. macOS/Linux의 같은 명령 출력은 각각 `desktop/dist/ARTEX-macOS/artex-native`, `desktop/dist/ARTEX-Linux/artex-native`다.
+
+정식 패키지는 `desktop/dist/packages/<version>`, 릴리스 조립은 `desktop/dist/releases/v<version>`으로 고정하고 기존 버전을 덮어쓰지 않는다. 패키징의 전체 검증·커밋·고지·링커·실행·아이콘 조건은 유지했다. 일반 로컬 빌드가 정식 배포 검증을 통과했다는 뜻은 아니다. CI의 정상 빌드/실행 경로도 표준 스크립트와 dist 경로로 연결했으나 원격 CI나 macOS/Arch 빌드를 이번에 실행하지는 않았다.
+
+삭제 전 모든 절대 경로가 `D:\Artex` 내부의 명시된 생성 폴더인지 확인하고, reparse point·작업 공간 marker·실행 중 프로그램과의 충돌을 검사했다. 옛 checkout의 생성 폴더가 Git 추적 소스가 아님도 확인했다. `builds`, `rebuilt/desktop/dist`·`target`, `public-candidate/desktop/dist`·`target`, 중복 `desktop/native/target`, 이전 앱 복구 보관본의 target 등 7개 생성 폴더와 개별 산출물 44개를 삭제했다. 총 98,457개 파일, 논리 파일 크기 합계 72,902,837,138바이트이며 실제 디스크 회수량 측정값은 아니다.
+
+구버전 배포의 package/BUILD-INFO/감사 로그·이미지·링커 증거 등 123개 기록은 삭제 전에 바이트를 대조하여 저장소 밖 근거 폴더의 `retained-records`에 보존했다. 과거 보고서의 삭제된 실행 파일 경로는 현재 실행 위치로 안내하지 않는다. 실행 파일이 아닌 소스 ZIP·Git bundle·라이선스 원본 자료와 기존 시험 workspace는 유지했다. 현재 공통 Cargo 캐시는 빌드 중간 자료이며 별도 사용자 실행 위치가 아니다.
+
+검증은 빌드 실패/오래된 캐시 거부/같은 경로 재빌드/잠긴 출력 보존의 실제 파일 시험 4개, 저장소 루트와 하위 폴더에서의 표준 빌드, 세 Cargo manifest의 동일 cache 경로, Python/PowerShell 구문, Git ignore·공백 검사를 포함한다. 표준 위치의 실행 파일 자체에서 비대화형 통합 self-test가 성공했고 기존 81개 도구·로컬 공급자·CAS·저장/재열기·정리·정상 종료 근거를 확인했다. 앱 Rust 소스나 의존성은 변경하지 않아 UI/도구 전체 회귀를 새로 실행하지 않았다. 사용자가 중단한 데스크톱 화면 자동 조작은 재개하지 않았다.
+
+정리·검증 근거는 `.organization/current-build-output.txt`가 가리키는 저장소 밖 폴더의 `artifact-inventory-before.json`, `cleanup-plan-execute.json`, `cleanup-result.json`, `standard-self-test-result.json`, `result.json`에 기록한다. 실행 파일·생성 기록을 Git에 추가하거나 커밋·푸시·릴리스 업로드를 하지는 않았다.

@@ -2,10 +2,7 @@
 use crate::traffic_ui::{BlobReader, body_bytes};
 use crate::*;
 use base64::{Engine, engine::general_purpose::STANDARD};
-use std::{
-    collections::BTreeMap,
-    io::{Cursor, Write},
-};
+use std::io::{Cursor, Write};
 fn readable(v: &Value, key: &str, fallback: &str) -> String {
     let s = text(v, key).trim();
     if s.is_empty() {
@@ -183,8 +180,8 @@ fn download(bytes: &[u8], mime: &str, ext: &str) -> Value {
 pub fn export(p: &Value, s: &Snapshot, reader: &BlobReader) -> Result<Value> {
     let opts = &p["opts"];
     let mut rows = match required(opts, "scope")? {
-        "all" => findings_ui::filtered(s, &json!({}))?,
-        "filtered" => findings_ui::filtered(s, &opts["filters"])?,
+        "all" => findings_ui::filtered_with_reader(s, &json!({}), reader)?,
+        "filtered" => findings_ui::filtered_with_reader(s, &opts["filters"], reader)?,
         "selected" => {
             let selected = ids(opts, "ids").into_iter().collect::<BTreeSet<_>>();
             if selected.is_empty() {
@@ -328,56 +325,7 @@ pub fn export(p: &Value, s: &Snapshot, reader: &BlobReader) -> Result<Value> {
 pub fn task_report(p: &Value, s: &Snapshot, reader: &BlobReader) -> Result<Value> {
     let task = exploration_ui::resolve_task(s, p)?
         .ok_or_else(|| Error::new("NOT_FOUND", "No active task"))?;
-    let exp = text(&task.data, "exploration_id");
-    let mut findings = s
-        .records("exploration_nodes")
-        .into_iter()
-        .filter(|r| r.data["exploration_id"] == exp && r.data["kind"] == "finding")
-        .take(1000)
-        .collect::<Vec<_>>();
-    findings.sort_by_key(|r| {
-        std::cmp::Reverse(findings_ui::severity(text(&r.data["payload"], "severity")))
-    });
-    let mut counts = BTreeMap::<String, usize>::new();
-    for a in s.records("assets") {
-        *counts.entry(text(&a.data, "type").into()).or_default() += 1;
-    }
-    let mut report = format!(
-        "# Penetration Test Report — {}\n\n- **Mission objectives**: {}\n- **Generation time**: {}\n\n## Summary\n\n- Confirmed findings: **{}**\n- Assets: {}\n\n## Findings\n\n",
-        readable(&task.data, "description", "Unnamed task"),
-        readable(&task.data, "goal", "Unspecified"),
-        timestamp(&artex_core::now()),
-        findings.len(),
-        counts
-            .into_iter()
-            .map(|(k, n)| format!("{k} {n}"))
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-    if findings.is_empty() {
-        report.push_str("_No vulnerabilities confirmed._\n");
-    }
-    for (i, f) in findings.iter().enumerate() {
-        let d = &f.data["payload"];
-        report.push_str(&format!(
-            "### {}. [{}] {}\n\n{}\n\n",
-            i + 1,
-            readable(d, "severity", "info").to_uppercase(),
-            readable(d, "name", &readable(d, "vulnclass", "Uncategorized")),
-            text(d, "summary")
-        ));
-        let evidence = &d["evidence"];
-        let poc = if evidence.is_object() && evidence.get("poc").is_some() {
-            body_bytes(&evidence["poc"], reader)?
-        } else {
-            body_bytes(evidence, reader)?
-        };
-        if !poc.is_empty() {
-            report.push_str(&format!(
-                "**PoC / evidence:**\n\n```\n{}\n```\n\n",
-                String::from_utf8_lossy(&poc)
-            ));
-        }
-    }
-    Ok(artex_core::body(&report))
+    Ok(artex_core::body(&crate::assessment_report::render(
+        task, s, reader,
+    )?))
 }

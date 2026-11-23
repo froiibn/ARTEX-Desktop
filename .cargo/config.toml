@@ -1,0 +1,4 @@
+[build]
+# All three Cargo manifests share one cache; runnable local builds are published
+# by desktop/native/scripts/build.py to the documented desktop/dist location.
+target-dir = "desktop/target"

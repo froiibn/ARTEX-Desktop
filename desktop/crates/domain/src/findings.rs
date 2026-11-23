@@ -1,5 +1,45 @@
 use crate::*;
 
+// Preserve RecordFindingRetestResult's source byte limits and retry semantics.
+const RETEST_SUMMARY_LIMIT: usize = 16_000;
+const RETEST_EVIDENCE_LIMIT: usize = 128_000;
+
+fn matches_evidence(stored: &Value, evidence: &str) -> bool {
+    use sha2::{Digest, Sha256};
+    stored["text"].as_str() == Some(evidence)
+        || (stored["blob"]["length"] == evidence.len().to_string()
+            && stored["blob"]["sha256"] == format!("{:x}", Sha256::digest(evidence.as_bytes())))
+}
+
+/// Seal staged verdicts with the owning run's terminal transaction. A verdict
+/// alone is not a successful retest: cancellation/failure must take precedence.
+pub(crate) fn finish_retests(
+    b: &mut Planner<'_>, conversation: &str, status: &str, reason: &str,
+) -> Result<()> {
+    for rt in b.state.records("finding_retests") {
+        if rt.data["conversation_id"] != conversation
+            || !matches!(text(&rt.data, "status"), "pending" | "running")
+        {
+            continue;
+        }
+        let mut data = rt.data.clone();
+        let completed = status == "completed" && !text(&data, "verdict").is_empty();
+        data["status"] = json!(if completed { "completed" } else if status == "cancelled" { "stopped" } else { "failed" });
+        data["finished_at"] = json!(artex_core::now());
+        data["error"] = json!(if status == "completed" && !completed {
+            "Retest ended without recording a verdict"
+        } else if completed { "" } else { reason });
+        b.put("finding_retests", &rt.header.id, data.clone());
+        if completed && data["verdict"] == "fixed" {
+            let id = required(&data, "finding_id")?;
+            let mut finding = record(b.state, "findings", id)?.data.clone();
+            finding["status"] = json!("fixed");
+            b.put("findings", id, finding);
+        }
+    }
+    Ok(())
+}
+
 fn authorize_finding(s: &Snapshot, c: &Context, f: &Value, write: bool) -> Result<()> {
     if let Some(task) = c.task_id.as_deref() {
         let owner = text(f, "task_id");
@@ -355,28 +395,33 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
         }
         "record_finding_retest_result" => {
             let rt = retest(s, c)?;
-            if !matches!(text(&rt.data, "status"), "pending" | "running") {
-                return Err(Error::new("INVALID_PARAMS", "retest is terminal"));
+            if text(&rt.data, "status") != "running" {
+                return Err(Error::new("INVALID_PARAMS", "retest is not running"));
             }
             let verdict = required(p, "verdict")?;
             if !["reproduced", "fixed", "inconclusive"].contains(&verdict) {
                 return Err(Error::new("INVALID_PARAMS", "invalid verdict"));
             }
-            let summary = required(p, "summary")?;
-            let evidence = required(p, "evidence")?;
+            let summary = required(p, "summary")?.trim();
+            let evidence = required(p, "evidence")?.trim();
+            if summary.is_empty() || evidence.is_empty() {
+                return Err(Error::new("INVALID_PARAMS", "Retest summary and evidence cannot be blank"));
+            }
+            if summary.len() > RETEST_SUMMARY_LIMIT || evidence.len() > RETEST_EVIDENCE_LIMIT {
+                return Err(Error::new("SIZE_LIMIT", "Retest summary or evidence exceeds the source byte limit"));
+            }
+            if !text(&rt.data, "verdict").is_empty()
+                && (rt.data["verdict"] != verdict || rt.data["summary"] != summary
+                    || !matches_evidence(&rt.data["evidence"], evidence))
+            {
+                return Err(Error::new("VERSION_CONFLICT", "A different retest conclusion is already staged"));
+            }
             let mut d = rt.data.clone();
             d["verdict"] = json!(verdict);
             d["summary"] = json!(summary);
             d["evidence"] = artex_core::body(evidence);
-            d["status"] = json!("completed");
-            d["finished_at"] = json!(artex_core::now());
-            b.put("finding_retests", &rt.header.id, d.clone());
-            if verdict == "fixed" {
-                let fid = text(&d, "finding_id");
-                let mut finding = record(s, "findings", fid)?.data.clone();
-                finding["status"] = json!("fixed");
-                b.put("findings", fid, finding);
-            }
+            // Stage only. finish_run atomically seals the verdict and triage.
+            b.put("finding_retests", &rt.header.id, d);
             Ok(b.done(json!({"saved":true,"retest_id":rt.header.id,"verdict":verdict})))
         }
         _ => Err(Error::new("METHOD_NOT_FOUND", m)),

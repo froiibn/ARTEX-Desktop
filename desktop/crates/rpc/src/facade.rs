@@ -289,6 +289,15 @@ pub fn query_with_blob_reader(
     if artex_domain::traffic_ui::QUERIES.contains(&method) {
         return artex_domain::traffic_ui::query(method, p, s, c, reader);
     }
+    if artex_domain::findings_ui::QUERIES.contains(&method) {
+        return artex_domain::findings_ui::query_with_reader(method, p, s, c, reader);
+    }
+    if artex_domain::asset_graph_ui::QUERIES.contains(&method) {
+        return artex_domain::asset_graph_ui::query_with_reader(method, p, s, reader);
+    }
+    if artex_domain::auxiliary_ui::QUERIES.contains(&method) {
+        return artex_domain::auxiliary_ui::query_with_reader(method, p, s, c, reader);
+    }
     artex_domain::transcript_ui::project_with_snapshot(method, query(method, p, s, c)?, s, reader)
 }
 pub fn query(method: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<Value> {

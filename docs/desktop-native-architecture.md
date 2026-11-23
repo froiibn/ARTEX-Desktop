@@ -1,3 +1,7 @@
+# 현재 저장 구조
+
+2026-11-24부터 영속 저장은 [SQLite v2](sqlite-storage.md)로 전환한다. 아래 문서의 자체 저널·스냅샷 엔진 설명은 기존 v1 형식과 이전 입력에 적용한다. Rust 객체 모델과 불변 UI 조회 세대는 유지한다.
+
 # Rust 통합형 데스크톱 앱 설계
 
 2026-10-14 소스 폴더 정리 후 프로젝트 루트는 `D:/Artex/rebuilt`이며 현재 UI·서비스는 `desktop/native`, `desktop/native-core`에 있다. 기존 Go/Web와 Git 이력은 별도 `D:/Artex/original`에 보존했다. 일반 Cargo 빌드는 고정 계약·리소스를 사용해 원본 폴더에 의존하지 않는다. 원본 비교 도구만 `scripts/source-layout.mjs`와 `ARTEX_ORIGINAL_ROOT` 설정으로 원본을 읽는다. 과거 검증 결과의 절대 경로는 당시 증거로 유지한다.

@@ -34,6 +34,7 @@ fn state(call: ToolCall) -> RunState {
         failed_profiles: Default::default(),
         idle_nudges: 0,
         intent_failures: 0,
+        output_recoveries: 0,
         retry_at: None,
     }
 }

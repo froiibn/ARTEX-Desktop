@@ -9,16 +9,22 @@ pub enum StreamDelta {
 }
 const MAX_EVENT: usize = MAX_RESPONSE as usize;
 const DELTA: usize = 16 * 1024;
+// Preserve the existing SSE block-index bound for both indexed provider formats.
+const MAX_BLOCK_INDEX: usize = 1024;
 pub(super) struct SseDecoder {
     format: String,
     line: Vec<u8>,
     data: String,
+    event_name: String,
     open: Value,
     anth: Value,
     blocks: BTreeMap<usize, Value>,
     arguments: BTreeMap<usize, String>,
+    responses: BTreeMap<usize, Value>,
     completed: Option<Value>,
     committed: bool,
+    visible_text: String,
+    content_observed: bool,
 }
 impl SseDecoder {
     pub fn new(format: &str) -> Self {
@@ -26,16 +32,27 @@ impl SseDecoder {
             format: format.into(),
             line: vec![],
             data: String::new(),
+            event_name: String::new(),
             open: json!({"choices":[{"message":{"content":"","reasoning_content":"","tool_calls":[]},"finish_reason":null}],"usage":{}}),
             anth: json!({"content":[],"usage":{},"stop_reason":null}),
             blocks: BTreeMap::new(),
             arguments: BTreeMap::new(),
+            responses: BTreeMap::new(),
             completed: None,
             committed: false,
+            visible_text: String::new(),
+            content_observed: false,
         }
     }
     pub fn committed(&self) -> bool {
         self.committed
+    }
+    /// Text actually observed before failure, never thinking or invented output.
+    pub fn observed_text(&self) -> &str {
+        &self.visible_text
+    }
+    pub fn content_observed(&self) -> bool {
+        self.content_observed
     }
     /// Only provider-reported counters are returned; unknown partial usage is
     /// absent rather than an invented zero-token completion.
@@ -47,7 +64,7 @@ impl SseDecoder {
         };
         raw.as_object()
             .filter(|o| !o.is_empty())
-            .map(|_| usage(raw))
+            .map(|_| usage(&self.format, raw))
     }
     pub fn feed(
         &mut self,
@@ -74,6 +91,14 @@ impl SseDecoder {
         if line.is_empty() {
             return self.event(emit);
         }
+        if let Some(name) = line.strip_prefix("event:") {
+            // Source parseResponsesFrame uses the SSE name as authoritative,
+            // and falls back to JSON.type only for unnamed data events.
+            if !self.data.is_empty() {
+                self.event(emit)?;
+            }
+            self.event_name = name.strip_prefix(' ').unwrap_or(name).to_owned();
+        }
         if let Some(data) = line.strip_prefix("data:") {
             // Compatible servers sometimes omit the blank separator between JSON events.
             if !self.data.is_empty()
@@ -93,34 +118,84 @@ impl SseDecoder {
     }
     fn event(&mut self, emit: &mut dyn FnMut(StreamDelta) -> Result<()>) -> Result<()> {
         let data = std::mem::take(&mut self.data);
+        let name = std::mem::take(&mut self.event_name);
         if data.is_empty() || data.trim() == "[DONE]" {
             return Ok(());
         }
-        let e: Value = serde_json::from_str(&data)
+        let mut e: Value = serde_json::from_str(&data)
             .map_err(|_| Error::new("EXTERNAL_FAILURE", "Malformed SSE event JSON"))?;
+        if !e.is_object() {
+            return Err(Error::new(
+                "EXTERNAL_FAILURE",
+                "SSE event is not a JSON object",
+            ));
+        }
+        if self.format == "openai-responses" && !name.is_empty() {
+            e["type"] = json!(name);
+        }
         if e["error"].is_object() || e["type"] == "error" {
             return Err(provider_error(200, &serde_json::to_vec(&e)?, ""));
         }
         match self.format.as_str() {
             "openai-responses" => match e["type"].as_str() {
                 Some("response.output_text.delta") => {
-                    self.progress(false, e["delta"].as_str().unwrap_or(""), emit)?
+                    let piece = e["delta"].as_str().unwrap_or("");
+                    append(
+                        &mut self.response_item(&e, "message", false)?["content"][0]["text"],
+                        piece,
+                    );
+                    self.progress(false, piece, emit)?
                 }
                 Some("response.reasoning_text.delta" | "response.reasoning_summary_text.delta") => {
-                    self.progress(true, e["delta"].as_str().unwrap_or(""), emit)?
+                    let piece = e["delta"].as_str().unwrap_or("");
+                    append(
+                        &mut self.response_item(&e, "reasoning", false)?["summary"][0]["text"],
+                        piece,
+                    );
+                    self.progress(true, piece, emit)?
                 }
-                Some("response.function_call_arguments.delta") => self.committed = true,
+                Some("response.function_call_arguments.delta") => {
+                    self.committed = true;
+                    self.content_observed = true;
+                    append(
+                        &mut self.response_item(&e, "function_call", false)?["arguments"],
+                        e["delta"].as_str().unwrap_or(""),
+                    );
+                }
                 Some("response.output_item.added") if e["item"]["type"] == "function_call" => {
-                    self.committed = true
+                    self.committed = true;
+                    self.content_observed = true;
+                    *self.response_item(&e, "function_call", true)? = e["item"].clone();
                 }
                 Some("response.completed") => {
                     self.committed = true;
                     self.completed = Some(e["response"].clone());
-                    emit(StreamDelta::Usage(usage(&e["response"]["usage"])))?;
+                    emit(StreamDelta::Usage(usage(
+                        &self.format,
+                        &e["response"]["usage"],
+                    )))?;
                 }
                 Some("response.failed" | "response.incomplete" | "response.cancelled") => {
                     self.committed = true;
                     self.completed = Some(e["response"].clone());
+                    // A terminal snapshot can include text omitted from deltas.
+                    // Replace with that observed snapshot, never append/duplicate
+                    // it; when absent keep the real deltas already received.
+                    let terminal_text = observed_json_text(&self.format, &e["response"]);
+                    if !terminal_text.is_empty() {
+                        self.visible_text = terminal_text;
+                    }
+                    // Match source Responses streaming: an output cap terminates
+                    // generation normally and decode retains max_tokens + usage.
+                    if e["type"] == "response.incomplete"
+                        && e["response"]["incomplete_details"]["reason"] == "max_output_tokens"
+                    {
+                        emit(StreamDelta::Usage(usage(
+                            &self.format,
+                            &e["response"]["usage"],
+                        )))?;
+                        return Ok(());
+                    }
                     return Err(Error::new(
                         "EXTERNAL_FAILURE",
                         "Responses stream did not complete",
@@ -131,13 +206,14 @@ impl SseDecoder {
             "anthropic" => match e["type"].as_str() {
                 Some("message_start") => {
                     self.anth["usage"] = e["message"]["usage"].clone();
-                    emit(StreamDelta::Usage(usage(&self.anth["usage"])))?;
+                    emit(StreamDelta::Usage(usage(&self.format, &self.anth["usage"])))?;
                 }
                 Some("content_block_start") => {
                     let i = index(&e)?;
                     let block = e["content_block"].clone();
                     if block["type"] == "tool_use" {
                         self.committed = true;
+                        self.content_observed = true;
                     }
                     if block["type"] == "text" {
                         self.progress(false, block["text"].as_str().unwrap_or(""), emit)?;
@@ -162,6 +238,7 @@ impl SseDecoder {
                     if target == "input" {
                         if !piece.is_empty() {
                             self.committed = true;
+                            self.content_observed = true;
                         }
                         self.arguments.entry(i).or_default().push_str(piece);
                     } else {
@@ -182,18 +259,26 @@ impl SseDecoder {
                             self.anth["usage"][k] = v.clone();
                         }
                     }
-                    emit(StreamDelta::Usage(usage(&self.anth["usage"])))?;
+                    emit(StreamDelta::Usage(usage(&self.format, &self.anth["usage"])))?;
                 }
                 _ => {}
             },
             _ => {
                 let c = &e["choices"][0];
                 let d = &c["delta"];
-                for (field, thinking) in [("content", false), ("reasoning_content", true)] {
-                    if let Some(piece) = d[field].as_str() {
-                        self.progress(thinking, piece, emit)?;
-                        append(&mut self.open["choices"][0]["message"][field], piece);
-                    }
+                if let Some(piece) = d["content"].as_str() {
+                    self.progress(false, piece, emit)?;
+                    append(&mut self.open["choices"][0]["message"]["content"], piece);
+                }
+                // Normalize each delta with the same alias priority as JSON;
+                // the accumulated neutral turn retains it for tool replay.
+                let piece = reasoning_text(d);
+                if !piece.is_empty() {
+                    self.progress(true, piece, emit)?;
+                    append(
+                        &mut self.open["choices"][0]["message"]["reasoning_content"],
+                        piece,
+                    );
                 }
                 if !c["finish_reason"].is_null() {
                     self.committed = true;
@@ -201,10 +286,11 @@ impl SseDecoder {
                 }
                 if e["usage"].is_object() {
                     self.open["usage"] = e["usage"].clone();
-                    emit(StreamDelta::Usage(usage(&e["usage"])))?;
+                    emit(StreamDelta::Usage(usage(&self.format, &e["usage"])))?;
                 }
                 for b in d["tool_calls"].as_array().into_iter().flatten() {
                     self.committed = true;
+                    self.content_observed = true;
                     let i = index(b)?;
                     let target = self.blocks.entry(i).or_insert_with(
                         || json!({"id":"","type":"function","function":{"name":"","arguments":""}}),
@@ -222,6 +308,46 @@ impl SseDecoder {
         }
         Ok(())
     }
+    fn response_item(&mut self, event: &Value, kind: &str, new: bool) -> Result<&mut Value> {
+        let index = if let Some(index) = event["output_index"].as_u64() {
+            usize::try_from(index).unwrap_or(usize::MAX)
+        } else if !new
+            && let Some((index, _)) = self.responses.iter().rev().find(|(_, b)| b["type"] == kind)
+        {
+            *index
+        } else {
+            self.responses.keys().next_back().map_or(0, |i| i + 1)
+        };
+        if index > MAX_BLOCK_INDEX {
+            return Err(Error::new(
+                "SIZE_LIMIT",
+                "Responses output index exceeds 1024",
+            ));
+        }
+        if kind == "function_call" && !new && !self.responses.contains_key(&index) {
+            return Err(Error::new(
+                "EXTERNAL_FAILURE",
+                "Tool arguments have no matching Responses item",
+            ));
+        }
+        if self
+            .responses
+            .get(&index)
+            .is_some_and(|item| item["type"] != kind)
+        {
+            return Err(Error::new(
+                "EXTERNAL_FAILURE",
+                "Responses output item changed type",
+            ));
+        }
+        Ok(self.responses.entry(index).or_insert_with(|| match kind {
+            "message" => json!({"type":"message","content":[{"type":"output_text","text":""}]}),
+            "reasoning" => {
+                json!({"type":"reasoning","summary":[{"type":"summary_text","text":""}]})
+            }
+            _ => json!({"type":"function_call","arguments":""}),
+        }))
+    }
     fn progress(
         &mut self,
         thinking: bool,
@@ -232,6 +358,12 @@ impl SseDecoder {
             return Ok(());
         }
         self.committed = true;
+        self.content_observed = true;
+        // The non-streaming side-question API discards progress callbacks. Keep
+        // real visible deltas so an interrupted answer can still be persisted.
+        if !thinking {
+            self.visible_text.push_str(piece);
+        }
         let mut rest = piece;
         while !rest.is_empty() {
             let mut end = rest.len().min(DELTA);
@@ -258,15 +390,23 @@ impl SseDecoder {
     pub fn finish(&mut self, emit: &mut dyn FnMut(StreamDelta) -> Result<()>) -> Result<Turn> {
         self.flush_pending(emit)?;
         if self.format == "openai-responses" {
-            return decode(
-                &self.format,
-                self.completed.take().ok_or_else(|| {
-                    Error::new(
-                        "EXTERNAL_FAILURE",
-                        "Missing terminal response; automatic replay is forbidden",
-                    )
-                })?,
-            );
+            let mut response = self.completed.clone().ok_or_else(|| {
+                Error::new(
+                    "EXTERNAL_FAILURE",
+                    "Missing terminal response; automatic replay is forbidden",
+                )
+            })?;
+            // Source Accumulator owns observed delta content. Gateways may omit
+            // the duplicate terminal output snapshot (or send []); reconstruct
+            // only from real deltas/items, and validate complete tool JSON before
+            // returning any executable calls. A supplied full snapshot wins.
+            if response["output"]
+                .as_array()
+                .is_none_or(|items| items.is_empty())
+            {
+                response["output"] = json!(self.responses.values().collect::<Vec<_>>());
+            }
+            return decode(&self.format, response);
         }
         if self.format == "anthropic" {
             for (i, arg) in std::mem::take(&mut self.arguments) {
@@ -303,7 +443,7 @@ impl SseDecoder {
 }
 fn index(e: &Value) -> Result<usize> {
     let i = e["index"].as_u64().unwrap_or(0);
-    if i > 1024 {
+    if i > MAX_BLOCK_INDEX as u64 {
         return Err(Error::new("SIZE_LIMIT", "SSE block index exceeds 1024"));
     }
     Ok(i as usize)
@@ -320,6 +460,31 @@ fn append(value: &mut Value, piece: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn named_multiline_responses_events_survive_every_utf8_chunk_boundary() {
+        let wire = "event: response.output_text.delta\r\ndata: {\"delta\":\r\ndata: \"한글🙂\"}\r\n\r\nevent: response.completed\r\ndata: {\"response\":{\"status\":\"completed\",\"output\":[],\"usage\":{\"input_tokens\":9,\"output_tokens\":4}}}\r\n\r\n";
+        let mut decoder = SseDecoder::new("openai-responses");
+        let mut seen = String::new();
+        for byte in wire.as_bytes() {
+            decoder
+                .feed(&[*byte], &mut |delta| {
+                    if let StreamDelta::Text(text) = delta {
+                        seen.push_str(&text);
+                    }
+                    Ok(())
+                })
+                .unwrap();
+        }
+        let turn = decoder.finish(&mut |_| Ok(())).unwrap();
+        assert_eq!(seen, "한글🙂");
+        assert_eq!(turn.text, "한글🙂");
+        assert_eq!(turn.usage["input_tokens"], 9);
+        let mut malformed = SseDecoder::new("openai-responses");
+        let error = malformed
+            .feed(b"event: response.completed\ndata: []\n\n", &mut |_| Ok(()))
+            .unwrap_err();
+        assert_eq!(error.code, "EXTERNAL_FAILURE");
+    }
     fn event(value: Value) -> String {
         format!("data: {value}\r\n\r\n")
     }
@@ -427,7 +592,7 @@ mod tests {
             )
             .unwrap();
         assert!(decoder.finish(&mut |_| Ok(())).is_err());
-        assert_eq!(decoder.observed_usage().unwrap()["input_tokens"], 17);
+        assert_eq!(decoder.observed_usage().unwrap()["input_tokens"], 20);
         assert_eq!(decoder.observed_usage().unwrap()["output_tokens"], 5);
         assert_eq!(decoder.observed_usage().unwrap()["cache_read_tokens"], 3);
         let mut decoder = SseDecoder::new("openai-responses");

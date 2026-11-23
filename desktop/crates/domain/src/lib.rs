@@ -7,6 +7,7 @@ pub mod bootstrap;
 pub mod tool_projection;
 pub use bootstrap::bootstrap_plan;
 pub mod approval_bypass;
+pub mod assessment_report;
 pub mod auxiliary_ui;
 pub mod configuration;
 pub mod configuration_ui;

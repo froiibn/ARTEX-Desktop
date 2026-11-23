@@ -246,6 +246,19 @@ pub fn scope_asset_ids(s: &Snapshot, scope: &str) -> BTreeSet<String> {
         .collect()
 }
 pub fn query(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<Value> {
+    query_with_reader(m, p, s, &|_| {
+        Err(Error::new(
+            "FEATURE_DISABLED",
+            "Finding search requires a blob reader",
+        ))
+    })
+}
+pub fn query_with_reader(
+    m: &str,
+    p: &Value,
+    s: &Snapshot,
+    reader: &crate::traffic_ui::BlobReader,
+) -> Result<Value> {
     match m {
         "ui.taskCoverage" | "ui.taskCoverageGraph" => {
             let task = required(p, "id")?;
@@ -278,7 +291,7 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<Value> {
             if let Some(q) = q.as_object_mut() {
                 q.remove("assetScope");
             }
-            let findings = findings_ui::filtered(s, &q)?;
+            let findings = findings_ui::filtered_with_reader(s, &q, reader)?;
             let selected = findings
                 .iter()
                 .flat_map(|r| ids(&r.data, "asset_ids"))

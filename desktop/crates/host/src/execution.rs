@@ -54,6 +54,8 @@ struct State {
     file: std::fs::File,
     io_done: Arc<AtomicUsize>,
     io_expected: usize,
+    background: Option<(String, String)>,
+    notified: bool,
 }
 struct Execution {
     request: ExecutionRequest,
@@ -168,6 +170,8 @@ impl ExecutionSupervisor {
             file: tempfile::tempfile().map_err(Error::io)?,
             io_done: Arc::new(AtomicUsize::new(0)),
             io_expected,
+            background: None,
+            notified: false,
         }));
         let stop = Arc::new(AtomicBool::new(false));
         let force = Arc::new(AtomicBool::new(false));
@@ -341,6 +345,8 @@ impl ExecutionSupervisor {
             file: output_file,
             io_done: io_done.clone(),
             io_expected,
+            background: None,
+            notified: false,
         }));
         let mut drains = vec![];
         for reader in [
@@ -476,6 +482,56 @@ impl ExecutionSupervisor {
             },
         );
         Ok(status)
+    }
+    /// Mark only commands returned to the model as background work. Recording
+    /// this after launch also handles commands that completed before admission.
+    pub fn background(
+        &self,
+        id: &str,
+        run: &str,
+        epoch: &str,
+        kind: &str,
+        description: &str,
+    ) -> Result<()> {
+        let map = self.executions.lock().unwrap();
+        let execution = map
+            .get(id)
+            .ok_or_else(|| Error::new("NOT_FOUND", "Execution not found"))?;
+        check_owner(execution, run, epoch)?;
+        execution
+            .state
+            .lock()
+            .unwrap()
+            .background
+            .get_or_insert_with(|| (kind.into(), description.into()));
+        Ok(())
+    }
+    /// Like norma Manager.DrainNotifications, completion is delivered once to
+    /// its owning run; output remains in the scoped artifact, not in the event.
+    pub fn drain_events(&self, run: &str, epoch: &str) -> Vec<serde_json::Value> {
+        let map = self.executions.lock().unwrap();
+        let mut events = Vec::new();
+        for execution in map
+            .values()
+            .filter(|e| e.request.run_id == run && e.request.engine_epoch == epoch)
+        {
+            let mut state = execution.state.lock().unwrap();
+            if state.notified
+                || !matches!(
+                    state.status.state.as_str(),
+                    "completed" | "failed" | "timeout" | "interrupted"
+                )
+            {
+                continue;
+            }
+            let Some((kind, description)) = state.background.clone() else {
+                continue;
+            };
+            state.notified = true;
+            events.push(serde_json::json!({"kind":"task_notification","task_id":state.status.execution_id,"task_type":kind,"status":state.status.state,"exit_code":state.status.exit_code,"output_path":state.status.output_path,"summary":description}));
+        }
+        events.sort_by(|a, b| a["task_id"].as_str().cmp(&b["task_id"].as_str()));
+        events
     }
     pub fn status(&self, id: &str, run: &str, epoch: &str) -> Result<ExecutionStatus> {
         let map = self.executions.lock().unwrap();

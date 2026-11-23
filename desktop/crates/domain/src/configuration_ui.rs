@@ -275,6 +275,7 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<Value> {
             &keyed(s, "agents", required(p, "key")?)?.header.id,
         )),
         "ui.tools" => {
+            let calls = crate::auxiliary_ui::tool_usage_counts(s)?;
             let mut rows = s.records("tools");
             rows.sort_by(|a, b| text(&a.data, "key").cmp(text(&b.data, "key")));
             Ok(json!(
@@ -285,12 +286,7 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<Value> {
                         if d["exec"].is_null() {
                             d.as_object_mut().unwrap().remove("exec");
                         }
-                        d["calls"] = json!(
-                            s.records("tool_usage")
-                                .iter()
-                                .filter(|u| u.data["tool_key"] == r.data["key"])
-                                .count()
-                        );
+                        d["calls"] = json!(calls.get(text(&r.data, "key")).copied().unwrap_or(0));
                         d
                     })
                     .collect::<Vec<_>>()
@@ -906,6 +902,18 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
                 ));
             }
             b.delete("llm_profiles", id);
+            // The judge binding is serialized in settings rather than a real FK.
+            // Clear it in the same CAS plan so a deleted shared model cannot
+            // remain selected by the approval policy in this or another space.
+            for setting in s.records("settings").into_iter().filter(|r|
+                r.data["key"] == "llm_judge_profile_id" && r.data["value"] == id)
+            {
+                let mut data = setting.data.clone();
+                data["value"] = json!("");
+                b.put("settings", &setting.header.id, data);
+            }
+            // Source returns the deleted identity, not a count. The native wire
+            // override preserves the profile ID instead of inventing a number.
             json!({"deleted":id})
         }
         "ui.activateLLMProfile" => {

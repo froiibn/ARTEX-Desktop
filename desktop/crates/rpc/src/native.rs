@@ -2,6 +2,10 @@
 use super::*;
 use std::{path::Path, sync::Arc, time::Duration};
 
+/// Native report pages use the existing Blob chunk capacity. The view and
+/// service share this policy without increasing the ordinary full-Body limit.
+pub const NATIVE_BODY_PAGE_BYTES: usize = MAX_CHUNK;
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NativeTicket(pub String);
 impl NativeTicket {
@@ -123,6 +127,12 @@ pub enum NativeQuery {
     },
     Body {
         body: Value,
+    },
+    /// A bounded UTF-8 view of a complete, generation-owned Body. Offsets are
+    /// source byte boundaries; the full source is verified before returning.
+    BodyPage {
+        body: Value,
+        offset: u64,
     },
 }
 #[derive(Clone, Debug)]
@@ -332,6 +342,124 @@ impl NativeStageSource {
     }
 }
 
+/// Retain one page plus UTF-8 lookahead while the existing source reader hashes
+/// every byte. Stopping the copy early would skip integrity failures after the
+/// visible page; retaining every byte would defeat bounded native reads.
+struct BodyPageWindow {
+    offset: u64,
+    position: u64,
+    bytes: Vec<u8>,
+}
+impl BodyPageWindow {
+    // UTF-8 characters contain at most four bytes. Three lookahead bytes finish
+    // a character whose leading byte is the last byte of an ordinary page.
+    const LOOKAHEAD: usize = 3;
+    fn new(offset: u64) -> Self {
+        Self {
+            offset,
+            position: 0,
+            bytes: Vec::with_capacity(NATIVE_BODY_PAGE_BYTES + Self::LOOKAHEAD),
+        }
+    }
+    fn reply(self, total: u64) -> Result<Value> {
+        if self.offset > total {
+            return Err(Error::new(
+                "INVALID_PARAMS",
+                "Body page offset exceeds source length",
+            ));
+        }
+        if self.position != total {
+            return Err(Error::new(
+                "CORRUPT_STORE",
+                "Body page copy length disagrees with verified source",
+            ));
+        }
+        if self.offset == total {
+            return Ok(json!({"text":"","next_offset":null,"total_length":total.to_string()}));
+        }
+        if self.offset > 0 && self.bytes.first().is_some_and(|b| b & 0xc0 == 0x80) {
+            return Err(Error::new(
+                "INVALID_PARAMS",
+                "Body page offset is not a UTF-8 boundary",
+            ));
+        }
+        let capacity = self.bytes.len().min(NATIVE_BODY_PAGE_BYTES);
+        let page = &self.bytes[..capacity];
+        let text = match std::str::from_utf8(page) {
+            Ok(text) => text,
+            Err(error) if error.error_len().is_none() => {
+                // Only a valid character split by the page boundary may be
+                // deferred. A truncated/corrupt final character remains an error.
+                let valid = error.valid_up_to();
+                let lead = self.bytes[valid];
+                let width = if lead & 0xe0 == 0xc0 {
+                    2
+                } else if lead & 0xf0 == 0xe0 {
+                    3
+                } else if lead & 0xf8 == 0xf0 {
+                    4
+                } else {
+                    0
+                };
+                if width == 0
+                    || valid + width > self.bytes.len()
+                    || std::str::from_utf8(&self.bytes[valid..valid + width]).is_err()
+                {
+                    return Err(Error::new(
+                        "CORRUPT_STORE",
+                        "Body page source contains invalid UTF-8",
+                    ));
+                }
+                std::str::from_utf8(&self.bytes[..valid]).expect("validated UTF-8 prefix")
+            }
+            Err(_) => {
+                return Err(Error::new(
+                    "CORRUPT_STORE",
+                    "Body page source contains invalid UTF-8",
+                ));
+            }
+        };
+        let next = self.offset + text.len() as u64;
+        if next == self.offset {
+            return Err(Error::new(
+                "CORRUPT_STORE",
+                "Body page made no UTF-8 progress",
+            ));
+        }
+        Ok(
+            json!({"text":text,"next_offset":if next<total {json!(next.to_string())} else {Value::Null},"total_length":total.to_string()}),
+        )
+    }
+}
+impl std::io::Write for BodyPageWindow {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let end = self
+            .position
+            .checked_add(bytes.len() as u64)
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Body source length overflow",
+                )
+            })?;
+        let window_end = self
+            .offset
+            .saturating_add((NATIVE_BODY_PAGE_BYTES + Self::LOOKAHEAD) as u64);
+        let begin = self.position.max(self.offset);
+        let take_end = end.min(window_end);
+        if begin < take_end {
+            self.bytes.extend_from_slice(
+                &bytes[(begin - self.position) as usize..(take_end - self.position) as usize],
+            );
+        }
+        self.position = end;
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 impl Router {
     pub fn native_stage_source(
         &self,
@@ -375,11 +503,7 @@ impl Router {
         if let Some(bytes) = self.ephemeral_blob_bytes(&reference, 512 * 1024 * 1024)? {
             return Ok(NativeStageSource::Ephemeral(bytes));
         }
-        let view = self
-            .store
-            .as_ref()
-            .ok_or_else(|| Error::new("WORKSPACE_NOT_OPEN", "Workspace is closed"))?
-            .read_view();
+        let view = self.configuration_body_store(&reference)?.read_view();
         Ok(NativeStageSource::Blob { view, reference })
     }
     /// Switch output to Rust values before any deferred operation is started.
@@ -470,6 +594,7 @@ impl Router {
         command: Option<&NativeCommand>,
     ) -> Result<NativeDispatch> {
         self.check_native_scope(scope)?;
+        self.recover_shared_settings()?;
         let timeout = command
             .map(|c| c.timeout)
             .unwrap_or(Duration::from_secs(30));
@@ -547,6 +672,9 @@ impl Router {
         if self.shutting_down {
             return Err(Error::new("CANCELLED", "Application has shut down"));
         }
+        self.recover_shared_settings()?;
+        self.shared_settings_view = None;
+        self.shared_settings_root = None;
         if options.read_only && matches!(options.mode, OpenMode::Create { .. }) {
             return Err(Error::new(
                 "INVALID_PARAMS",
@@ -581,16 +709,30 @@ impl Router {
             timeout_ms: 30000,
             params: params.clone(),
         };
-        let value = match self.dispatch_request(&request, None) {
-            Ok(value) => value,
+        match self.dispatch_request(&request, None) {
+            Ok(_) => {},
             Err(error) => {
                 self.capabilities.remove(&directory);
                 return Err(error);
             }
         };
         let root = root.canonicalize().map_err(Error::io)?;
+        self.shared_settings_root = Some(root.clone());
+        self.project_shared_settings()?;
+        // Projection may commit new configuration. Report the final persisted
+        // state, not the sequence returned before importing common settings.
+        let mut value = self.store.as_ref().unwrap().info();
+        value["read_only"] = json!(self.effective_read_only());
         let work_root = root.join("work");
-        let resources_root = root.join("resources");
+        let resources_root = if let Some(profile) = self.native_shared_profile() {
+            let resources = profile.join("shared-resources");
+            std::fs::create_dir_all(&resources).map_err(Error::io)?;
+            let resources = resources.canonicalize().map_err(Error::io)?;
+            if !resources.starts_with(profile) || resources == profile {
+                return Err(Error::new("PERMISSION_DENIED", "Shared resource directory escaped the app profile"));
+            }
+            resources
+        } else { root.join("resources") };
         let read_only = self.effective_read_only();
         if !read_only {
             std::fs::create_dir_all(&work_root)
@@ -657,6 +799,17 @@ impl Router {
                 read_versions: vec![],
             }));
         }
+        if let NativeQuery::BodyPage { body, offset } = &query {
+            let source = self.native_stage_source(scope, body.clone())?;
+            let mut window = BodyPageWindow::new(*offset);
+            let total = source.copy_to(&mut window)?;
+            return Ok(NativeDispatch::Complete(NativeReply {
+                value: window.reply(total)?,
+                scope: self.native_scope(),
+                read_seq: self.snapshot()?.commit_seq,
+                read_versions: vec![],
+            }));
+        }
         let (method, params) = match query {
             NativeQuery::WorkspaceInfo => ("workspace.info".into(), json!({})),
             NativeQuery::Feature { method, params } => {
@@ -699,6 +852,7 @@ impl Router {
                 json!({"sha256":sha256,"offset":offset.to_string(),"length":length}),
             ),
             NativeQuery::Body { .. } => unreachable!("Body handled above"),
+            NativeQuery::BodyPage { .. } => unreachable!("BodyPage handled above"),
             NativeQuery::AgentMonitor { .. }
             | NativeQuery::DeletionPreview { .. }
             | NativeQuery::ConversationTrash => unreachable!("Native lifecycle handled above"),
@@ -875,6 +1029,9 @@ fn normalize_body_fields(
     Ok(())
 }
 
+#[cfg(test)]
+#[path = "native_report_body_tests.rs"]
+mod report_body_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

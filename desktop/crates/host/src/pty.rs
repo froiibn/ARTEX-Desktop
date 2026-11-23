@@ -6,7 +6,7 @@ use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     fs,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -30,7 +30,11 @@ struct State {
     group_empty: bool,
 }
 struct Session {
+    // A model-facing ShellId and the invocation's ExecutionId have different
+    // contracts. Keep their association for retries and cleanup inspections.
     id: String,
+    execution_id: String,
+    directory: PathBuf,
     fingerprint: String,
     command: String,
     mode: String,
@@ -81,7 +85,7 @@ impl PtySupervisor {
         self.sessions.lock().unwrap().values().filter(|s|s.run==run&&s.epoch==epoch).map(|s|{
             let st=s.state.lock().unwrap();let drained=s.drain_done.load(Ordering::SeqCst)&&s.writer_done.load(Ordering::SeqCst)&&s.terminal_closed.load(Ordering::SeqCst);
             let known=st.leader_exited&&st.group_empty;let descendants=cfg!(windows)&&known;let confirmed=descendants&&drained;
-            json!({"execution_id":s.id,"kind":"pty","executable":"terminal","pid":s.pid,"state":st.state,"exit_code":st.exit,"stop_requested":s.stop.load(Ordering::SeqCst),"force_requested":s.force.load(Ordering::SeqCst),"leader_exited":st.leader_exited,"output_drained":drained,"known_cleanup_confirmed":known,"descendant_cleanup_confirmed":descendants,"cleanup_confirmed":confirmed,"cleanup_state":if confirmed{"confirmed"}else if st.state=="running"{"running"}else{"unconfirmed"},"containment":if cfg!(windows){"windows_job"}else{"unix_process_group_unconfined"},"first_cursor":st.total.saturating_sub(st.bytes.len()as u64).to_string(),"last_cursor":st.total.to_string(),"output_path":s.output_path,"cleanup_error":st.error})
+            json!({"execution_id":s.execution_id,"kind":"pty","executable":"terminal","pid":s.pid,"state":st.state,"exit_code":st.exit,"stop_requested":s.stop.load(Ordering::SeqCst),"force_requested":s.force.load(Ordering::SeqCst),"leader_exited":st.leader_exited,"output_drained":drained,"known_cleanup_confirmed":known,"descendant_cleanup_confirmed":descendants,"cleanup_confirmed":confirmed,"cleanup_state":if confirmed{"confirmed"}else if st.state=="running"{"running"}else{"unconfirmed"},"containment":if cfg!(windows){"windows_job"}else{"unix_process_group_unconfined"},"first_cursor":st.total.saturating_sub(st.bytes.len()as u64).to_string(),"last_cursor":st.total.to_string(),"output_path":s.output_path,"cleanup_error":st.error})
         }).collect()
     }
     pub fn force_stop_run(&self, run: &str, epoch: &str) {
@@ -286,17 +290,29 @@ impl PtySupervisor {
         }
         use sha2::{Digest, Sha256};
         let fingerprint = hex::encode(Sha256::digest(serde_json::to_vec(&semantic)?));
+        // Check the current capability even on command retry. A revoked token,
+        // or a token rebound to another directory, cannot reuse an old session.
+        let cap = text(input, "directory_capability")?;
+        let cwd = registry.root(cap)?;
+        let execution_id = match input.get("execution_id") {
+            Some(value) => value
+                .as_str()
+                .filter(|id| artex_core::valid_id(id, "exec"))
+                .ok_or_else(|| Error::new("INVALID_PARAMS", "Typed PTY execution ID required"))?
+                .to_owned(),
+            None => new_id("exec"),
+        };
         let mut sessions = self.sessions.lock().unwrap();
-        if sessions.len() >= 1024 || sessions.values().filter(|s| session_active(s)).count() >= 64 {
-            return Err(Error::new("BUSY", "PTY session capacity reached"));
-        }
-        let id = input["execution_id"]
-            .as_str()
-            .map(str::to_owned)
-            .unwrap_or_else(|| new_id("sess"));
-        if let Some(old) = sessions.get(&id) {
+        // norma openSession exposes an independent session identifier. Locate
+        // retries by their execution receipt, not by rewriting one ID's prefix;
+        // model shell APIs use ShellId while monitors/kill keep ExecutionId.
+        if let Some(old) = sessions
+            .values()
+            .find(|session| session.execution_id == execution_id)
+        {
             if old.run != run
                 || old.epoch != epoch
+                || old.directory != cwd
                 || old.command != command
                 || old.mode != mode
                 || old.rows != rows
@@ -309,16 +325,22 @@ impl PtySupervisor {
                 ));
             }
             return Ok(
-                json!({"session_id":id,"state":old.state.lock().unwrap().state,"output_path":old.output_path}),
+                json!({"session_id":old.id,"state":old.state.lock().unwrap().state,"output_path":old.output_path}),
             );
         }
-        let cap = text(input, "directory_capability")?;
-        let cwd = registry.root(cap)?;
+        if sessions.len() >= 1024 || sessions.values().filter(|s| session_active(s)).count() >= 64 {
+            return Err(Error::new("BUSY", "PTY session capacity reached"));
+        }
+        let id = new_id("shell");
         let dir = registry.resolve(cap, ".artex-host/pty", true)?;
         fs::create_dir_all(&dir).map_err(Error::io)?;
         let filename = format!(
             "{}.log",
-            hex::encode(Sha256::digest(format!("{epoch}\0{id}").as_bytes()))
+            // Keep the existing epoch+execution spool identity. A retry must
+            // reuse the retained session rather than create another output file.
+            hex::encode(Sha256::digest(
+                format!("{epoch}\0{execution_id}").as_bytes()
+            ))
         );
         let output = registry.resolve(cap, &format!(".artex-host/pty/{filename}"), true)?;
         let file = fs::OpenOptions::new()
@@ -343,6 +365,8 @@ impl PtySupervisor {
         let (tx, rx) = mpsc::sync_channel::<Vec<u8>>(16);
         let s = Arc::new(Session {
             id: id.clone(),
+            execution_id,
+            directory: cwd.clone(),
             fingerprint,
             command: command.into(),
             mode: mode.into(),
@@ -702,8 +726,14 @@ fn read(s: &Session, from: u64, max: usize, lines: usize, drain: bool) -> Result
     }
     let offset = (from - first) as usize;
     let available = &st.bytes[offset..];
-    let n = available.len().min(max);
-    let n = if lines > 0 {
+    // norma ptySession.readSince drains the retained stream without pagination.
+    // Never advance past bytes that were not returned to the caller.
+    let n = if drain {
+        available.len()
+    } else {
+        available.len().min(max)
+    };
+    let n = if !drain && lines > 0 {
         available[..n]
             .iter()
             .enumerate()
@@ -715,7 +745,7 @@ fn read(s: &Session, from: u64, max: usize, lines: usize, drain: bool) -> Result
         n
     };
     let output = String::from_utf8_lossy(&available[..n]).into_owned();
-    let cursor = if drain { st.total } else { from + n as u64 };
+    let cursor = from + n as u64;
     let omitted = st.total - cursor;
     st.cursor = cursor;
     Ok(
@@ -1152,11 +1182,12 @@ mod tests {
         } else {
             "sleep 30"
         };
+        let execution = new_id("exec");
         let opened = host
             .execute(
                 &registry,
                 "shell_open",
-                &json!({"directory_capability":cap,"command":command,"mode":"hands-free"}),
+                &json!({"directory_capability":cap,"execution_id":execution,"command":command,"mode":"hands-free"}),
                 &context,
             )
             .unwrap();
@@ -1174,7 +1205,12 @@ mod tests {
             assert!(Instant::now() < end, "terminal cleanup did not finish");
             thread::sleep(Duration::from_millis(10));
         };
-        assert_eq!(stopped[0]["execution_id"], opened["session_id"]);
+        assert_eq!(stopped[0]["execution_id"], execution);
+        assert!(artex_core::valid_id(
+            opened["session_id"].as_str().unwrap(),
+            "shell"
+        ));
+        assert_ne!(opened["session_id"], stopped[0]["execution_id"]);
         assert_eq!(stopped[0]["leader_exited"], true);
         assert_eq!(stopped[0]["cleanup_confirmed"], cfg!(windows));
         assert!(stopped[0].get("command").is_none());

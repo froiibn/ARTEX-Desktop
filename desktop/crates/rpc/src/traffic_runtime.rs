@@ -57,10 +57,22 @@ mod tests {
             }
         }
     }
-    fn drive_capture(router: &mut Router) {
-        for _ in 0..40 {
-            router.traffic.last_poll = Instant::now() - Duration::from_secs(1);
+    fn drive_capture(router: &mut Router, host: &ToggleTraffic) {
+        // A scheduler load must not turn a fixed 40ms sleep into an assertion
+        // about gateway completion. Wait for the observable reply/poll boundary
+        // within the same bound as traffic.configure's host request.
+        let enabled=artex_domain::setting_bool(&router.snapshot().unwrap(), "traffic_capture", false);
+        let before=host.polls.load(Ordering::SeqCst);
+        let deadline=Instant::now()+Duration::from_secs(10);
+        loop {
+            if router.traffic.pending.is_none() {
+                router.traffic.last_poll=Instant::now()-Duration::from_secs(1);
+            }
             router.process_traffic().unwrap();
+            if router.traffic.pending.is_none() && !router.traffic.configured.is_empty()
+                && host.enabled.load(Ordering::SeqCst)==enabled
+                && (!enabled || host.polls.load(Ordering::SeqCst)>before) { break; }
+            assert!(Instant::now()<deadline, "Traffic fixture did not reach a completed gateway boundary");
             std::thread::sleep(Duration::from_millis(1));
         }
     }
@@ -79,7 +91,7 @@ mod tests {
         });
         router.attach_host(host.clone());
         let before = router.snapshot().unwrap().commit_seq;
-        drive_capture(&mut router);
+        drive_capture(&mut router, &host);
         assert_eq!(host.configurations.load(Ordering::SeqCst), 1);
         assert_eq!(host.polls.load(Ordering::SeqCst), 0);
         assert_eq!(router.snapshot().unwrap().commit_seq, before);
@@ -93,7 +105,7 @@ mod tests {
             )
             .unwrap();
         router.internal_commit(p.done(json!({}))).unwrap();
-        drive_capture(&mut router);
+        drive_capture(&mut router, &host);
         assert!(host.polls.load(Ordering::SeqCst) > 0);
         let s = router.snapshot().unwrap();
         let mut p = Planner::new(&s, "fixture.disable.capture", &json!({}));
@@ -101,10 +113,10 @@ mod tests {
         disabled["value"] = json!("false");
         p.put("settings", &id, disabled);
         router.internal_commit(p.done(json!({}))).unwrap();
-        drive_capture(&mut router);
+        drive_capture(&mut router, &host);
         let polls = host.polls.load(Ordering::SeqCst);
         let seq = router.snapshot().unwrap().commit_seq;
-        drive_capture(&mut router);
+        drive_capture(&mut router, &host);
         assert_eq!(host.polls.load(Ordering::SeqCst), polls);
         assert_eq!(host.configurations.load(Ordering::SeqCst), 3);
         assert_eq!(router.snapshot().unwrap().commit_seq, seq);

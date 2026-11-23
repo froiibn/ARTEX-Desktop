@@ -759,14 +759,19 @@ pub fn finish_run(
     b.put("agent_runs", run_id, d);
     if let Some(intent) = run.data["intent_id"].as_str() {
         let mut n = record(s, "exploration_nodes", intent)?.data.clone();
-        n["state"] = json!(match status {
+        // A deadline settlement cannot turn an exhausted intent into ordinary
+        // success/failure; its graph writes only preserve already known results.
+        n["state"] = json!(if matches!(text(&run.data, "purpose"), "task_timeout_wrapup" | "run_wrapup") {
+            "exhausted"
+        } else { match status {
             "completed" => "done",
             "failed" => "blocked",
             _ => "stopped",
-        });
+        }});
         b.put("exploration_nodes", intent, n);
     }
     if let Some(conversation) = run.data["conversation_id"].as_str() {
+        crate::findings::finish_retests(&mut b, conversation, status, text(detail, "text"))?;
         let mut d = record(s, "conversations", conversation)?.data.clone();
         d["updated_at"] = json!(artex_core::now());
         b.put("conversations", conversation, d);

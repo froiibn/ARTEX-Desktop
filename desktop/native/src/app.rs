@@ -156,6 +156,8 @@ pub struct NativeApp {
     search: String,
     error: Option<Error>,
     notices: VecDeque<String>,
+    analysis_status: crate::analysis_status::StatusTracker,
+    analysis_notice: Option<String>,
     close_confirmation: bool,
     exit_after_close: bool,
     allow_exit: bool,
@@ -207,10 +209,10 @@ impl NativeApp {
         });
         let ctx = cc.egui_ctx.clone();
         let wake: Arc<dyn Fn() + Send + Sync> = Arc::new(move || ctx.request_repaint());
-        let service = Service::spawn(ServiceConfig {
+        let service = Service::spawn_with_profile(ServiceConfig {
             host_factory: Some(factory),
             wake_ui: Some(wake.clone()),
-        })?;
+        }, &profile)?;
         let handle = service.handle();
         let power = NativePower::start(handle.clone(), wake.clone());
         let foreground = cc.egui_ctx.clone();
@@ -265,6 +267,8 @@ impl NativeApp {
             search: String::new(),
             error: None,
             notices: VecDeque::new(),
+            analysis_status: crate::analysis_status::StatusTracker::default(),
+            analysis_notice: None,
             close_confirmation: false,
             exit_after_close: false,
             allow_exit: false,
@@ -320,6 +324,16 @@ impl NativeApp {
             let Some(pinned) = self.command_read.clone().or_else(|| self.handle.view()) else {
                 return;
             };
+            // A new foreground command owns its pending/error presentation.
+            // Keep the previous failure in Activity instead of attributing an
+            // old settings validation error to a new conversation request.
+            if let Some(previous) = self.error.take() {
+                self.notices.push_back(format!(
+                    "이전 오류 기록 · {} · {}: {}",
+                    previous.details["native_operation"].as_str().unwrap_or("이전 작업"),
+                    previous.code, previous.message
+                ));
+            }
             self.submit(
                 NativeAction::Query {
                     scope: scope.clone(),
@@ -387,7 +401,12 @@ impl NativeApp {
                 name: params["name"].as_str().unwrap_or("").into(),
             }
         } else {
-            let query = if method == "native.body.read" {
+            let query = if method == "native.report.page" {
+                NativeQuery::BodyPage {
+                    body: params["body"].clone(),
+                    offset: params["offset"].as_u64().unwrap_or(0),
+                }
+            } else if method == "native.body.read" {
                 NativeQuery::Body {
                     body: params
                         .get("body")
@@ -624,6 +643,9 @@ impl NativeApp {
                             self.forms.set_projection(&method, &projected);
                         }
                         if let Some(token) = params["_pane_token"].as_str() {
+                            if method == "ui.report" {
+                                self.panes.site_report_read_seq(token, reply.read_seq);
+                            }
                             let value = if method == "native.body.read" {
                                 json!({"target":params["_pane_target"],"text":reply.value})
                             } else {
@@ -823,7 +845,8 @@ impl NativeApp {
                         selected,
                         scope,
                     } => {
-                        self.notices.push_back(format!("완료: {method}"));
+                        // Admission/commit success is not analysis completion.
+                        self.notices.push_back(format!("요청 반영: {method}"));
                         if self.handle.scope().as_ref() == Some(&scope) {
                             self.panes.set_command_result_for_params(
                                 &method,
@@ -952,11 +975,26 @@ impl NativeApp {
                     .into(),
             );
         }
+        if self.handle.status().phase == ServicePhase::Ready {
+            if let Some(view) = self.handle.view() {
+                for notice in self.analysis_status.observe(
+                    &view.workspace.scope.workspace_id,
+                    &view.workspace.scope.engine_epoch,
+                    &view.generation.snapshot,
+                ) {
+                    self.analysis_notice = Some(notice.clone());
+                    self.notices.push_back(notice);
+                }
+            }
+        } else {
+            self.analysis_status.clear();
+            self.analysis_notice = None;
+        }
         while self.notices.len() > 40 {
             self.notices.pop_front();
         }
     }
-    fn failed(&mut self, purpose: &Purpose, error: Error) {
+    fn failed(&mut self, purpose: &Purpose, mut error: Error) {
         if let Purpose::NativeOperation { token, scope, .. } = purpose {
             if self.handle.scope().as_ref() == Some(scope) {
                 self.panes
@@ -1090,6 +1128,12 @@ impl NativeApp {
             _ => {}
         }
         if !matches!(error.code.as_str(), "CANCELLED" | "STALE_EPOCH") {
+            // Keep the originating operation alongside the exact service error.
+            // Do not rewrite validation rules or guess a missing input value.
+            if error.details.is_null() { error.details = json!({}); }
+            if let Some(details) = error.details.as_object_mut() {
+                details.insert("native_operation".into(), json!(purpose_label(failure)));
+            }
             self.error = Some(error);
             self.drawer.show(DrawerTab::Activity);
         }
@@ -1311,6 +1355,7 @@ impl NativeApp {
                         ))
                     }
                 },
+                Effect::ExportBody { name, body } => self.export_body(name, body),
                 Effect::ExportBase64Body { name, body } => {
                     if let Some(scope) = self.handle.scope() {
                         self.submit(
@@ -1750,9 +1795,18 @@ impl NativeApp {
         let snapshot = &view.generation.snapshot;
         self.forms.set_read_only(view.workspace.read_only);
         self.panes.set_read_only(view.workspace.read_only);
+        self.panes.engine_epoch.clone_from(&view.workspace.scope.engine_epoch);
         self.command_read = Some(view.clone());
         let mut effects = Vec::new();
         self.draw_navigation(ctx);
+        // Missing entry means the model screen has not been initialized in this
+        // workspace. An explicit None belongs to the user's new-model draft.
+        if self.section == Section::Models && !self.selected.contains_key(&Section::Models) {
+            let models = snapshot.records("llm_profiles");
+            let initial = models.iter().find(|r| r.data["is_default"] == true)
+                .or_else(|| models.first());
+            self.selected.insert(Section::Models, initial.map(|r| r.header.id.clone()));
+        }
         self.draw_object_list(ctx, snapshot, view.workspace.read_only);
         let selected = self.selected.get(&self.section).cloned().flatten();
         let item = selected_record(snapshot, self.section, selected.as_deref());
@@ -1810,6 +1864,28 @@ impl NativeApp {
                 let chat_pane = self.section == Section::Chat && ui.available_height() >= 420.0;
                 let mut render_pane = |ui: &mut egui::Ui| {
                     if self.section.configuration() {
+                        if self.section == Section::Models {
+                            // Compact windows may hide the side list; the saved
+                            // model picker must stay reachable in the main pane.
+                            ui.horizontal_wrapped(|ui| {
+                                let models = snapshot.records("llm_profiles");
+                                ui.label(format!("저장된 모델 {}개", models.len()));
+                                let mut chosen = selected.clone();
+                                egui::ComboBox::from_id_salt("shared-model-picker")
+                                    .selected_text(item.map(display_name).unwrap_or_else(|| "새 모델 연결".into()))
+                                    .show_ui(ui, |ui| {
+                                        for model in models {
+                                            ui.selectable_value(&mut chosen, Some(model.header.id.clone()), display_name(model));
+                                        }
+                                    });
+                                if chosen != selected {
+                                    self.selected.insert(Section::Models, chosen);
+                                }
+                                if ui.add_enabled(!view.workspace.read_only, egui::Button::new("모델 추가")).clicked() {
+                                    self.selected.insert(Section::Models, None);
+                                }
+                            });
+                        }
                         if self.section == Section::Skills {
                             self.panes
                                 .skill_import(ui, selected.as_deref(), &mut effects);
@@ -2627,3 +2703,7 @@ mod workspace_switch_tests {
         service.join().unwrap();
     }
 }
+
+#[cfg(all(test, windows))]
+#[path = "app_workflow_e2e_tests.rs"]
+mod app_workflow_e2e_tests;

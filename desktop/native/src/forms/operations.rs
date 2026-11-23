@@ -344,6 +344,28 @@ impl Draft {
 }
 
 impl SourceOperations {
+    /// Headless App tests seed only user input; owner/pinned/token, actual
+    /// widgets, submissions and completions remain production paths.
+    #[cfg(all(test,windows))]
+    pub(crate) fn seed_query_for_app_test(&mut self,view:&NativeReadView,section:Section,selected:Option<&str>,method:&str,params:Value) {
+        let action=catalog().iter().find(|a|a.section==section && a.method==method).unwrap();
+        assert!(!action.mutation);
+        if self.workspace_id.as_deref()!=Some(&view.workspace.scope.workspace_id) {
+            self.drafts.clear();self.choices.clear();self.exports.clear();
+            self.workspace_id=Some(view.workspace.scope.workspace_id.clone());
+        }
+        let mut draft=Draft::new(action,view,section,selected);
+        draft.params=params;
+        self.choices.insert(section,action.key.clone());
+        self.drafts.insert(format!("{}:{}",action.key,selected.unwrap_or("")),draft);
+    }
+    /// Observe the actual callback-owned result; never supplies or hydrates it.
+    #[cfg(all(test,windows))]
+    pub(crate) fn query_result_for_app_test(&self,method:&str,selected:Option<&str>)->Option<Value> {
+        let draft=self.drafts.get(&format!("{}:{}",method,selected.unwrap_or("")))?;
+        assert!(draft.error.is_none(),"Actual Source operation error: {:?}",draft.error);
+        if draft.busy || !draft.pending_reads.is_empty() {None} else {draft.result.clone()}
+    }
     pub fn show(
         &mut self,
         ui: &mut Ui,
@@ -1903,5 +1925,53 @@ mod tests {
                 .2
         );
         finish(service, &h);
+    }
+    #[test]
+    fn actual_graph_actions_query_service_and_display_source_endpoints() {
+        let (_dir, service, handle, _) = fixture();
+        let submit = |method: &str, params: Value| {
+            let view=handle.view().unwrap();
+            // Use the actual UI preparation read-set, not unrelated moving
+            // maintenance rows from a full snapshot CAS vector.
+            let prepared=handle.try_submit(NativeAction::Query{scope:view.workspace.scope.clone(),query:NativeQuery::Prepare{method:method.into(),params:params.clone()}}).unwrap();
+            let references:Vec<Expected>=serde_json::from_value(wait(&handle,prepared).value["expected"].clone()).unwrap();
+            let expected=references.iter().map(|r|crate::model::expected(view.generation.get(&r.collection,&r.id).expect("Dependency exists in the original UI read"))).collect();
+            let ticket=handle.try_submit(NativeAction::Command{scope:view.workspace.scope.clone(),command:NativeCommand::new(method,params,expected)}).unwrap();
+            wait(&handle,ticket).value
+        };
+        let task=submit("ui.createTask",json!({"input":{"name":"Graph UI fixture","description":"Actual graph display","goal":"Local fixture only"}}))["id"].as_str().unwrap().to_owned();
+        let goal=submit("ui.addGoal",json!({"id":task,"text":"Displayed graph goal"}))["id"].as_str().unwrap().to_owned();
+        let view=handle.view().unwrap();
+        let edge=view.generation.records("exploration_edges").into_iter().find(|e|e.data["dst_id"]==goal).unwrap();
+        let expected=json!({"src":edge.data["src_id"],"dst":edge.data["dst_id"],"rel":edge.data["rel"]});
+        for method in ["ui.explorationGraph","ui.explorationNodes"] {
+            let ctx=egui::Context::default();crate::app::configure(&ctx);ctx.style_mut(|s|s.animation_time=0.);
+            let action=action(method);let section=action.section;
+            let mut operations=SourceOperations::default();operations.workspace_id=Some(view.workspace.scope.workspace_id.clone());
+            operations.choices.insert(section,action.key.clone());
+            let mut draft=Draft::new(&action,&view,section,Some(&task));draft.params=json!({"task":task});
+            operations.drafts.insert(format!("{}:{}",action.key,task),draft);
+            let mut submissions=vec![];
+            let render=|operations:&mut SourceOperations,submissions:&mut Vec<OperationSubmission>,events|ctx.run(egui::RawInput{screen_rect:Some(egui::Rect::from_min_size(egui::Pos2::ZERO,egui::vec2(1100.,6000.))),events,..Default::default()},|ctx|{egui::CentralPanel::default().show(ctx,|ui|submissions.extend(operations.show_expanded(ui,&view,section,Some(&task))));});
+            let click=|label:&str,operations:&mut SourceOperations,submissions:&mut Vec<OperationSubmission>|{
+                let output=render(operations,submissions,vec![]);
+                let pos=output.shapes.iter().find_map(|s|if let egui::epaint::Shape::Text(t)=&s.shape{(t.galley.text()==label).then(||t.visual_bounding_rect().center())}else{None}).unwrap_or_else(||panic!("Missing actual action {label} for {method}"));
+                let _=render(operations,submissions,vec![egui::Event::PointerMoved(pos),egui::Event::PointerButton{pos,button:egui::PointerButton::Primary,pressed:true,modifiers:Default::default()}]);
+                let _=render(operations,submissions,vec![egui::Event::PointerButton{pos,button:egui::PointerButton::Primary,pressed:false,modifiers:Default::default()}]);
+            };
+            click("조회",&mut operations,&mut submissions);
+            let query=submissions.iter().find(|s|s.method==method).expect("Actual query widget emits the selected method");assert!(!query.mutation);assert_eq!(query.params,json!({"task":task}));
+            let ticket=handle.try_submit(NativeAction::Query{scope:query.scope.clone(),query:NativeQuery::Feature{method:query.method.clone(),params:query.params.clone()}}).unwrap();
+            let result=wait(&handle,ticket).value;assert!(result["edges"].as_array().unwrap().contains(&expected));
+            assert!(operations.result(&query.scope,&query.token,method,result));
+            // Open the actual result tree. Edges precede nodes in its object,
+            // so the first item disclosure owns the first real stored edge.
+            for label in ["항목 1","src","dst","rel"]{click(label,&mut operations,&mut submissions);}
+            let output=render(&mut operations,&mut submissions,vec![]);
+            let visible=output.shapes.iter().filter_map(|s|if let egui::epaint::Shape::Text(t)=&s.shape{Some(t.galley.text().to_owned())}else{None}).collect::<Vec<_>>().join("\n");
+            for field in ["src","dst","rel"]{assert!(visible.contains(expected[field].as_str().unwrap()),"{method} did not display {field}: {visible}");}
+            assert!(handle.snapshot().unwrap().records("exploration_edges").iter().any(|r|r.data["src_id"]==expected["src"]&&r.data["dst_id"]==expected["dst"]));
+        }
+        finish(service,&handle);
     }
 }

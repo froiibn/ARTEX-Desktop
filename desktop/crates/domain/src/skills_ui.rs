@@ -1,5 +1,4 @@
 use crate::*;
-use std::collections::BTreeMap;
 pub const QUERIES: &[&str] = &["ui.skillUsage", "ui.missingSkills"];
 /// Decorate native filesystem metadata with the persistent successful-call ledger.
 pub fn decorate_skills(items: &Value, s: &Snapshot) -> Result<Value> {
@@ -13,14 +12,11 @@ pub fn decorate_skills(items: &Value, s: &Snapshot) -> Result<Value> {
             )
         })?;
     let mut out = vec![];
+    let usage = crate::auxiliary_ui::skill_statistics(s, true)?;
     for item in array {
         let name = required(item, "name")?;
-        let rows = s
-            .records("skill_usage")
-            .into_iter()
-            .filter(|r| r.data["skill"] == name && r.data["found"] == true)
-            .collect::<Vec<_>>();
-        let mut d = json!({"name":name,"files":item["files"].as_array().cloned().unwrap_or_default(),"calls":rows.len(),"tasks":rows.iter().filter_map(|r|r.data["task_id"].as_str()).collect::<BTreeSet<_>>().len(),"usage_agents":rows.iter().filter_map(|r|r.data["agent_key"].as_str()).filter(|v|!v.is_empty()).collect::<BTreeSet<_>>()});
+        let row = usage.iter().find(|r| r["skill"] == name);
+        let mut d = json!({"name":name,"files":item["files"].as_array().cloned().unwrap_or_default(),"calls":row.map(|r|r["calls"].clone()).unwrap_or(json!(0)),"tasks":row.map(|r|r["tasks"].clone()).unwrap_or(json!(0)),"usage_agents":row.map(|r|r["agents"].clone()).unwrap_or(json!([]))});
         for key in ["description", "license", "compatibility", "mcps"] {
             if let Some(value) = item.get(key) {
                 if !value.is_null() {
@@ -28,7 +24,7 @@ pub fn decorate_skills(items: &Value, s: &Snapshot) -> Result<Value> {
                 }
             }
         }
-        if let Some(ts) = rows.iter().map(|r| text(&r.data, "ts")).max() {
+        if let Some(ts) = row.and_then(|r| r["last_used"].as_str()) {
             d["last_used"] = json!(ts);
         }
         out.push(d);
@@ -64,24 +60,10 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<Value> {
                 .as_u64()
                 .filter(|n| *n > 0 && *n <= 200)
                 .unwrap_or(20) as usize;
-            let mut groups = BTreeMap::<String, Vec<&Record>>::new();
-            for r in s
-                .records("skill_usage")
-                .into_iter()
-                .filter(|r| r.data["found"] == false)
-            {
-                groups
-                    .entry(text(&r.data, "skill").into())
-                    .or_default()
-                    .push(r);
+            let mut rows = crate::auxiliary_ui::skill_statistics(s, false)?;
+            for row in &mut rows {
+                row.as_object_mut().unwrap().remove("tasks");
             }
-            let mut rows=groups.into_iter().map(|(skill,rows)|json!({"skill":skill,"calls":rows.len(),"agents":rows.iter().filter_map(|r|r.data["agent_key"].as_str()).filter(|v|!v.is_empty()).collect::<BTreeSet<_>>(),"last_used":rows.iter().map(|r|text(&r.data,"ts")).max()})).collect::<Vec<_>>();
-            rows.sort_by(|a, b| {
-                b["calls"]
-                    .as_u64()
-                    .cmp(&a["calls"].as_u64())
-                    .then_with(|| a["skill"].as_str().cmp(&b["skill"].as_str()))
-            });
             rows.truncate(limit);
             Ok(json!(rows))
         }

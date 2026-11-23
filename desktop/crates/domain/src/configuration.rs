@@ -160,6 +160,20 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<CommandBatc
             if m == "create_mcp" && p["enabled"].is_null() {
                 data["enabled"] = json!(true);
             }
+            // Discovery belongs to this exact local execution definition. Keeping
+            // old schemas after an endpoint/environment change can invoke a tool
+            // against a different server contract. The ordinary writer batch also
+            // adds these cache versions to the public Prepare/CAS read set.
+            if existing.is_some_and(|old| {
+                ["transport", "command", "args", "env", "url", "enabled", "insecure"]
+                    .iter().any(|key| old.data[*key] != data[*key])
+            }) {
+                for cache in s.records("mcp_tools_cache") {
+                    if cache.data["server_id"] == id {
+                        b.delete("mcp_tools_cache", &cache.header.id);
+                    }
+                }
+            }
             b.put("mcp_servers", &id, data);
             Ok(b.done(json!({"id":id,"connected":false})))
         }

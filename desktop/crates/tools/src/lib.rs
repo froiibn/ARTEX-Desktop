@@ -339,6 +339,20 @@ pub fn resolved_definition(name: &str, state: &Snapshot, context: &Context) -> R
     )
 }
 
+pub fn is_timeout_wrapup(run: &Value) -> bool {
+    matches!(text(run, "purpose"), "task_timeout_wrapup" | "run_wrapup")
+}
+
+/// A deadline settles confirmed observations; it does not admit another scan,
+/// subprocess or intent. These graph writes are required by the source wrapup
+/// contract and still pass the normal role, binding and approval checks.
+pub fn wrapup_tool_allowed(name: &str, definition: &Value) -> bool {
+    (definition["family"] == "artex" && definition["mutation"] == "read" && !HOST.contains(&name))
+        || matches!(name, "insert_assets" | "record_fact" | "report_finding"
+            | "update_finding_report" | "prove_goal" | "goal_met"
+            | "Read" | "LS" | "Glob" | "Grep" | "TaskList" | "TaskOutput")
+}
+
 pub fn check_access(name: &str, input: &Value, state: &Snapshot, context: &Context) -> Result<()> {
     let def = resolved_definition(name, state, context)?;
     if !input.is_object() {
@@ -350,6 +364,9 @@ pub fn check_access(name: &str, input: &Value, state: &Snapshot, context: &Conte
         input,
     )?;
     let run = artex_domain::sdk::current_run(state, context)?;
+    if is_timeout_wrapup(&run.data) && !wrapup_tool_allowed(name, &def) {
+        return Err(Error::new("PERMISSION_DENIED", "Deadline wrapup may only read existing context or record confirmed results"));
+    }
     if text(&run.data, "state") != "running" {
         return Err(Error::new(
             "BUSY",

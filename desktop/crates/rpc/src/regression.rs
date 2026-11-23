@@ -398,14 +398,15 @@ fn corrupt_store_readonly_overrides_cached_router_flag_and_can_close() {
     let (dir, mut router, _run, _context) = seeded();
     let path = dir.path().join("store");
     drop(router.store.take());
-    let journal = std::fs::read_dir(path.join("store/journal"))
-        .unwrap()
-        .map(|e| e.unwrap().path())
-        .find(|p| p.extension().is_some_and(|e| e == "jnl"))
-        .unwrap();
-    let mut bytes = std::fs::read(&journal).unwrap();
-    bytes[104] ^= 1;
-    std::fs::write(journal, bytes).unwrap();
+    // Corrupt referenced evidence through the public v2 Blob contract. SQLite
+    // page corruption is a failed-open case; valid DB + bad evidence remains a
+    // queryable read-only workspace whose lifecycle must still be closable.
+    let mut source = Store::open(&path).unwrap();
+    let blob = source.blob_put(b"confirmed fixture evidence", "text/plain").unwrap();
+    source.commit(artex_core::CommandBatch { command_id:new_id("command"), method:"fixture.evidence".into(), normalized_params:json!({}), expected:vec![], changes:vec![], events:vec![], deliveries:vec![], result:json!({"evidence":blob}) }).unwrap();
+    drop(source);
+    let digest=blob["sha256"].as_str().unwrap();
+    std::fs::write(path.join("objects/blobs").join(&digest[..2]).join(digest),b"damaged").unwrap();
     router.store = Some(Store::open(&path).unwrap());
     assert!(router.store.as_ref().unwrap().read_only());
     assert!(!router.read_only);

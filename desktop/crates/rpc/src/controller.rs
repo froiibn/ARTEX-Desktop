@@ -15,6 +15,16 @@ use std::{
 #[cfg(test)]
 #[path = "approval_tests.rs"]
 mod approval_tests;
+#[cfg(test)]
+#[path = "stability_parity_tests.rs"]
+mod stability_parity_tests;
+#[cfg(test)]
+#[path = "e2e_parity_tests.rs"]
+mod e2e_parity_tests;
+
+// norma/harness.handleMaxOutputTokens permits three continuations from the
+// confirmed partial answer. This is a recovery budget, not a model/tool turn cap.
+const MAX_OUTPUT_RECOVERIES: u8 = 3;
 
 fn strip_traffic_parameters(schema: &mut Value) {
     if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
@@ -42,6 +52,7 @@ pub(super) struct RunState {
     failed_profiles: std::collections::BTreeSet<String>,
     idle_nudges: u64,
     intent_failures: u64,
+    output_recoveries: u8,
     retry_at: Option<Instant>,
 }
 pub(super) const NATIVE_UI: &[&str] = &[
@@ -408,8 +419,8 @@ impl Router {
                 }
             }
             if request.method == "ui.skills" {
-                result =
-                    artex_domain::skills_ui::decorate_skills(&result, self.snapshot()?.as_ref())?;
+                let state = self.archive_statistics_view("ui.skills", self.snapshot()?)?;
+                result = artex_domain::skills_ui::decorate_skills(&result, state.as_ref())?;
             }
             let result = self.externalize_query(result)?;
             let mutation = ui_mutates(&request.method);
@@ -527,12 +538,7 @@ impl Router {
         batch.command_id = new_id("command");
         artex_domain::augment_expected(&mut batch, self.snapshot()?.as_ref())?;
         self.externalize_batch(&mut batch)?;
-        Ok(self
-            .store
-            .as_mut()
-            .ok_or_else(|| Error::new("WORKSPACE_NOT_OPEN", "Workspace closed"))?
-            .commit(batch)?
-            .result)
+        Ok(self.commit_with_shared_settings(batch)?.result)
     }
     pub(super) fn externalize_batch(&mut self, batch: &mut CommandBatch) -> Result<()> {
         // Pause/stop boundaries account the final fraction in the same CAS commit.
@@ -723,6 +729,9 @@ impl Router {
         Ok(())
     }
     pub(super) fn finish_runtime(&mut self, run: &str, status: &str, detail: &str) -> Result<()> {
+        self.finish_runtime_with_intent_state(run, status, detail, None)
+    }
+    fn finish_runtime_with_intent_state(&mut self, run: &str, status: &str, detail: &str, intent_state: Option<&str>) -> Result<()> {
         self.cancel_approval_judge(run);
         self.finish_stream(run, false)?;
         let s = self.snapshot()?;
@@ -738,34 +747,6 @@ impl Router {
         let c = self.stored_run_context(&s, run)?;
         self.finish_owned_deliveries(run, status, detail)?;
         let s = self.snapshot()?;
-        let r = record(&s, "agent_runs", run)?;
-        if let Some(cid) = r.data["conversation_id"].as_str() {
-            for retest in s.records("finding_retests").into_iter().filter(|rt| {
-                rt.data["conversation_id"] == cid
-                    && matches!(text(&rt.data, "status"), "pending" | "running")
-            }) {
-                let mut p = Planner::new(
-                    &s,
-                    "run.retest.finish",
-                    &json!({"run_id":run,"retest_id":retest.header.id}),
-                );
-                let mut d = retest.data.clone();
-                d["status"] = json!(if status == "cancelled" {
-                    "stopped"
-                } else {
-                    "failed"
-                });
-                d["finished_at"] = json!(artex_core::now());
-                d["error"] = json!(if status == "completed" {
-                    "Retest ended without recording a verdict"
-                } else {
-                    detail
-                });
-                p.put("finding_retests", &retest.header.id, d);
-                self.internal_commit(p.done(json!({"finished":true})))?;
-            }
-        }
-        let s = self.snapshot()?;
         {
             let mut b = artex_domain::conversation::finish_run(
                 &s,
@@ -779,6 +760,18 @@ impl Router {
                 &body(detail),
                 None,
             )?;
+            // Budget exhaustion is distinct from a provider/tool failure, and
+            // must be committed with the run result rather than patched later.
+            if let Some(intent_state) = intent_state {
+                let intent = s.get("agent_runs", run).and_then(|r| r.data["intent_id"].as_str());
+                for change in &mut b.changes {
+                    if let Change::Put { collection, id, data } = change {
+                        if collection == "exploration_nodes" && Some(id.as_str()) == intent {
+                            data["state"] = json!(intent_state);
+                        }
+                    }
+                }
+            }
             if status == "recovery_required" {
                 for change in &mut b.changes {
                     if let Change::Put {
@@ -1005,6 +998,8 @@ impl Router {
                         && !(role == "worker" && ["MultiEdit", "Glob", "Grep"].contains(&name))
                 };
                 bound
+                    && (!artex_tools::is_timeout_wrapup(&run.data)
+                        || artex_tools::wrapup_tool_allowed(name, d))
                     && (name != "Compress" || self.noa_enabled(&run.header.id).unwrap_or(false))
                     && (name != "web_search"
                         || (agent.data["web_search"] == true
@@ -1051,6 +1046,13 @@ impl Router {
             t.data["system"] != true && t.data["enabled"] == true && t.data["deferred"] != true
         }) {
             if let Ok(d) = artex_tools::resolved_definition(text(&tool.data, "key"), s, &c) {
+                // Settlement offers must match execution policy, including
+                // custom tools, rather than consuming turns on denied calls.
+                if artex_tools::is_timeout_wrapup(&run.data)
+                    && !artex_tools::wrapup_tool_allowed(text(&d, "name"), &d)
+                {
+                    continue;
+                }
                 tools.push(json!({"name":d["name"],"description":d["description"],"input_schema":d["desktop_input_schema"]}));
             }
         }
@@ -1151,26 +1153,26 @@ impl Router {
         };
         let timeout_wrapup =
             run.data["purpose"] == "task_timeout_wrapup" || run.data["purpose"] == "run_wrapup";
+        // Zero is the source's unlimited sentinel, not a hidden turn cap.
         let max = if timeout_wrapup {
-            agent.data[if run.data["purpose"] == "task_timeout_wrapup" {
+            Some(agent.data[if run.data["purpose"] == "task_timeout_wrapup" {
                 "task_timeout_wrapup_max_turns"
             } else {
                 "wrapup_max_turns"
             }]
             .as_u64()
-            .unwrap_or(3)
+            .unwrap_or(3))
         } else {
             agent.data["max_turns"]
                 .as_u64()
                 .filter(|n| *n > 0)
-                .unwrap_or(100)
         };
-        if timeout_wrapup && self.runtime.runs[rid].turns >= max {
+        if timeout_wrapup && max.is_some_and(|max| self.runtime.runs[rid].turns >= max) {
             return self.finish_runtime(rid, "failed", "Timeout wrap-up turn budget exhausted");
         }
         let state = self.runtime.runs.get(rid).unwrap();
         let wrapup_max = agent.data["wrapup_max_turns"].as_u64().unwrap_or(3);
-        if state.turns >= max && !state.wrapup {
+        if max.is_some_and(|max| state.turns >= max) && !state.wrapup {
             self.runtime.runs.get_mut(rid).unwrap().wrapup = true;
             let prompt = self.body_text(&agent.data["wrapup_prompt"])?;
             let prompt = if prompt.is_empty() {
@@ -1190,8 +1192,8 @@ impl Router {
                 None,
             )?;
         }
-        if self.runtime.runs[rid].turns >= max.saturating_add(wrapup_max) {
-            return self.finish_runtime(rid, "failed", "Run and wrap-up turn budgets exhausted");
+        if max.is_some_and(|max| self.runtime.runs[rid].turns >= max.saturating_add(wrapup_max)) {
+            return self.finish_runtime_with_intent_state(rid, "failed", "Run and wrap-up turn budgets exhausted", Some("exhausted"));
         }
         let interval = profile.data["rate_per_second"]
             .as_f64()
@@ -1334,6 +1336,11 @@ impl Router {
         let run = record(&s, "agent_runs", rid)?;
         let context = artex_agent::context_for_run(&s, rid, &self.engine_epoch)?;
         let def = artex_tools::resolved_definition(&call.name, &s, &context)?;
+        if artex_tools::is_timeout_wrapup(&run.data)
+            && !artex_tools::wrapup_tool_allowed(&call.name, &def)
+        {
+            return Ok(Decision::Deny);
+        }
         if run.data["permission_mode"] == "plan"
             && def["mutation"] != "read"
             && ![
@@ -1595,6 +1602,9 @@ impl Router {
         let i = record(&s, "tool_invocations", invocation)?;
         let effect_error = result.as_ref().map_or(true, |v| {
             v["is_error"] == true
+                // MCP's wire flag is camelCase; keep it through the generic
+                // extra-tool boundary instead of recording a false success.
+                || (i.data["name"] == "ExecuteExtraTool" && v["isError"] == true)
                 || (["Bash", "Monitor", "ExecuteExtraTool"].contains(&text(&i.data, "name"))
                     && (v["exit_code"].as_i64().is_some_and(|code| code != 0)
                         || matches!(
@@ -1761,6 +1771,21 @@ impl Router {
             Err(e) => {
                 self.finish_stream(rid, false)?;
                 let s = self.snapshot()?;
+                let run = record(&s, "agent_runs", rid)?;
+                let task_timed_out = !artex_tools::is_timeout_wrapup(&run.data)
+                    && run.data["task_id"].as_str()
+                        .and_then(|id| s.get("tasks", id))
+                        .is_some_and(|task| task.data["status"] == "timeout");
+                let run_timed_out = run.data["deadline_at"].as_str()
+                    .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+                    .is_some_and(|at| at.with_timezone(&Utc) <= Utc::now());
+                // A request bounded by our own expired run/task deadline is not
+                // a provider outage (norma/llmpool excludes context deadlines).
+                // Record the actual failed call above, then settle without
+                // poisoning health, switching credentials or replaying work.
+                if e.code == "TIMEOUT" && (run_timed_out || task_timed_out) {
+                    return self.begin_timeout_wrapup(rid, task_timed_out);
+                }
                 let c = artex_agent::context_for_run(&s, rid, &self.engine_epoch)?;
                 let failure = json!({"profile_id":metadata["profile_id"],"chain_revision":metadata["chain_revision"],"message":e.message,"status":e.details["status"],"committed":e.details["committed"]==true,"cancelled":e.code=="CANCELLED"});
                 let plan = artex_domain::conversation::profile_failure_plan(&s, &c, rid, &failure)?;
@@ -1869,7 +1894,25 @@ impl Router {
         )?;
         self.record_tool_calls(rid, &turn.tools)?;
         if turn.tools.is_empty() {
-            if turn.text.trim().is_empty() {
+            if matches!(turn.stop_reason.as_str(), "max_tokens" | "length")
+                && self.runtime.runs[rid].output_recoveries < MAX_OUTPUT_RECOVERIES
+            {
+                // Resume after the persisted assistant message; never resend an
+                // identical generation request or replace the partial answer.
+                // Recovery belongs to the same logical turn, including when a
+                // finite turn budget would otherwise start wrap-up immediately.
+                let state = self.runtime.runs.get_mut(rid).unwrap();
+                state.output_recoveries += 1;
+                state.turns = state.turns.saturating_sub(1);
+                self.append_transcript(rid, "user", "Output limit continuation", &Message {
+                    role: "user".into(),
+                    content: vec![json!({"type":"text","text":"Output token limit hit. Resume directly — no apology, no recap of what you already wrote. Continue exactly where you left off."})],
+                }, None)?;
+                return Ok(());
+            }
+            if turn.text.trim().is_empty()
+                && !matches!(turn.stop_reason.as_str(), "max_tokens" | "length")
+            {
                 let policy: Value = serde_json::from_str(&artex_domain::configuration_ui::setting(
                     self.snapshot()?.as_ref(),
                     "llm_retry_policy",
@@ -2336,7 +2379,7 @@ impl Router {
         }]
         .as_u64()
         .unwrap_or(3);
-        self.finish_runtime(
+        self.finish_runtime_with_intent_state(
             rid,
             "failed",
             if task_timeout {
@@ -2344,6 +2387,7 @@ impl Router {
             } else {
                 "Run deadline reached"
             },
+            Some("exhausted"),
         )?;
         if limit == 0 {
             return Ok(());
@@ -2354,9 +2398,11 @@ impl Router {
             "scheduler.timeout.wrapup",
             &json!({"parent_run_id":rid,"task_timeout":task_timeout}),
         );
-        let mut data = self.new_run_data(&agent, original.data["task_id"].as_str(), None);
+        // Retain the assigned intent and the user's permission mode. Settlement
+        // may persist confirmed graph results, never elevate a plan-mode run.
+        let mut data = self.new_run_data(&agent, original.data["task_id"].as_str(), original.data["intent_id"].as_str());
         data["conversation_id"] = original.data["conversation_id"].clone();
-        data["permission_mode"] = json!("plan");
+        data["permission_mode"] = original.data["permission_mode"].clone();
         data["state"] = json!("running");
         data["started_at"] = json!(artex_core::now());
         data["purpose"] = json!(if task_timeout {
@@ -2369,7 +2415,11 @@ impl Router {
             (Utc::now() + ChronoDuration::seconds(120))
                 .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
         );
-        let child = p.insert("agent_runs", "run", data)?;
+        // Planner::insert merges only defaulted (required) fields. These optional
+        // schema fields carry the settlement boundary and must survive storage.
+        let child = new_id("run");
+        data["id"] = json!(child);
+        p.put("agent_runs", &child, data);
         self.internal_commit(p.done(json!({"run_id":child})))?;
         self.runtime.runs.insert(
             child.clone(),
@@ -2383,6 +2433,7 @@ impl Router {
                 failed_profiles: Default::default(),
                 idle_nudges: 0,
                 intent_failures: 0,
+                output_recoveries: 0,
                 retry_at: None,
             },
         );
@@ -2399,7 +2450,7 @@ impl Router {
         } else {
             template
         };
-        self.append_transcript(&child,"user","Timeout wrap-up",&Message{role:"user".into(),content:vec![json!({"type":"text","text":format!("The execution deadline has passed. Produce only the configured final wrap-up. No new work, writes or external effects are permitted.\n{template}")})]},None)?;
+        self.append_transcript(&child,"user","Timeout wrap-up",&Message{role:"user".into(),content:vec![json!({"type":"text","text":format!("The execution deadline has passed. Settle only observations already confirmed in the parent context using the configured final wrap-up. You may record those facts, assets, findings and final goal judgments through the permitted graph tools. Do not start new work, intents, subprocesses or network effects.\n{template}")})]},None)?;
         Ok(())
     }
     pub(super) fn runtime_tick(&mut self) -> Result<()> {
@@ -2691,6 +2742,7 @@ impl Router {
                         failed_profiles: Default::default(),
                         idle_nudges: 0,
                         intent_failures: 0,
+                        output_recoveries: 0,
                         retry_at: None,
                     },
                 );
@@ -2753,6 +2805,7 @@ impl Router {
         Ok(())
     }
     pub(super) fn close_workspace_orderly(&mut self) -> Result<()> {
+        self.recover_shared_settings()?;
         self.read_only = self.effective_read_only();
         if !self.deleting_tasks.is_empty() || self.native_lifecycle_busy() {
             return Err(Error::new(

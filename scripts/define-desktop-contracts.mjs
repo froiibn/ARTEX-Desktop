@@ -190,6 +190,11 @@ function wire(s,ctx,key='',typeName='') {
   wireDefs[newName]=wire(original,next,'',sourceType); return {$ref:'#/$defs/'+newName};
  }
  const k=snake(key);
+ // Mention identities follow the returned record kind, never a generic string.
+ if(ctx.role==='result' && ctx.method==='ui.chatMentions' && typeName==='ChatMention' && k==='id') {
+  wireOverrides.push({method:ctx.method,field:key,prefix:'company|finding|asset',role:ctx.role});
+  return {anyOf:[id('company'),id('finding'),id('asset')]};
+ }
  if(ctx.role==='params' && ['ui.workspaceWrite','ui.writeSkillFile'].includes(ctx.method)&&k==='content') return ref('Body');
  if(ctx.role==='params' && ctx.method==='ui.createSkill'&&k==='instructions') return preserveNull(s,ref('Body'));
  if(ctx.role==='result' && ctx.method==='ui.workspaceRead'&&k==='content') return ref('Body');
@@ -217,6 +222,9 @@ function wire(s,ctx,key='',typeName='') {
  if(k==='id' && ctx.role==='result' && ctx.method==='ui.controlIntent') prefix='node';
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteTaskCategory') prefix='category';
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteTaskTemplate') prefix='template';
+ // Delete results identify the removed native object; they are not row counts.
+ if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteLLMProfile') prefix='profile';
+ if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteMcpServer') prefix='mcp';
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteInterceptRule') prefix='interceptrule';
  if(k==='id' && ctx.role==='params' && /[Tt]askInterceptRule/.test(ctx.method)) prefix='task';
  if(k==='id' && ctx.role==='params' && ctx.method==='ui.taskArchive') prefix='archive';
@@ -258,6 +266,11 @@ function wire(s,ctx,key='',typeName='') {
  if(ctx.role==='result'&&typeName==='Activity'&&result.properties) result.properties.stream=obj({run_id:id('run'),turn_id:str,pending:bool});
  if(ctx.role==='result'&&typeName==='Task'&&result.properties) Object.assign(result.properties,{accounting_state:{enum:['known','recovery_required']},active_elapsed_ms:uint,remaining_timeout_ms:nullable(uint)});
  if(ctx.role==='result'&&ctx.method==='ui.createCompany'&&result.properties?.scope_added) result.properties.scope_skipped={type:'integer',minimum:0};
+ if(ctx.role==='result' && ctx.method==='ui.chatMentions' && typeName==='ChatMention' && result.properties) result.allOf=[
+  {if:{properties:{kind:{const:'company'}},required:['kind']},then:{properties:{id:id('company')}}},
+  {if:{properties:{kind:{const:'finding'}},required:['kind']},then:{properties:{id:id('finding')}}},
+  {if:{properties:{kind:{enum:['asset','root_domain','subdomain','ip','service','app','endpoint']}},required:['kind']},then:{properties:{id:id('asset')}}}
+ ];
  if(s.items) result.items=wire(s.items,ctx,'',typeName);
  if(s.anyOf) result.anyOf=s.anyOf.map(x=>wire(x,ctx,key,typeName));
  if(s.additionalProperties && typeof s.additionalProperties==='object') result.additionalProperties=wire(s.additionalProperties,ctx,'',typeName);
@@ -278,7 +291,7 @@ for (const r of routeRegistry.routes) if (r.disposition !== 'removed_os_session'
   methods[r.rpc_method] ??= obj({ route_id:{ enum:[] }, path:{ type:'object' }, query:{ type:'object' }, body:{}, blob_ref:nullable(ref('BlobRef')) }, ['route_id','path','query','body']);
   methods[r.rpc_method].properties.route_id.enum.push(r.route_id);
 }
-const workspaceResult = obj({ workspace_id:id('workspace'), name:str, format_version:{ const:1 }, commit_seq:uint, read_only:bool, recovery:{ type:'object' }, capabilities:array(str) });
+const workspaceResult = obj({ workspace_id:id('workspace'), name:str, format_version:{ enum:[1,2] }, commit_seq:uint, read_only:bool, recovery:{ type:'object' }, capabilities:array(str) });
 const executionResult = obj({ execution_id:id('exec'),state:{ enum:['prepared','running','completed','failed','cancelled','unknown'] },exit_code:nullable({ type:'integer' }),output_ref:nullable(ref('BlobRef')),last_cursor:uint },['execution_id','state']);
 const results = {
  'system.hello':obj({ protocol:{ const:'artex-rpc/1.0' }, engine_epoch:id('epoch'),engine_version:str,store_format:{ const:1 },max_frame_bytes:{ const:1048576 },max_blob_chunk:{ const:65536 },read_only:bool,workspace_id:nullable(id('workspace')),commit_seq:uint,capabilities:array(str) }),
@@ -321,7 +334,7 @@ extendWorkspaceApprovalSettings(rpcContract);
 save('rpc.v1.schema.json', rpcContract);
 const manifestProperties = { format:{const:'artex-checkpoint'},format_version:{const:1},workspace_id:id('workspace'),generation:uint,base_seq:uint,base_frame_sha256:digest,created_at:timestamp,files:array(obj({path:str,sha256:digest,length:uint,record_count:uint})),journal_start_seq:uint,command_receipt_count:uint,manifest_sha256:digest };
 save('storage.v1.schema.json', { $schema:dialect,$id:'urn:artex:storage:1',$defs:{ ...definitions,
- Project:obj({format:{const:'artex-workspace'},format_version:{const:1},workspace_id:id('workspace'),name:str,created_at:timestamp}),
+ Project:{anyOf:[obj({format:{const:'artex-workspace'},format_version:{const:1},workspace_id:id('workspace'),name:str,created_at:timestamp}),obj({format:{const:'artex-workspace'},format_version:{const:2},storage:{const:'sqlite-v1'},workspace_id:id('workspace'),name:str,created_at:timestamp})]},
  Manifest:obj(manifestProperties),
  Mutation:obj({op:{enum:['put','delete']},collection:{enum:allCollections},id:str,expected_version:uint,new_version:uint,record:ref('RecordEnvelope')},['op','collection','id','expected_version','new_version']),
  JournalPayload:obj({format_version:{const:1},committed_at:timestamp,command_id:id('command'),method:str,normalized_params:{},expected:array(ref('Expected')),mutations:array(ref('Mutation')),events:array(ref('RecordEnvelope')),deliveries:array(ref('RecordEnvelope')),result:{}})

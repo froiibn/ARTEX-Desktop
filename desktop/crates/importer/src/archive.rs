@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    io::{Read, Write},
+    io::{Cursor, Read, Seek, SeekFrom, Write},
     path::Path,
 };
 
@@ -62,15 +62,29 @@ pub fn read_archive(path: &Path, source_instance: &str) -> Result<LegacyExport> 
     if meta.file_type().is_symlink() || meta.len() > MAX_ARCHIVE_BYTES {
         return Err(Error::new("SIZE_LIMIT", "Archive file boundary exceeded"));
     }
+    read_archive_reader(fs::File::open(path)?, source_instance)
+}
+/// Decode an immutable stored package without creating files in a read-only workspace.
+/// Uses the same entry, expansion, schema and checksum verification as file import.
+pub fn read_archive_bytes(bytes: &[u8], source_instance: &str) -> Result<LegacyExport> {
+    if bytes.len() as u64 > MAX_ARCHIVE_BYTES {
+        return Err(Error::new("SIZE_LIMIT", "Archive file boundary exceeded"));
+    }
+    read_archive_reader(Cursor::new(bytes), source_instance)
+}
+fn read_archive_reader(
+    mut reader: impl Read + Seek,
+    source_instance: &str,
+) -> Result<LegacyExport> {
     let mut signature = [0; 4];
-    let mut file = fs::File::open(path)?;
-    file.read_exact(&mut signature)?;
+    reader.read_exact(&mut signature)?;
+    reader.seek(SeekFrom::Start(0))?;
     let mut files = BTreeMap::new();
     let mut names = BTreeSet::new();
     let mut total = 0;
     if signature[..2] == *b"PK" {
-        let mut archive = zip::ZipArchive::new(fs::File::open(path)?)
-            .map_err(|_| archive_error("Invalid ZIP archive"))?;
+        let mut archive =
+            zip::ZipArchive::new(reader).map_err(|_| archive_error("Invalid ZIP archive"))?;
         for i in 0..archive.len() {
             let entry = archive
                 .by_index(i)
@@ -86,7 +100,7 @@ pub fn read_archive(path: &Path, source_instance: &str) -> Result<LegacyExport> 
             add_entry(&mut files, &mut names, &name, entry, size, &mut total)?;
         }
     } else {
-        let decoder = zstd::stream::read::Decoder::new(fs::File::open(path)?)
+        let decoder = zstd::stream::read::Decoder::new(reader)
             .map_err(|_| archive_error("Invalid Zstandard archive"))?;
         let mut archive = tar::Archive::new(decoder);
         for entry in archive

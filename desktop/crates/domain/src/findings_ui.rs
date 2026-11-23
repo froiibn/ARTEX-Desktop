@@ -114,6 +114,20 @@ pub fn severity(s: &str) -> u8 {
     }
 }
 pub fn filtered<'a>(s: &'a Snapshot, q: &Value) -> Result<Vec<&'a Record>> {
+    filtered_with_reader(s, q, &|_| {
+        Err(Error::new(
+            "FEATURE_DISABLED",
+            "Finding search requires a blob reader",
+        ))
+    })
+}
+/// Search persisted text independently of its inline/blob representation.
+/// A failed read must fail the query rather than silently exclude a finding.
+pub fn filtered_with_reader<'a>(
+    s: &'a Snapshot,
+    q: &Value,
+    reader: &crate::traffic_ui::BlobReader,
+) -> Result<Vec<&'a Record>> {
     let query = text(q, "query").trim().to_lowercase();
     let asset_scope = text(q, "assetScope");
     let scope_ids = if asset_scope.is_empty() || asset_scope == "__none__" {
@@ -142,20 +156,6 @@ pub fn filtered<'a>(s: &'a Snapshot, q: &Value) -> Result<Vec<&'a Record>> {
         } else if !matches!(task, "" | "all") && d["task_id"] != task {
             continue;
         }
-        if !query.is_empty()
-            && !["name", "vulnclass", "summary", "evidence", "report"]
-                .iter()
-                .any(|k| {
-                    d[*k]
-                        .as_str()
-                        .or(d[*k]["text"].as_str())
-                        .unwrap_or("")
-                        .to_lowercase()
-                        .contains(&query)
-                })
-        {
-            continue;
-        }
         if !asset_scope.is_empty() {
             let aids = ids(d, "asset_ids");
             if asset_scope == "__none__" {
@@ -166,6 +166,30 @@ pub fn filtered<'a>(s: &'a Snapshot, q: &Value) -> Result<Vec<&'a Record>> {
                 if !aids.iter().any(|id| scope_ids.contains(id)) {
                     continue;
                 }
+            }
+        }
+        if !query.is_empty() {
+            let fields = ["name", "vulnclass", "summary", "evidence", "report"];
+            // Check already available text first; a matching name/summary does
+            // not need to hydrate unrelated large evidence or report bodies.
+            let mut matched = fields
+                .iter()
+                .filter_map(|key| d[*key].as_str().or(d[*key]["text"].as_str()))
+                .any(|value| value.to_lowercase().contains(&query));
+            for key in fields.into_iter().filter(|key| d[*key]["blob"].is_object()) {
+                if matched {
+                    break;
+                }
+                let bytes = crate::traffic_ui::body_bytes(&d[key], reader)?;
+                let value = std::str::from_utf8(&bytes)
+                    .map_err(|_| Error::new("CORRUPT_STORE", "Finding text is not UTF-8"))?;
+                if value.to_lowercase().contains(&query) {
+                    matched = true;
+                    break;
+                }
+            }
+            if !matched {
+                continue;
             }
         }
         rows.push(f);
@@ -188,12 +212,26 @@ fn retest(d: &Value) -> Value {
     d
 }
 pub fn query(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<Value> {
+    query_with_reader(m, p, s, c, &|_| {
+        Err(Error::new(
+            "FEATURE_DISABLED",
+            "Finding search requires a blob reader",
+        ))
+    })
+}
+pub fn query_with_reader(
+    m: &str,
+    p: &Value,
+    s: &Snapshot,
+    c: &Context,
+    reader: &crate::traffic_ui::BlobReader,
+) -> Result<Value> {
     match m{
 "ui.getFinding"=>{let context=scoped(s,p,c,false)?;let f=record(s,"findings",required(p,"id")?)?;Ok(finding(&f.data,s,true,context.task_id.as_deref()))},
 "ui.findingTraffic"=>{scoped(s,p,c,false)?;traffic(required(p,"id")?,s)},
 "ui.findings"=>{let task=text(p,"task");let allowed=if !task.is_empty()&&task!="all"{Some(direct_sources(s,task))}else{None};let mut rows=s.records("findings").into_iter().filter(|r|allowed.as_ref().is_none_or(|set|set.contains(text(&r.data,"task_id")))).collect::<Vec<_>>();rows.sort_by(|a,b|b.header.created_at.cmp(&a.header.created_at));rows.truncate(500);Ok(json!(rows.iter().map(|r|finding(&r.data,s,false,if task.is_empty(){None}else{Some(task)})).collect::<Vec<_>>()))},
-"ui.findingsPage"=>{let q=&p["q"];let rows=filtered(s,q)?;let total=rows.len();let page=q["page"].as_u64().unwrap_or(1).max(1);let size=q["pageSize"].as_u64().unwrap_or(20).clamp(1,100);Ok(json!({"items":rows.into_iter().skip((page-1).saturating_mul(size)as usize).take(size as usize).map(|r|finding(&r.data,s,false,None)).collect::<Vec<_>>(),"total":total,"page":page,"page_size":size}))},
-"ui.findingGroups"=>{let q=&p["q"];let rows=filtered(s,q)?;let finding_total=rows.len();let mut groups=BTreeMap::<Option<String>,Vec<&Record>>::new();for r in rows{let owner=r.data["task_id"].as_str().filter(|id|s.get("tasks",id).is_some()).map(str::to_owned);groups.entry(owner).or_default().push(r);}let mut rows=groups.into_iter().map(|(id,findings)|{let t=id.as_deref().and_then(|id|s.get("tasks",id));let mut out=json!({"task_id":id,"task_name":t.map(|r|text(&r.data,"name")).unwrap_or(""),"task_description":t.map(|r|text(&r.data,"description")).unwrap_or(""),"task_status":t.map(|r|text(&r.data,"status")).unwrap_or(""),"count":findings.len(),"last_found_at":findings.iter().map(|r|r.header.created_at.clone()).max().unwrap()});for severity in ["critical","high","medium","low"]{out[severity]=json!(findings.iter().filter(|f|f.data["severity"]==severity).count());}out}).collect::<Vec<_>>();rows.sort_by(|a,b|{let rank=|v:&Value|["critical","high","medium","low"].iter().position(|k|v[*k].as_u64().unwrap_or(0)>0).unwrap_or(4);(if q["sort"]=="severity"{rank(a).cmp(&rank(b))}else{std::cmp::Ordering::Equal}).then_with(||text(b,"last_found_at").cmp(text(a,"last_found_at"))).then_with(||text(b,"task_id").cmp(text(a,"task_id")))});let total=rows.len();let page=q["page"].as_u64().unwrap_or(1).max(1);let size=q["pageSize"].as_u64().unwrap_or(10).clamp(1,100);Ok(json!({"items":rows.into_iter().skip((page-1).saturating_mul(size)as usize).take(size as usize).collect::<Vec<_>>(),"total":total,"finding_total":finding_total,"page":page,"page_size":size}))},
+"ui.findingsPage"=>{let q=&p["q"];let rows=filtered_with_reader(s,q,reader)?;let total=rows.len();let page=q["page"].as_u64().unwrap_or(1).max(1);let size=q["pageSize"].as_u64().unwrap_or(20).clamp(1,100);Ok(json!({"items":rows.into_iter().skip((page-1).saturating_mul(size)as usize).take(size as usize).map(|r|finding(&r.data,s,false,None)).collect::<Vec<_>>(),"total":total,"page":page,"page_size":size}))},
+"ui.findingGroups"=>{let q=&p["q"];let rows=filtered_with_reader(s,q,reader)?;let finding_total=rows.len();let mut groups=BTreeMap::<Option<String>,Vec<&Record>>::new();for r in rows{let owner=r.data["task_id"].as_str().filter(|id|s.get("tasks",id).is_some()).map(str::to_owned);groups.entry(owner).or_default().push(r);}let mut rows=groups.into_iter().map(|(id,findings)|{let t=id.as_deref().and_then(|id|s.get("tasks",id));let mut out=json!({"task_id":id,"task_name":t.map(|r|text(&r.data,"name")).unwrap_or(""),"task_description":t.map(|r|text(&r.data,"description")).unwrap_or(""),"task_status":t.map(|r|text(&r.data,"status")).unwrap_or(""),"count":findings.len(),"last_found_at":findings.iter().map(|r|r.header.created_at.clone()).max().unwrap()});for severity in ["critical","high","medium","low"]{out[severity]=json!(findings.iter().filter(|f|f.data["severity"]==severity).count());}out}).collect::<Vec<_>>();rows.sort_by(|a,b|{let rank=|v:&Value|["critical","high","medium","low"].iter().position(|k|v[*k].as_u64().unwrap_or(0)>0).unwrap_or(4);(if q["sort"]=="severity"{rank(a).cmp(&rank(b))}else{std::cmp::Ordering::Equal}).then_with(||text(b,"last_found_at").cmp(text(a,"last_found_at"))).then_with(||text(b,"task_id").cmp(text(a,"task_id")))});let total=rows.len();let page=q["page"].as_u64().unwrap_or(1).max(1);let size=q["pageSize"].as_u64().unwrap_or(10).clamp(1,100);Ok(json!({"items":rows.into_iter().skip((page-1).saturating_mul(size)as usize).take(size as usize).collect::<Vec<_>>(),"total":total,"finding_total":finding_total,"page":page,"page_size":size}))},
 "ui.findingLineage"=>{let f=record(s,"findings",required(p,"id")?)?;let Some(node)=f.data["node_id"].as_str().and_then(|id|s.get("exploration_nodes",id))else{return Ok(json!({"nodes":[],"edges":[]}));};let mut visited=BTreeSet::from([node.header.id.clone()]);loop{let mut added=false;for e in s.records("exploration_edges"){if e.data["exploration_id"]==node.data["exploration_id"]&&visited.contains(text(&e.data,"dst_id")){added|=visited.insert(text(&e.data,"src_id").into());}}if !added{break;}}let owner=text(&f.data,"task_id");Ok(json!({"nodes":visited.iter().filter_map(|id|s.get("exploration_nodes",id)).map(|r|exploration_ui::node(r,s,owner)).collect::<Vec<_>>(),"edges":s.records("exploration_edges").iter().filter(|r|visited.contains(text(&r.data,"src_id"))&&visited.contains(text(&r.data,"dst_id"))).map(|r|exploration_ui::edge(r)).collect::<Vec<_>>()}))},
 "ui.findingRetests"=>{let id=required(p,"id")?;record(s,"findings",id)?;let mut rows=s.records("finding_retests").into_iter().filter(|r|r.data["finding_id"]==id).collect::<Vec<_>>();rows.sort_by(|a,b|b.header.created_at.cmp(&a.header.created_at));Ok(json!(rows.iter().map(|r|retest(&r.data)).collect::<Vec<_>>()))},
 "ui.activeFindingRetests"=>Ok(json!(s.records("finding_retests").iter().filter(|r|matches!(text(&r.data,"status"),"pending"|"running")).map(|r|json!({"id":r.header.id,"finding_id":r.data["finding_id"],"conversation_id":r.data["conversation_id"],"status":r.data["status"]})).collect::<Vec<_>>())),

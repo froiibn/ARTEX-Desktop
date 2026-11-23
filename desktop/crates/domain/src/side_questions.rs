@@ -414,6 +414,14 @@ pub fn update_plan(
     d["error"] = json!(error);
     d["usage"] = usage.clone();
     d["context_info"] = context.clone();
+    // Preparation can publish progress/memory while the request is running.
+    // Never replace its immutable admitted question/checkpoint with a newer
+    // parent snapshot when a worker resumes or the next progress update arrives.
+    for key in ["admitted_question", "frozen_snapshot"] {
+        if let Some(value) = row.data["context_info"].get(key) {
+            d["context_info"][key] = value.clone();
+        }
+    }
     d["sequence"] = json!((n(&d, "sequence") + 1).to_string());
     b.put("side_question_requests", id, d);
     b.expect(session);
@@ -430,6 +438,54 @@ pub fn update_plan(
         "side_question_requests",
         id,
     )?;
+    let mut out = b.done(json!({"saved":true}));
+    augment_expected(&mut out, s)?;
+    Ok(out)
+}
+
+/// Cancellation fences answer/memory changes immediately, but the owned worker
+/// may still receive provider-reported billing counters while its socket closes.
+/// Settle only those monotone counters for the same live session generation;
+/// the caller fences workspace/engine epoch before entering this internal plan.
+/// A clear/delete must never recreate an old request or its discussion.
+pub fn cancelled_usage_plan(
+    s: &Snapshot,
+    c: &Context,
+    id: &str,
+    generation: &str,
+    usage: &Value,
+) -> Result<CommandBatch> {
+    user(c)?;
+    let mut b = Planner::new(s, "side.cancelled_usage", &json!({"id":id,"generation":generation}));
+    let Some(row) = s.get("side_question_requests", id) else {
+        return Ok(b.done(json!({"saved":false})));
+    };
+    let Some(session) = session(s, text(&row.data, "session_key")) else {
+        return Ok(b.done(json!({"saved":false})));
+    };
+    if row.data["status"] != "cancelled"
+        || row.data["generation"] != generation
+        || session.data["generation"] != generation
+    {
+        return Ok(b.done(json!({"saved":false})));
+    }
+    let mut combined = if row.data["usage"].is_object() { row.data["usage"].clone() } else { json!({}) };
+    let mut observed = false;
+    for key in ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"] {
+        if let Some(count) = usage[key].as_u64() {
+            observed = true;
+            combined[key] = json!(combined[key].as_u64().unwrap_or(0).max(count));
+        }
+    }
+    if !observed || combined == row.data["usage"] {
+        return Ok(b.done(json!({"saved":false})));
+    }
+    let mut data = row.data.clone();
+    data["usage"] = combined;
+    data["sequence"] = json!((n(&data, "sequence") + 1).to_string());
+    b.expect(session);
+    b.put("side_question_requests", id, data);
+    conversation::push_event(&mut b.batch, s, c, "SideQuestionUpdated", "side_question_requests", id)?;
     let mut out = b.done(json!({"saved":true}));
     augment_expected(&mut out, s)?;
     Ok(out)
@@ -458,6 +514,9 @@ pub fn execution_input(s: &Snapshot, id: &str) -> Result<Value> {
             r.data["session_key"] == session.data["session_key"]
                 && r.data["generation"] == request.data["generation"]
                 && r.data["status"] == "completed"
+                // Source Replay.Load(after): previously summarized originals
+                // remain durable but need not be loaded into the next worker.
+                && n(&r.data, "ordinal") > n(&session.data["memory"], "through")
                 && n(&r.data, "ordinal") < n(&request.data, "ordinal")
         })
         .collect::<Vec<_>>();

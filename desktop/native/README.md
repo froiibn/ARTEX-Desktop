@@ -1,19 +1,24 @@
 # ARTEX Rust 데스크톱
 
+LLM 연결·기본 모델·일반 설정·에이전트·도구/MCP·스킬 구성은 같은 앱 프로필의 모든 작업 공간에서 공통으로 사용한다. 첫 열기에서 최근 사용 기록의 모델도 읽기 전용으로 가져오며, 기록 밖의 공간은 직접 열어 이전한다. 기존 공통 값과 기본 모델은 유지한다. 좁은 화면에서도 중앙의 저장된 모델 선택기로 기존 연결을 확인할 수 있다. 설정 화면에 공유 범위를 표시한다. Bypass와 작업·대화 기록은 현재 작업 공간에 유지한다. [공통 설정 저장·이전·검증 안내](../../docs/shared-application-settings.md)를 참고한다.
+
 현재 개발 대상은 Rust로 작성한 네이티브 데스크톱 앱이다. 화면은 egui/eframe이며 `native-core`의 객체·파일 저장, LLM 실행, 권한 검사와 같은 프로세스에서 실행된다. React, JavaScript, WebView, HTTP UI 서버, 별도 `artex-engine` 프로세스를 사용하지 않는다.
 
-작업 디렉터리: `D:\Artex\rebuilt\desktop\native` (UI), `D:\Artex\rebuilt\desktop\native-core` (앱 서비스). 이전 Tauri/React 구현은 현재 작업 트리에서 제거했다. 데이터 저장은 기존 Rust 파일 포맷과 객체 ID를 유지한다. 임의 사용자 공간을 테스트 데이터로 쓰지 않는다.
+소스 위치는 저장소 루트 기준 `desktop/native` (UI), `desktop/native-core` (앱 서비스)다. 이전 Tauri/React 구현은 현재 작업 트리에서 제거했다. 데이터 저장은 기존 Rust 파일 포맷과 객체 ID를 유지한다. 임의 사용자 공간을 테스트 데이터로 쓰지 않는다.
 
 ## 빌드와 실행
 
-Rust와 OS의 네이티브 빌드 도구가 필요하다. Node/npm 및 WebView 런타임은 필요하지 않다.
+Rust, Python 3.11 이상과 OS의 네이티브 빌드 도구가 필요하다. Python은 빌드 보조 도구이며 기본 앱 실행에 필요하지 않다. Node/npm 및 WebView 런타임은 필요하지 않다.
 
 ```powershell
-Set-Location D:\Artex\rebuilt
-$env:CARGO_TARGET_DIR = 'D:\Artex\rebuilt\desktop\target'
-cargo build --manifest-path desktop/native/Cargo.toml
-& D:\Artex\rebuilt\desktop\target\debug\artex-native.exe
+# 저장소 루트에서 실행
+python desktop/native/scripts/build.py
+& .\desktop\dist\ARTEX-Windows\ARTEX.exe
 ```
+
+실행 위치는 위 경로로 고정한다. 다른 현재 폴더에서 호출해도 스크립트 자신의 위치로 저장소 루트를 찾아 같은 파일을 교체한다. macOS/Linux의 동일 명령 출력은 `desktop/dist/ARTEX-macOS/artex-native`, `desktop/dist/ARTEX-Linux/artex-native`다. `.cargo/config.toml`과 빌드 스크립트가 Cargo 중간 파일을 `desktop/target`에 모은다. 이 캐시의 debug/release 실행 파일을 별도 사용자 실행본으로 복사하지 않는다.
+
+실제 Cargo가 보고한 실행 파일만 복사하고 `BUILD-INFO.json`에 SHA-256·Git 상태·로컬 빌드 구분을 기록한다. 컴파일 실패나 실행 중 파일 잠금 때문에 교체할 수 없으면 기존 실행 파일은 삭제하지 않고 오류로 끝낸다. 정식 배포는 기존 검증·고지 수집 절차를 유지하며 `package.ps1`의 `desktop/dist/packages/<version>`, `create-release.py`의 `desktop/dist/releases/v<version>`을 사용한다. 같은 버전의 정식 산출물을 덮어쓰지 않는다.
 
 앱에서 새 작업 공간을 만들거나 기존 공간 폴더를 연다. LLM 모델 메뉴에서 공급자·모델·API 키를 설정한 뒤 대화 또는 작업을 만든다. API 키 원문은 객체 저장에 쓰지 않고 OS 자격 증명 저장소의 참조로 기록한다. Linux에서 Secret Service를 사용할 수 없으면 세션 메모리 키라는 점을 화면에 표시한다. Windows/macOS에서 OS 저장에 실패하면 오류를 표시하며 저장 성공으로 처리하지 않는다.
 
@@ -28,8 +33,8 @@ Claude의 `stop_reason=refusal`은 모델 제공자의 요청 거절이다. 일�
 승인 버튼을 누르면 즉시 처리 중 상태가 표시된다. 승인 요청은 일반 조회보다 먼저 처리하고 확정 후 해당 실행을 다시 확인한다. 정확히 같은 도구 호출에 대한 수동 규칙 승인은 권한 승인에서도 재사용하여 같은 실행을 두 번 승인하지 않게 한다. 자동 규칙·모델의 허용은 수동 승인으로 간주하지 않는다. 도구 실행이나 모델의 다음 응답 시간은 별도이며 실제 실행 완료 전에 완료된 것으로 표시하지 않는다.
 
 ```powershell
-& D:\Artex\rebuilt\desktop\target\debug\artex-native.exe --workspace D:\사용자\작업공간
-& D:\Artex\rebuilt\desktop\target\debug\artex-native.exe --workspace D:\사용자\작업공간 --read-only
+& .\desktop\dist\ARTEX-Windows\ARTEX.exe --workspace D:\사용자\작업공간
+& .\desktop\dist\ARTEX-Windows\ARTEX.exe --workspace D:\사용자\작업공간 --read-only
 ```
 
 `--profile`은 앱 설정/단일 인스턴스 잠금 경로를 별도로 지정한다. 검증 전용 `--self-test --workspace NEW_ABSOLUTE_PATH`는 새 폴더에서 실제 서비스·LLM 시험 공급자·파일 도구를 검사한다. `--smoke --workspace ABSOLUTE_PATH --screenshot ABSOLUTE_PNG_PATH`는 네이티브 창의 각 메뉴를 그린 뒤 화면을 저장하고 정상 종료한다. 기존 폴더를 `--self-test`로 덮어쓰지 않는다.
@@ -37,6 +42,8 @@ Claude의 `stop_reason=refusal`은 모델 제공자의 요청 거절이다. 일�
 검증용 `--smoke-screen dashboard|tasks|sessions|chat|models|settings|approvals|files|archives`를 함께 지정하면 23개 화면 검사 후 해당 화면의 실제 저장 항목을 선택해 GPU 화면을 캡처한다. 기본은 대시보드다. `--smoke-narrow`는 `--smoke`와 함께 900×620 논리 크기의 최소 창을 검사할 때 사용한다. `--smoke-dock activity|management`는 같은 절차에서 하단 탭을 펼친다. 관리 탭의 캡처 대상은 `chat`이다. `--smoke-dialog delete-preview`는 대화·작업·보관 화면의 삭제 미리보기만 열고 실행하지 않는다. `--smoke-dialog trash`는 보관 화면의 대화 휴지통을 조회한다. 모든 화면 검증에는 격리된 시험 작업 공간과 별도 프로필을 사용한다.
 
 ## 작업 화면
+
+사이트 분석 작업을 선택하고 **종합 보고서** 탭에서 검사 내역·발견 문제·개선 우선순위·미검증 항목을 확인한다. 실행 중·중지·실패는 부분 보고서로 구분하고 **보고서 내보내기 (.md)**로 전체 원문을 저장한다. 큰 본문은 페이지로 읽으며 모델 호출 없이 저장된 기록으로 구성한다. [사용·저장·검증 기준](../../docs/site-assessment-report.md)을 참고한다.
 
 대화·작업 목록의 체크박스로 여러 항목을 선택하고 `⋯` 또는 우클릭 메뉴에서 관리한다. 대화의 기본 삭제는 휴지통으로 이동이며 **보관·휴지통 → 대화 휴지통**에서 복원한다. **대화 내역 비우기**는 대화 설정을 유지하고 기록과 전용 파일을 정리한다. **영구 삭제**와 작업 삭제는 자료별 영향·전용 파일 경로·보존 자료를 확인한 후 확정한다. 작업의 보관·복원 기능은 유지한다. 공유 자료와 원래 업로드 파일은 전용 작업 디렉터리로 취급하지 않는다. 전용 파일은 활성 작업 영역에서 `.artex-host/quarantine`으로 격리하고 복구용 사본을 보존한다. 영구 삭제는 앱의 객체·활성 기록 삭제를 뜻하며 격리 사본·이전 WAL·백업의 물리적 제거 또는 보안 삭제는 보장하지 않는다.
 
@@ -73,3 +80,7 @@ UI와 객체 저장은 Rust 채널과 읽기 전용 스냅샷으로 연결한다
 한글 글꼴은 OFL의 Noto Sans KR을 실행 파일에 포함했다. 출처와 라이선스는 `assets/fonts/PROVENANCE.md`, `assets/fonts/OFL.txt`에 기록했다.
 
 Windows에서 개발·검증 중이다. macOS와 Arch Linux는 플랫폼 코드와 UI 의존성을 준비했으나 실제 호스트에서 빌드·운영 검증하기 전까지 실행 성공을 보장하지 않는다. 새 구현 검증 결과와 원본 기능 차이는 [STATUS.md](STATUS.md), [UI-PARITY.md](UI-PARITY.md), [PARITY.md](PARITY.md)를 기준으로 확인한다. 이전 Tauri의 테스트 수를 새 UI 검증 결과로 합산하지 않는다.
+
+## SQLite 작업공간
+
+현재 작업·대화·객체 관계·실행 기록과 공통 설정은 앱에 번들한 SQLite에 저장한다. DB 서버 설치는 필요하지 않다. 작업공간 DB는 `store/workspace.sqlite3`이며 대형 증거·도구 작업 파일은 파일로 유지한다. 정상적인 쓰기 열기에서 기존 v1 공간을 검증·이전하고 기존 파일과 설명 파일의 백업을 보존한다. 읽기 전용 열기는 원본을 이전하거나 수정하지 않는다. 이전 중에는 종료 완료를 기다리고, DB를 백업할 때는 앱을 정상 종료하거나 검증된 복구 내보내기를 사용한다. 실행 중 DB 파일 하나만 복사하지 않는다. 자세한 형식·복구·검증 범위는 [SQLite 저장 명세](../../docs/sqlite-storage.md)를 참고한다.

@@ -157,6 +157,9 @@ async fn models_async(
     if empty { Ok(vec![]) } else { Err(error) }
 }
 pub fn encode(profile: &Value, prompt: &Prompt) -> Result<(String, Value)> {
+    // Repair API-only tool pairs without rewriting the durable conversation.
+    let normalized = crate::request_messages::normalize(prompt);
+    let prompt = &normalized;
     let format = profile["format"].as_str().unwrap_or("openai");
     let model = profile["model"]
         .as_str()
@@ -173,12 +176,21 @@ pub fn encode(profile: &Value, prompt: &Prompt) -> Result<(String, Value)> {
     let mut body = match format {
         "anthropic" => {
             let mut messages = prompt.messages.clone();
+            // Source filterThinkingBlocks: an explicit disabled override must
+            // remove even signed history. Unsigned foreign-provider reasoning
+            // is never replayable, and a removed thinking-only turn must not
+            // leave the empty content array rejected by Messages endpoints.
+            let thinking_enabled = profile["thinking_type"]
+                .as_str()
+                .is_some_and(|mode| !mode.is_empty() && mode != "disabled");
             for m in &mut messages {
                 m.content.retain(|b| {
                     b["type"] != "thinking"
-                        || b["signature"].as_str().is_some_and(|s| !s.is_empty())
+                        || (thinking_enabled
+                            && b["signature"].as_str().is_some_and(|s| !s.is_empty()))
                 });
             }
+            messages.retain(|message| !message.content.is_empty());
             // API requires consecutive roles to be coalesced.
             let mut merged: Vec<Message> = Vec::new();
             for m in messages.drain(..) {
@@ -269,7 +281,9 @@ pub fn encode(profile: &Value, prompt: &Prompt) -> Result<(String, Value)> {
         body["thinking"] =
             json!({"type":"enabled","budget_tokens":(max/2).max(1024).min(max.saturating_sub(1))});
     }
-    if profile["thinking_type"] == "disabled" {
+    // Responses has no Messages-style thinking switch. Tool-free side-question
+    // summaries override thinking without adding an unsupported Responses field.
+    if format != "openai-responses" && profile["thinking_type"] == "disabled" {
         body["thinking"] = json!({"type":"disabled"});
     }
     if format == "openai" && profile["thinking_type"] == "enabled" {
@@ -303,8 +317,30 @@ fn content_text(v: &Value) -> String {
         v.to_string()
     }
 }
-fn usage(v: &Value) -> Value {
-    json!({"input_tokens":v["input_tokens"].as_i64().or_else(||v["prompt_tokens"].as_i64()).unwrap_or(0).clamp(0,i32::MAX as i64),"output_tokens":v["output_tokens"].as_i64().or_else(||v["completion_tokens"].as_i64()).unwrap_or(0).clamp(0,i32::MAX as i64),"cache_read_tokens":v["cache_read_input_tokens"].as_i64().or_else(||v["input_tokens_details"]["cached_tokens"].as_i64()).unwrap_or(0).clamp(0,i32::MAX as i64),"cache_write_tokens":v["cache_creation_input_tokens"].as_i64().unwrap_or(0).clamp(0,i32::MAX as i64)})
+fn usage(format: &str, v: &Value) -> Value {
+    // Source OpenAI Complete/Stream report Chat cache reads under prompt details;
+    // Responses and Anthropic retain their own names for the same counter.
+    let mut normalized = json!({"input_tokens":v["input_tokens"].as_i64().or_else(||v["prompt_tokens"].as_i64()).unwrap_or(0).clamp(0,i32::MAX as i64),"output_tokens":v["output_tokens"].as_i64().or_else(||v["completion_tokens"].as_i64()).unwrap_or(0).clamp(0,i32::MAX as i64),"cache_read_tokens":v["cache_read_input_tokens"].as_i64().or_else(||v["input_tokens_details"]["cached_tokens"].as_i64()).or_else(||v["prompt_tokens_details"]["cached_tokens"].as_i64()).unwrap_or(0).clamp(0,i32::MAX as i64),"cache_write_tokens":v["cache_creation_input_tokens"].as_i64().unwrap_or(0).clamp(0,i32::MAX as i64)});
+    if format == "anthropic" {
+        // Source anthropicUsage.norm: Messages input_tokens is uncached input.
+        // The canonical total includes cache subsets; OpenAI already includes
+        // them, so only Anthropic adds them once, before callers aggregate usage.
+        normalized["input_tokens"] = json!(
+            (normalized["input_tokens"].as_i64().unwrap()
+                + normalized["cache_read_tokens"].as_i64().unwrap()
+                + normalized["cache_write_tokens"].as_i64().unwrap())
+            .min(i32::MAX as i64)
+        );
+    }
+    normalized
+}
+/// Source pickReasoning: gateways use three names for one channel. Select the
+/// first nonempty alias so servers echoing several names do not duplicate it.
+fn reasoning_text(value: &Value) -> &str {
+    ["reasoning_content", "reasoning", "reasoning_text"]
+        .into_iter()
+        .find_map(|key| value[key].as_str().filter(|text| !text.is_empty()))
+        .unwrap_or("")
 }
 fn call(id: &Value, name: &Value, input: Value) -> Result<ToolCall> {
     Ok(ToolCall {
@@ -320,10 +356,75 @@ fn call(id: &Value, name: &Value, input: Value) -> Result<ToolCall> {
         input,
     })
 }
+fn tool_input(arguments: &Value) -> Result<Value> {
+    // Source Complete parsers accept absent/blank arguments for zero-parameter
+    // calls. Nonempty unfinished JSON remains an error, never a fabricated {}.
+    let raw = arguments.as_str().unwrap_or("{}").trim();
+    Ok(serde_json::from_str(if raw.is_empty() {
+        "{}"
+    } else {
+        raw
+    })?)
+}
 pub fn decode(format: &str, response: Value) -> Result<Turn> {
+    decode_inner(format, &response).map_err(|mut error| {
+        // A malformed/failed terminal JSON can still contain billed generation.
+        // Keep that observation on the error, so the transport never regenerates
+        // an already observed answer or drops its usage (including invalid tools).
+        let text = observed_json_text(format, &response);
+        let generated = match format {
+            "anthropic" => response["content"]
+                .as_array()
+                .is_some_and(|a| !a.is_empty()),
+            "openai-responses" => response["output"].as_array().is_some_and(|a| !a.is_empty()),
+            _ => {
+                !text.is_empty()
+                    || !reasoning_text(&response["choices"][0]["message"]).is_empty()
+                    || response["choices"][0]["message"]["tool_calls"]
+                        .as_array()
+                        .is_some_and(|a| !a.is_empty())
+            }
+        };
+        if generated {
+            error.details["committed"] = json!(true);
+        }
+        if response["usage"].as_object().is_some_and(|o| !o.is_empty()) {
+            error.details["usage"] = usage(format, &response["usage"]);
+        }
+        if !text.is_empty() {
+            error.details["partial_text"] = json!(text);
+        }
+        error
+    })
+}
+fn observed_json_text(format: &str, response: &Value) -> String {
+    match format {
+        "anthropic" => response["content"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|b| b["type"] == "text")
+            .filter_map(|b| b["text"].as_str())
+            .collect(),
+        "openai-responses" => response["output"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|b| b["type"] == "message")
+            .flat_map(|b| b["content"].as_array().into_iter().flatten())
+            .filter(|b| b["type"] == "output_text")
+            .filter_map(|b| b["text"].as_str())
+            .collect(),
+        _ if !response["choices"][0]["message"]["content"].is_null() => {
+            content_text(&response["choices"][0]["message"]["content"])
+        }
+        _ => String::new(),
+    }
+}
+fn decode_inner(format: &str, response: &Value) -> Result<Turn> {
     let mut turn = Turn {
         raw_response: response.clone(),
-        usage: usage(&response["usage"]),
+        usage: usage(format, &response["usage"]),
         ..Default::default()
     };
     if response.get("error").is_some_and(|e| !e.is_null()) {
@@ -352,7 +453,13 @@ pub fn decode(format: &str, response: Value) -> Result<Turn> {
         }
         "openai-responses" => {
             turn.stop_reason = response["status"].as_str().unwrap_or("").into();
-            if ["failed", "incomplete", "cancelled"].contains(&turn.stop_reason.as_str()) {
+            // Source openaiResponsesProvider.Complete treats the cap as a normal
+            // bounded generation, preserving partial content and its true reason.
+            if turn.stop_reason == "incomplete"
+                && response["incomplete_details"]["reason"] == "max_output_tokens"
+            {
+                turn.stop_reason = "max_tokens".into();
+            } else if ["failed", "incomplete", "cancelled"].contains(&turn.stop_reason.as_str()) {
                 return Err(Error::new(
                     "EXTERNAL_FAILURE",
                     "Responses generation did not complete",
@@ -374,11 +481,19 @@ pub fn decode(format: &str, response: Value) -> Result<Turn> {
                         for c in b["summary"].as_array().into_iter().flatten() {
                             turn.thinking.push_str(c["text"].as_str().unwrap_or(""));
                         }
+                        // Responses gateways may return the same reasoning
+                        // channel used by reasoning_text.delta in content,
+                        // rather than a summary (source parseResponsesOutput).
+                        for c in b["content"].as_array().into_iter().flatten() {
+                            if c["type"] == "reasoning_text" {
+                                turn.thinking.push_str(c["text"].as_str().unwrap_or(""));
+                            }
+                        }
                     }
                     Some("function_call") => turn.tools.push(call(
                         &b["call_id"],
                         &b["name"],
-                        serde_json::from_str(b["arguments"].as_str().unwrap_or("{}"))?,
+                        tool_input(&b["arguments"])?,
                     )?),
                     _ => {}
                 }
@@ -395,12 +510,12 @@ pub fn decode(format: &str, response: Value) -> Result<Turn> {
             if m["content"].is_null() {
                 turn.text.clear();
             }
-            turn.thinking = m["reasoning_content"].as_str().unwrap_or("").into();
+            turn.thinking = reasoning_text(m).into();
             for b in m["tool_calls"].as_array().into_iter().flatten() {
                 turn.tools.push(call(
                     &b["id"],
                     &b["function"]["name"],
-                    serde_json::from_str(b["function"]["arguments"].as_str().unwrap_or("{}"))?,
+                    tool_input(&b["function"]["arguments"])?,
                 )?);
             }
         }
@@ -558,7 +673,11 @@ async fn owned<F: std::future::Future>(
     let mut timer = tokio::time::interval(Duration::from_millis(20));
     loop {
         tokio::select! {
-            value=&mut future=>{cancel.check()?;return Ok(value)},
+            // A transport timeout and the caller's deadline can become ready
+            // together. Classify the owning deadline before exposing transport
+            // failure, so disabling retries cannot poison provider health for
+            // a run-owned timeout (source context.DeadlineExceeded semantics).
+            value=&mut future=>{cancel.check()?;if Instant::now()>=deadline{return Err(Error::new("TIMEOUT","LLM deadline elapsed"));}return Ok(value)},
             _=timer.tick()=>{cancel.check()?;if Instant::now()>=deadline{return Err(Error::new("TIMEOUT","LLM deadline elapsed"));}}
         }
     }
@@ -798,7 +917,12 @@ async fn generate_async(
                         .map_err(Error::from)
                         .and_then(|v| decode(format, v))
                 };
-                let committed = committed || (sse && decoder.committed());
+                let committed = committed
+                    || (sse && decoder.committed())
+                    || result
+                        .as_ref()
+                        .err()
+                        .is_some_and(|e| e.details["committed"] == true);
                 let turn = match result {
                     Ok(turn) => turn,
                     Err(mut e) => {
@@ -809,6 +933,13 @@ async fn generate_async(
                         if sse {
                             if let Some(observed) = decoder.observed_usage() {
                                 e.details["usage"] = observed;
+                            }
+                            if !decoder.observed_text().is_empty()
+                                && !e.details["partial_text"]
+                                    .as_str()
+                                    .is_some_and(|s| !s.is_empty())
+                            {
+                                e.details["partial_text"] = json!(decoder.observed_text());
                             }
                         }
                         let deterministic = [
@@ -840,11 +971,29 @@ async fn generate_async(
                     }
                 };
                 if turn.text.is_empty() && turn.tools.is_empty() {
+                    // Source harness handles max_tokens independently of text
+                    // or thinking content. A valid capped turn must reach that
+                    // bounded continuation policy, rather than a provider retry
+                    // or generic empty-output failure. Decode/terminal failures
+                    // have already returned above; refusal/filter stops stay errors.
+                    if matches!(turn.stop_reason.as_str(), "length" | "max_tokens") {
+                        return Ok(turn);
+                    }
                     if empty_completion_class(&turn) != "empty_output" {
                         return Err(completed_empty_error(format, &turn));
                     }
                     if !turn.thinking.is_empty() {
                         return Ok(turn);
+                    }
+                    if sse && decoder.content_observed() {
+                        // A terminal snapshot must not turn already emitted
+                        // content into a replayable empty completion. Preserve
+                        // any actual visible draft if the snapshot was unusable.
+                        let mut error = completed_empty_error(format, &turn);
+                        if !decoder.observed_text().is_empty() {
+                            error.details["partial_text"] = json!(decoder.observed_text());
+                        }
+                        return Err(error);
                     }
                     if empty < retry_count(profile, "empty", 2) {
                         retry_wait(profile, "empty", empty, 8000, cancellation, deadline).await?;
@@ -904,5 +1053,130 @@ mod tests {
         assert_eq!(t.thinking_signature, "sig");
         let t=decode("openai-responses",json!({"status":"completed","output":[{"type":"function_call","call_id":"a","name":"Read","arguments":"{}"}],"usage":{"input_tokens":3}})).unwrap();
         assert_eq!(t.tools[0].id, "a");
+    }
+    #[test]
+    fn anthropic_thinking_override_removes_invalid_history_and_merges_remaining_roles() {
+        let signed = json!({"type":"thinking","thinking":"verified reasoning","signature":"signed-original"});
+        let p = Prompt {
+            system: "Fixture".into(),
+            messages: vec![
+                Message {
+                    role: "user".into(),
+                    content: vec![json!({"type":"text","text":"first"})],
+                },
+                Message {
+                    role: "assistant".into(),
+                    content: vec![signed.clone()],
+                },
+                Message {
+                    role: "user".into(),
+                    content: vec![json!({"type":"text","text":"continue"})],
+                },
+                Message {
+                    role: "assistant".into(),
+                    content: vec![json!({"type":"thinking","thinking":"foreign unsigned"})],
+                },
+                Message {
+                    role: "assistant".into(),
+                    content: vec![
+                        json!({"type":"text","text":"answer"}),
+                        json!({"type":"tool_use","id":"call","name":"Read","input":{}}),
+                    ],
+                },
+                Message {
+                    role: "user".into(),
+                    content: vec![
+                        json!({"type":"tool_result","tool_use_id":"call","content":"result"}),
+                    ],
+                },
+            ],
+            tools: vec![],
+            session_id: "fixture".into(),
+        };
+        for mode in ["", "disabled", "enabled"] {
+            let profile = json!({"format":"anthropic","model":"fixture","thinking_type":mode});
+            let (_, body) = encode(&profile, &p).unwrap();
+            let messages = body["messages"].as_array().unwrap();
+            assert!(
+                messages
+                    .iter()
+                    .all(|m| !m["content"].as_array().unwrap().is_empty())
+            );
+            let thinking: Vec<_> = messages
+                .iter()
+                .flat_map(|m| m["content"].as_array().unwrap())
+                .filter(|b| b["type"] == "thinking")
+                .collect();
+            if mode == "enabled" {
+                assert_eq!(thinking, vec![&signed]);
+            } else {
+                assert!(thinking.is_empty());
+                assert_eq!(messages[0]["content"].as_array().unwrap().len(), 2);
+            }
+            assert_eq!(
+                messages.last().unwrap()["content"][0]["tool_use_id"],
+                "call"
+            );
+        }
+        assert_eq!(
+            p.messages[1].content[0], signed,
+            "encoding must not mutate durable history"
+        );
+    }
+    #[test]
+    fn reasoning_aliases_json_sse_and_responses_content_survive_tool_replay() {
+        for alias in ["reasoning_content", "reasoning", "reasoning_text"] {
+            let mut response = json!({"choices":[{"message":{"content":"answer","tool_calls":[{"id":"call","function":{"name":"Read","arguments":"{}"}}]},"finish_reason":"tool_calls"}]});
+            response["choices"][0]["message"][alias] = json!("thinking α");
+            let turn = decode("openai", response).unwrap();
+            assert_eq!(turn.thinking, "thinking α");
+            assert_eq!(turn.text, "answer");
+            assert_eq!(turn.tools[0].id, "call");
+            let delta = json!({"choices":[{"delta":{alias:"thinking α","content":"answer"},"finish_reason":"stop"}]});
+            let streamed =
+                decode_sse("openai", &format!("data: {delta}\n\ndata: [DONE]\n\n")).unwrap();
+            assert_eq!(streamed.thinking, "thinking α");
+            let p = Prompt {
+                system: "Fixture".into(),
+                messages: vec![Message {
+                    role: "assistant".into(),
+                    content: vec![
+                        json!({"type":"thinking","thinking":turn.thinking}),
+                        json!({"type":"tool_use","id":"call","name":"Read","input":{}}),
+                    ],
+                }],
+                tools: vec![],
+                session_id: "fixture".into(),
+            };
+            assert_eq!(
+                encode(&json!({"format":"openai","model":"fixture"}), &p)
+                    .unwrap()
+                    .1["messages"][1]["reasoning_content"],
+                "thinking α"
+            );
+        }
+        let aliases = json!({"choices":[{"message":{"content":"ok","reasoning_content":"primary","reasoning":"duplicate","reasoning_text":"duplicate"},"finish_reason":"stop"}]});
+        assert_eq!(decode("openai", aliases).unwrap().thinking, "primary");
+        let delta = json!({"choices":[{"delta":{"reasoning_content":"primary","reasoning":"duplicate","reasoning_text":"duplicate"},"finish_reason":"stop"}]});
+        assert_eq!(
+            decode_sse("openai", &format!("data: {delta}\n\n"))
+                .unwrap()
+                .thinking,
+            "primary"
+        );
+        let response = json!({"status":"completed","output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"summary "}],"content":[{"type":"reasoning_text","text":"body"},{"type":"unknown","text":"ignored"}]},{"type":"message","content":[{"type":"output_text","text":"answer"}]}]});
+        assert_eq!(
+            decode("openai-responses", response.clone())
+                .unwrap()
+                .thinking,
+            "summary body"
+        );
+        let event = json!({"type":"response.completed","response":response});
+        assert_eq!(
+            decode_sse("openai-responses", &format!("data: {event}\n\n"))
+                .unwrap()
+                .thinking,
+            "summary body"
+        );
     }
 }

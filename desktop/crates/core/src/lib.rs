@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 pub mod models;
+pub mod execution_status;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -1028,10 +1029,76 @@ pub fn validate_snapshot(snapshot: &Snapshot) -> Result<()> {
     validate_unique(snapshot)?;
     validate_semantics(snapshot)
 }
+/// Validate a transaction over an already validated immutable generation.
+/// Historical rows cannot change through this boundary. Revalidate touched
+/// records and every reference whose source or target may have changed; retain
+/// the same uniqueness and semantic rules as a full restore validation.
+pub fn validate_snapshot_delta(
+    previous: &Snapshot,
+    snapshot: &Snapshot,
+    changed: &BTreeSet<(String, String)>,
+) -> Result<()> {
+    if previous.workspace_id != snapshot.workspace_id
+        || snapshot.commit_seq
+            != previous
+                .commit_seq
+                .checked_add(1)
+                .ok_or_else(|| Error::new("SIZE_LIMIT", "Sequence exhausted"))?
+    {
+        return Err(Error::new("INVALID_PARAMS", "Invalid snapshot transition"));
+    }
+    let collections: BTreeSet<_> = changed.iter().map(|(c, _)| c.as_str()).collect();
+    for (collection, id) in changed {
+        collection_prefix(collection)?;
+        if let Some(record) = snapshot.get(collection, id) {
+            if record.header.id != *id
+                || record.header.collection != *collection
+                || parse_u64(&record.header.commit_seq)? != snapshot.commit_seq
+            {
+                return Err(Error::new(
+                    "INVALID_PARAMS",
+                    "Changed record identity/sequence mismatch",
+                ));
+            }
+            validate_record(record)?;
+        }
+    }
+    for fk in foreign_keys() {
+        let target_changed = collections.contains(fk.target.as_str());
+        if !target_changed && !collections.contains(fk.collection.as_str()) {
+            continue;
+        }
+        for record in snapshot.records(&fk.collection).into_iter().filter(|r| {
+            target_changed || changed.contains(&(fk.collection.clone(), r.header.id.clone()))
+        }) {
+            if fk.columns.iter().any(|c| record.data[c].is_null()) {
+                continue;
+            }
+            if !snapshot.records(&fk.target).iter().any(|target| {
+                same_fields(&record.data, &fk.columns, &target.data, &fk.target_columns)
+            }) {
+                let mut error = Error::new("VERSION_CONFLICT", "Foreign key target does not exist");
+                error.details = json!({"collection":fk.collection,"id":record.header.id,"columns":fk.columns,"target":fk.target});
+                return Err(error);
+            }
+        }
+    }
+    // Uniqueness is collection-local and reads immutable rows directly. Receipt
+    // and traffic histories must not be cloned just to inspect unrelated keys.
+    validate_unique_for(snapshot, Some(&collections))?;
+    validate_semantics(snapshot)
+}
 fn validate_unique(snapshot: &Snapshot) -> Result<()> {
+    validate_unique_for(snapshot, None)
+}
+fn validate_unique_for(snapshot: &Snapshot, only: Option<&BTreeSet<&str>>) -> Result<()> {
+    let records = |collection: &str| {
+        if only.is_none_or(|set|set.contains(collection)) { snapshot.records(collection) } else { Vec::new() }
+    };
     let composite = regex::Regex::new(r"(?i)(?:PRIMARY KEY|UNIQUE)\s*\(([^)]+)\)").unwrap();
     for table in data_model()["tables"].as_array().unwrap() {
         let collection = table["name"].as_str().unwrap();
+        if only.is_some_and(|set|!set.contains(collection)) { continue; }
         let mut keys = Vec::new();
         for column in table["columns"].as_array().unwrap() {
             let decl = column["declaration"].as_str().unwrap_or("");
@@ -1046,7 +1113,7 @@ fn validate_unique(snapshot: &Snapshot) -> Result<()> {
         }
         for columns in keys {
             let mut seen = BTreeSet::new();
-            for r in snapshot.records(collection) {
+            for r in records(collection) {
                 if columns.iter().any(|c| r.data[c].is_null()) {
                     continue;
                 }
@@ -1059,7 +1126,7 @@ fn validate_unique(snapshot: &Snapshot) -> Result<()> {
     }
     // Explicit partial natural keys from db/assets.go and schema.sql.
     let mut asset_keys = BTreeSet::new();
-    for r in snapshot.records("assets") {
+    for r in records("assets") {
         let d = &r.data;
         let ty = d["type"].as_str().unwrap_or("");
         let text = |k: &str| d[k].as_str().unwrap_or("").to_owned();
@@ -1132,23 +1199,22 @@ fn validate_unique(snapshot: &Snapshot) -> Result<()> {
             ));
         }
     }
-    unique_filtered(snapshot, "finding_retests", &["finding_id"], |r| {
+    unique_filtered(records("finding_retests"), &["finding_id"], |r| {
         ["pending", "running"].contains(&r.data["status"].as_str().unwrap_or(""))
     })?;
     unique_filtered(
-        snapshot,
-        "company_scope",
+        records("company_scope"),
         &["company_id", "kind", "value"],
         |r| ["icp", "keyword"].contains(&r.data["kind"].as_str().unwrap_or("")),
     )?;
-    unique_filtered(snapshot, "llm_profiles", &["is_default"], |r| {
+    unique_filtered(records("llm_profiles"), &["is_default"], |r| {
         r.data["is_default"] == true
     })?;
-    unique_filtered(snapshot, "side_question_requests", &["session_key"], |r| {
+    unique_filtered(records("side_question_requests"), &["session_key"], |r| {
         r.data["status"] == "running"
     })?;
     let mut scope_keys = BTreeSet::new();
-    for r in snapshot.records("task_scope") {
+    for r in records("task_scope") {
         let key: Vec<_> = ["task_id", "kind", "domain", "net", "company_id", "value"]
             .iter()
             .map(|k| {
@@ -1163,27 +1229,25 @@ fn validate_unique(snapshot: &Snapshot) -> Result<()> {
             return Err(Error::new("VERSION_CONFLICT", "Duplicate task scope"));
         }
     }
-    unique_filtered(snapshot, "agent_features", &["agent_id"], |_| true)?;
-    unique_filtered(snapshot, "task_runtime", &["task_id"], |_| true)?;
+    unique_filtered(records("agent_features"), &["agent_id"], |_| true)?;
+    unique_filtered(records("task_runtime"), &["task_id"], |_| true)?;
     unique_filtered(
-        snapshot,
-        "memory_records",
+        records("memory_records"),
         &["agent_id", "name", "type"],
         |_| true,
     )?;
-    unique_filtered(snapshot, "agent_deliveries", &["activation_key"], |r| {
+    unique_filtered(records("agent_deliveries"), &["activation_key"], |r| {
         !r.data["activation_key"].is_null()
     })?;
     Ok(())
 }
 fn unique_filtered<F: Fn(&Record) -> bool>(
-    s: &Snapshot,
-    c: &str,
+    rows: Vec<&Record>,
     fields: &[&str],
     filter: F,
 ) -> Result<()> {
     let mut seen = BTreeSet::new();
-    for r in s.records(c).into_iter().filter(|r| filter(r)) {
+    for r in rows.into_iter().filter(|r| filter(r)) {
         let key: Vec<_> = fields.iter().map(|k| r.data[k].clone()).collect();
         if !seen.insert(serde_json::to_string(&key)?) {
             return Err(Error::new(

@@ -68,7 +68,7 @@ if ($SharedRegressionReport) {
             $checked++
         }
     }
-    $sharedInputs = @(@('desktop/crates','desktop/contracts') | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $repoRoot $_) -Recurse -File | Where-Object { $_.Extension -in @('.rs','.json','.txt','.dat','.pem','.png','.svg') -or $_.Name -in @('Cargo.toml','Cargo.lock') } })
+    $sharedInputs = @(@('desktop/crates','desktop/contracts') | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $repoRoot $_) -Recurse -File | Where-Object { $_.Extension -in @('.rs','.py','.json','.txt','.dat','.pem','.png','.svg') -or $_.Name -in @('Cargo.toml','Cargo.lock') } })
     foreach ($inputFile in $sharedInputs) {
         if (@($parent.source_files | Where-Object { $_.path -eq $inputFile.FullName }).Count -ne 1) { throw "Shared input is absent from reused evidence: $($inputFile.FullName). Run -FullRegression." }
     }
@@ -232,8 +232,11 @@ if ($softwareOpenGl) {
 if (@($children | Where-Object { $_.Name -match 'artex-engine|msedgewebview2' }).Count -gt 0 -or @($modules | Where-Object { $_ -match 'WebView2Loader|wry' }).Count -gt 0) { throw 'Native window launched a legacy sidecar/WebView' }
 if ((Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant() -ne $testedSha) { throw 'Executable changed during verification' }
 $sourcePaths = [System.Collections.Generic.List[string]]::new()
-foreach ($directory in @('desktop/native/src','desktop/native/examples','desktop/native-core/src','desktop/crates')) {
-    Get-ChildItem -LiteralPath (Join-Path $repoRoot $directory) -Recurse -File | Where-Object { $_.Extension -in @('.rs','.json','.txt','.dat','.pem','.png','.svg') -or $_.Name -in @('Cargo.toml','Cargo.lock') } | ForEach-Object { [void]$sourcePaths.Add($_.FullName) }
+# Integration fixtures under native-core/tests execute the real Service/Host
+# boundary too. Bind their bytes to this report just like crate-local tests.
+# Host MCP/HTTP tests execute Python fixtures; their bytes are inputs as well.
+foreach ($directory in @('desktop/native/src','desktop/native/examples','desktop/native-core/src','desktop/native-core/tests','desktop/crates')) {
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot $directory) -Recurse -File | Where-Object { $_.Extension -in @('.rs','.py','.json','.txt','.dat','.pem','.png','.svg') -or $_.Name -in @('Cargo.toml','Cargo.lock') } | ForEach-Object { [void]$sourcePaths.Add($_.FullName) }
 }
 foreach ($manifest in @('desktop/Cargo.toml','desktop/Cargo.lock','desktop/native/Cargo.toml','desktop/native/Cargo.lock','desktop/native-core/Cargo.toml','desktop/native-core/Cargo.lock')) {
     $path = Join-Path $repoRoot $manifest

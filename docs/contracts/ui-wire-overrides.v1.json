@@ -2168,6 +2168,18 @@
       "role": "result"
     },
     {
+      "method": "ui.deleteLLMProfile",
+      "field": "deleted",
+      "prefix": "profile",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteMcpServer",
+      "field": "deleted",
+      "prefix": "mcp",
+      "role": "result"
+    },
+    {
       "method": "ui.llmPool",
       "field": "profile_id",
       "prefix": "profile",
@@ -2639,6 +2651,12 @@
       "method": "ui.llmRecordDetail",
       "field": "id",
       "prefix": "llmrecord",
+      "role": "result"
+    },
+    {
+      "method": "ui.chatMentions",
+      "field": "id",
+      "prefix": "company|finding|asset",
       "role": "result"
     }
   ],

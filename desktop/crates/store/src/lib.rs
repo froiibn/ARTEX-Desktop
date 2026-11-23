@@ -14,6 +14,8 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 mod maintenance;
+mod replay_logs;
+mod sqlite;
 pub mod query;
 pub use maintenance::{GcOptions, GcReport};
 pub use query::{QueryIndex, ReadGeneration, SearchPage};
@@ -75,9 +77,12 @@ struct Payload {
     result: Value,
 }
 
-/// One native OS file lock and one append stream own the workspace writer.
-/// Snapshots are deep immutable values; readers can never mutate committed state.
+/// One native OS lock and SQLite transaction owner control a v2 workspace.
+/// The legacy journal fields serve verified v1 reads/migration only. Immutable
+/// snapshots preserve the existing UI/domain boundary without exposing a writer.
 pub struct Store {
+    database: Option<sqlite::Database>,
+    sqlite_checkpoint: Option<(CheckpointTicket, Value)>,
     path: PathBuf,
     _lock: Arc<File>,
     journal: Option<File>,
@@ -99,7 +104,7 @@ pub struct Store {
     fault: Option<String>,
 }
 /// A worker may read a pinned generation and immutable blobs, but cannot append
-/// journal records. Sharing the exact native lock handle keeps the workspace
+/// database records. Sharing the exact native lock handle keeps the workspace
 /// protected even if its writer closes while a read job is cancelling.
 pub struct StoreReadView {
     path: PathBuf,
@@ -195,6 +200,10 @@ impl Store {
         existing_blob_reference(&self.path, digest, media_type)
     }
     pub fn create(path: &Path, name: &str) -> Result<Self> {
+        Self::create_sqlite(path, name)
+    }
+    #[cfg(test)]
+    fn create_legacy(path: &Path, name: &str) -> Result<Self> {
         if name.trim().is_empty() {
             return Err(Error::new("INVALID_PARAMS", "Workspace name is empty"));
         }
@@ -226,6 +235,8 @@ impl Store {
             .append(true)
             .open(&journal_path)?;
         let mut store = Self {
+            database: None,
+            sqlite_checkpoint: None,
             path: path.into(),
             _lock: Arc::new(lock),
             journal: Some(journal),
@@ -254,6 +265,10 @@ impl Store {
         store.checkpoint()?;
         Ok(store)
     }
+    #[cfg(test)]
+    fn open_legacy_test(path: &Path) -> Result<Self> { Self::open_legacy_with_mode(path, false) }
+    #[cfg(test)]
+    fn open_legacy_read_only_test(path: &Path) -> Result<Self> { Self::open_legacy_with_mode(path, true) }
     pub fn open(path: &Path) -> Result<Self> {
         Self::open_with_mode(path, false)
     }
@@ -261,6 +276,25 @@ impl Store {
         Self::open_with_mode(path, true)
     }
     pub fn open_with_mode(path: &Path, requested_read_only: bool) -> Result<Self> {
+        reject_links(path)?;
+        reject_links(&path.join("project.json"))?;
+        if !path.join("project.json").is_file() { return Err(Error::new("NOT_FOUND", "Project file is missing")); }
+        let project: Value = serde_json::from_slice(&fs::read(path.join("project.json"))?)?;
+        match project["format_version"].as_u64() {
+            Some(2) => Self::open_sqlite(path, requested_read_only, project),
+            Some(1) => {
+                // A legacy reader must not truncate a tail, replace owner bytes,
+                // or checkpoint the source before migration is fully verified.
+                let mut store = Self::open_legacy_with_mode(path, true)?;
+                if !requested_read_only && store.corruption.is_none() {
+                    store.migrate_to_sqlite(project)?;
+                }
+                Ok(store)
+            }
+            _ => Err(Error::new("VERSION_MISMATCH", "Workspace format is unsupported")),
+        }
+    }
+    fn open_legacy_with_mode(path: &Path, requested_read_only: bool) -> Result<Self> {
         reject_links(path)?;
         if !path.join("project.json").is_file() {
             return Err(Error::new("NOT_FOUND", "Project file is missing"));
@@ -280,6 +314,8 @@ impl Store {
         }
         let workspace_id = project["workspace_id"].as_str().unwrap().to_owned();
         let mut store = Self {
+            database: None,
+            sqlite_checkpoint: None,
             path: path.into(),
             _lock: Arc::new(lock),
             journal: None,
@@ -402,8 +438,8 @@ impl Store {
         self.read_only
     }
     pub fn info(&self) -> Value {
-        json!({"workspace_id":self.state.workspace_id,"name":self.name,"format_version":1,"commit_seq":self.state.commit_seq.to_string(),
-        "read_only":self.read_only,"recovery":self.recovery(),"capabilities":["object_graph","journal_v1","checkpoint_v1","blob_sha256","native_writer_lock"]})
+        json!({"workspace_id":self.state.workspace_id,"name":self.name,"format_version":if self.database.is_some(){2}else{1},"commit_seq":self.state.commit_seq.to_string(),
+        "read_only":self.read_only,"recovery":self.recovery(),"capabilities":if self.database.is_some(){vec!["object_graph","sqlite_transactions_v1","sqlite_wal","blob_sha256","native_writer_lock"]}else{vec!["object_graph","journal_v1","checkpoint_v1","blob_sha256","native_writer_lock"]}})
     }
     pub fn recovery(&self) -> Value {
         json!({"mode":if self.read_only {"read_only"}else{"normal"},"valid_generations":self.valid_generations,
@@ -712,6 +748,25 @@ impl Store {
             result: result.clone(),
         };
         install_receipt(&mut candidate, &payload, seq)?;
+        if self.database.is_some() {
+            let changed = payload.mutations.iter().map(|m|(m.collection.clone(),m.id.clone()))
+                .chain(payload.events.iter().chain(&payload.deliveries).map(|r|(r.header.collection.clone(),r.header.id.clone())))
+                .chain(std::iter::once(("command_receipts".into(),payload.command_id.clone()))).collect();
+            artex_core::validate_snapshot_delta(&self.state, &candidate, &changed)?;
+            // Existing immutable blobs were verified on open/admission. Do not
+            // reread every historical response body for each progress update.
+            self.check_blobs(&serde_json::to_value(&payload)?)?;
+            let fault = self.fault_name();
+            let committed = self.database.as_mut().unwrap().commit(&payload, &candidate, &tombstones, self.state.commit_seq, fault.as_deref());
+            if let Err(error) = committed {
+                if error.recovery_required { self.mark_corruption(json!({"kind":"sqlite_write_failure","error":error.code,"command_id":payload.command_id})); }
+                return Err(error);
+            }
+            self.state = candidate;
+            self.tombstones = tombstones;
+            *self.read_cache.lock().unwrap() = None;
+            return Ok(Receipt { command_id: payload.command_id, commit_seq: seq.to_string(), result });
+        }
         validate_snapshot(&candidate)?;
         self.check_blobs(&serde_json::to_value(&candidate)?)?;
         let bytes = serde_json::to_vec(&payload)?;
@@ -1106,6 +1161,12 @@ impl Store {
         Ok(())
     }
     fn apply_payload(&mut self, payload: &Payload, seq: u64) -> Result<()> {
+        if self.try_replay_log_append(payload, seq)? {
+            return Ok(());
+        }
+        self.apply_payload_full(payload, seq)
+    }
+    fn check_replay_command(&self, payload: &Payload) -> Result<()> {
         if payload.format_version != 1
             || !valid_id(&payload.command_id, "command")
             || self
@@ -1118,108 +1179,170 @@ impl Store {
                 "Invalid or duplicate command in journal",
             ));
         }
-        artex_core::validate_secret_parameters(&payload.method, &payload.normalized_params)?;
-        let mut candidate = self.state.clone();
+        artex_core::validate_secret_parameters(&payload.method, &payload.normalized_params)
+    }
+    fn apply_payload_full(&mut self, payload: &Payload, seq: u64) -> Result<()> {
+        self.check_replay_command(payload)?;
+        // Opening/recovery has no published reader. Move the historical map
+        // instead of cloning it per frame; retain only touched rows for exact
+        // rollback if this frame fails validation. A bad frame never leaks.
+        let keys: BTreeSet<_> = payload
+            .mutations
+            .iter()
+            .map(|m| (m.collection.clone(), m.id.clone()))
+            .chain(
+                payload
+                    .events
+                    .iter()
+                    .chain(&payload.deliveries)
+                    .map(|r| (r.header.collection.clone(), r.header.id.clone())),
+            )
+            .chain(std::iter::once((
+                "command_receipts".into(),
+                payload.command_id.clone(),
+            )))
+            .collect();
+        let undo: Vec<_> = keys
+            .iter()
+            .map(|(c, id)| ((c.clone(), id.clone()), self.state.get(c, id).cloned()))
+            .collect();
+        let collections: BTreeSet<_> = self.state.collections.keys().cloned().collect();
+        let previous_sequence = self.state.commit_seq;
+        let workspace_id = self.state.workspace_id.clone();
+        let mut candidate = std::mem::replace(
+            &mut self.state,
+            Snapshot {
+                workspace_id,
+                commit_seq: previous_sequence,
+                collections: BTreeMap::new(),
+            },
+        );
         candidate.commit_seq = seq;
         let mut tombstones = self.tombstones.clone();
-        let mut seen = BTreeSet::new();
-        for mutation in &payload.mutations {
-            if mutation.collection == "command_receipts"
-                || !seen.insert((mutation.collection.clone(), mutation.id.clone()))
-            {
-                return Err(Error::new(
-                    "CORRUPT_STORE",
-                    "Duplicate/store-owned mutation",
-                ));
+        let outcome = (|| -> Result<()> {
+            let mut seen = BTreeSet::new();
+            for mutation in &payload.mutations {
+                if mutation.collection == "command_receipts"
+                    || !seen.insert((mutation.collection.clone(), mutation.id.clone()))
+                {
+                    return Err(Error::new(
+                        "CORRUPT_STORE",
+                        "Duplicate/store-owned mutation",
+                    ));
+                }
+                let actual = candidate
+                    .get(&mutation.collection, &mutation.id)
+                    .map(|r| parse_u64(&r.header.version))
+                    .transpose()?
+                    .unwrap_or(0);
+                let old = parse_u64(&mutation.expected_version)?;
+                let new = parse_u64(&mutation.new_version)?;
+                if old != actual || old.checked_add(1) != Some(new) {
+                    return Err(Error::new(
+                        "CORRUPT_STORE",
+                        "Mutation version discontinuity",
+                    ));
+                }
+                match mutation.op.as_str() {
+                    "put" => {
+                        let record = mutation
+                            .record
+                            .clone()
+                            .ok_or_else(|| Error::new("CORRUPT_STORE", "Put is missing record"))?;
+                        if record.header.collection != mutation.collection
+                            || record.header.id != mutation.id
+                            || record.header.version != mutation.new_version
+                            || parse_u64(&record.header.commit_seq)? != seq
+                            || tombstones
+                                .contains_key(&(mutation.collection.clone(), mutation.id.clone()))
+                        {
+                            return Err(Error::new(
+                                "CORRUPT_STORE",
+                                "Put header mismatch or tombstone reuse",
+                            ));
+                        }
+                        candidate
+                            .collections
+                            .entry(mutation.collection.clone())
+                            .or_default()
+                            .insert(mutation.id.clone(), record);
+                    }
+                    "delete" => {
+                        if mutation.record.is_some() {
+                            return Err(Error::new("CORRUPT_STORE", "Delete contains record"));
+                        }
+                        let old = candidate
+                            .collections
+                            .entry(mutation.collection.clone())
+                            .or_default()
+                            .remove(&mutation.id)
+                            .ok_or_else(|| Error::new("CORRUPT_STORE", "Deleted entity missing"))?;
+                        tombstones.insert(
+                            (mutation.collection.clone(), mutation.id.clone()),
+                            Tombstone {
+                                collection: mutation.collection.clone(),
+                                id: mutation.id.clone(),
+                                version: new.to_string(),
+                                commit_seq: seq.to_string(),
+                                deleted_at: payload.committed_at.clone(),
+                                legacy_key: old.header.legacy_key,
+                            },
+                        );
+                    }
+                    _ => return Err(Error::new("CORRUPT_STORE", "Unknown mutation operation")),
+                }
             }
-            let actual = candidate
-                .get(&mutation.collection, &mutation.id)
-                .map(|r| parse_u64(&r.header.version))
-                .transpose()?
-                .unwrap_or(0);
-            let old = parse_u64(&mutation.expected_version)?;
-            let new = parse_u64(&mutation.new_version)?;
-            if old != actual || old.checked_add(1) != Some(new) {
-                return Err(Error::new(
-                    "CORRUPT_STORE",
-                    "Mutation version discontinuity",
-                ));
-            }
-            match mutation.op.as_str() {
-                "put" => {
-                    let record = mutation
-                        .record
-                        .clone()
-                        .ok_or_else(|| Error::new("CORRUPT_STORE", "Put is missing record"))?;
-                    if record.header.collection != mutation.collection
-                        || record.header.id != mutation.id
-                        || record.header.version != mutation.new_version
+            for (required, records) in [
+                ("domain_events", &payload.events),
+                ("agent_deliveries", &payload.deliveries),
+            ] {
+                for record in records {
+                    if record.header.collection != required
+                        || record.header.version != "1"
                         || parse_u64(&record.header.commit_seq)? != seq
-                        || tombstones
-                            .contains_key(&(mutation.collection.clone(), mutation.id.clone()))
+                        || !seen.insert((required.into(), record.header.id.clone()))
+                        || candidate.get(required, &record.header.id).is_some()
+                        || tombstones.contains_key(&(required.into(), record.header.id.clone()))
                     {
                         return Err(Error::new(
                             "CORRUPT_STORE",
-                            "Put header mismatch or tombstone reuse",
+                            "Event/delivery mismatch or duplicate",
                         ));
                     }
                     candidate
                         .collections
-                        .entry(mutation.collection.clone())
+                        .entry(required.into())
                         .or_default()
-                        .insert(mutation.id.clone(), record);
+                        .insert(record.header.id.clone(), record.clone());
                 }
-                "delete" => {
-                    if mutation.record.is_some() {
-                        return Err(Error::new("CORRUPT_STORE", "Delete contains record"));
-                    }
-                    let old = candidate
+            }
+            install_receipt(&mut candidate, payload, seq)?;
+            // Legacy recovery is used for one-time SQLite conversion. Every prior
+            // frame/checkpoint is validated already; validate the delta with the
+            // same FK/unique/semantic rules rather than revalidating all history.
+            seen.insert(("command_receipts".into(), payload.command_id.clone()));
+            artex_core::validate_snapshot_delta(&self.state, &candidate, &seen)?;
+            Ok(())
+        })();
+        if let Err(error) = outcome {
+            for ((collection, id), record) in undo {
+                if let Some(record) = record {
+                    candidate
                         .collections
-                        .entry(mutation.collection.clone())
+                        .entry(collection)
                         .or_default()
-                        .remove(&mutation.id)
-                        .ok_or_else(|| Error::new("CORRUPT_STORE", "Deleted entity missing"))?;
-                    tombstones.insert(
-                        (mutation.collection.clone(), mutation.id.clone()),
-                        Tombstone {
-                            collection: mutation.collection.clone(),
-                            id: mutation.id.clone(),
-                            version: new.to_string(),
-                            commit_seq: seq.to_string(),
-                            deleted_at: payload.committed_at.clone(),
-                            legacy_key: old.header.legacy_key,
-                        },
-                    );
+                        .insert(id, record);
+                } else if let Some(rows) = candidate.collections.get_mut(&collection) {
+                    rows.remove(&id);
                 }
-                _ => return Err(Error::new("CORRUPT_STORE", "Unknown mutation operation")),
             }
+            candidate
+                .collections
+                .retain(|collection, rows| !rows.is_empty() || collections.contains(collection));
+            candidate.commit_seq = previous_sequence;
+            self.state = candidate;
+            return Err(error);
         }
-        for (required, records) in [
-            ("domain_events", &payload.events),
-            ("agent_deliveries", &payload.deliveries),
-        ] {
-            for record in records {
-                if record.header.collection != required
-                    || record.header.version != "1"
-                    || parse_u64(&record.header.commit_seq)? != seq
-                    || !seen.insert((required.into(), record.header.id.clone()))
-                    || candidate.get(required, &record.header.id).is_some()
-                    || tombstones.contains_key(&(required.into(), record.header.id.clone()))
-                {
-                    return Err(Error::new(
-                        "CORRUPT_STORE",
-                        "Event/delivery mismatch or duplicate",
-                    ));
-                }
-                candidate
-                    .collections
-                    .entry(required.into())
-                    .or_default()
-                    .insert(record.header.id.clone(), record.clone());
-            }
-        }
-        install_receipt(&mut candidate, payload, seq)?;
-        validate_snapshot(&candidate)?;
         self.state = candidate;
         *self.read_cache.lock().unwrap() = None;
         self.tombstones = tombstones;
@@ -1352,7 +1475,7 @@ fn inject(point: Option<&str>, stage: &str) -> Result<()> {
         Ok(())
     }
 }
-fn install_receipt(state: &mut Snapshot, payload: &Payload, seq: u64) -> Result<()> {
+fn receipt_record(payload: &Payload, seq: u64) -> Result<Record> {
     let data = json!({"command_id":payload.command_id,"method":payload.method,"normalized_params":payload.normalized_params,"expected":payload.expected,
         "commit_seq":seq.to_string(),"result":payload.result,"result_ref":null});
     let record = Record {
@@ -1368,6 +1491,10 @@ fn install_receipt(state: &mut Snapshot, payload: &Payload, seq: u64) -> Result<
         data,
     };
     validate_record(&record)?;
+    Ok(record)
+}
+fn install_receipt(state: &mut Snapshot, payload: &Payload, seq: u64) -> Result<()> {
+    let record = receipt_record(payload, seq)?;
     state
         .collections
         .entry("command_receipts".into())
@@ -1815,7 +1942,7 @@ mod tests {
     fn incomplete_tail_is_preserved_complete_corruption_is_read_only() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("workspace");
-        let mut store = Store::create(&path, "test").unwrap();
+        let mut store = Store::create_legacy(&path, "test").unwrap();
         let id = new_id("company");
         store
             .commit(batch("create", json!({}), vec![company(&id, "a")]))
@@ -1827,7 +1954,7 @@ mod tests {
         file.write_all(b"ARTEXJ").unwrap();
         file.sync_all().unwrap();
         drop(file);
-        let recovered = Store::open(&path).unwrap();
+        let recovered = Store::open_legacy_test(&path).unwrap();
         assert!(!recovered.read_only());
         assert_eq!(recovered.snapshot().commit_seq, 1);
         assert_eq!(fs::read(&journal).unwrap(), original);
@@ -1836,7 +1963,7 @@ mod tests {
         let mut damaged = original;
         damaged[104] ^= 1;
         fs::write(&journal, damaged).unwrap();
-        let recovered = Store::open(&path).unwrap();
+        let recovered = Store::open_legacy_test(&path).unwrap();
         assert!(recovered.read_only());
         assert_eq!(recovered.snapshot().commit_seq, 0);
         assert!(recovered.info()["recovery"]["corruption"].is_object());
@@ -1845,7 +1972,7 @@ mod tests {
     fn damaged_latest_generation_recovers_from_older_generation_and_journal() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("workspace");
-        let mut store = Store::create(&path, "test").unwrap();
+        let mut store = Store::create_legacy(&path, "test").unwrap();
         let id = new_id("company");
         store
             .commit(batch("create", json!({}), vec![company(&id, "a")]))
@@ -1861,7 +1988,7 @@ mod tests {
             b"damaged\n",
         )
         .unwrap();
-        let store = Store::open(&path).unwrap();
+        let store = Store::open_legacy_test(&path).unwrap();
         assert!(!store.read_only());
         assert_eq!(store.snapshot().commit_seq, 2);
         assert_eq!(
@@ -1873,7 +2000,7 @@ mod tests {
     fn requested_read_only_replays_all_segments_and_preserves_owner_and_incomplete_tail_bytes() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("w");
-        let mut store = Store::create(&path, "Physical read-only").unwrap();
+        let mut store = Store::create_legacy(&path, "Physical read-only").unwrap();
         let first = new_id("company");
         let second = new_id("company");
         store
@@ -1892,7 +2019,7 @@ mod tests {
         let before = fs::read(&journal).unwrap();
         let owner = fs::read(path.join("locks/writer.lock")).unwrap();
         let manifests = fs::read_dir(path.join("store/manifests")).unwrap().count();
-        let mut read = Store::open_read_only(&path).unwrap();
+        let mut read = Store::open_legacy_read_only_test(&path).unwrap();
         assert!(read.read_only());
         assert_eq!(read.snapshot().commit_seq, 2);
         assert!(read.snapshot().get("companies", &first).is_some());
@@ -1903,7 +2030,7 @@ mod tests {
         );
         assert!(read.checkpoint().is_err());
         assert!(read.blob_put(b"forbidden", "text/plain").is_err());
-        assert!(Store::open(&path).is_err());
+        assert!(Store::open_legacy_test(&path).is_err());
         drop(read);
         assert_eq!(fs::read(&journal).unwrap(), before);
         assert_eq!(fs::read(path.join("locks/writer.lock")).unwrap(), owner);
@@ -1912,7 +2039,7 @@ mod tests {
             manifests
         );
         assert_eq!(fs::read_dir(path.join("backups")).unwrap().count(), 0);
-        let write = Store::open(&path).unwrap();
+        let write = Store::open_legacy_test(&path).unwrap();
         assert!(!write.read_only());
         assert_eq!(write.snapshot().commit_seq, 2);
         assert_eq!(fs::read_dir(path.join("backups")).unwrap().count(), 1);
@@ -1948,7 +2075,7 @@ mod tests {
     fn damaged_latest_generation_with_missing_chain_does_not_silently_rollback() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("workspace");
-        let mut store = Store::create(&path, "test").unwrap();
+        let mut store = Store::create_legacy(&path, "test").unwrap();
         let id = new_id("company");
         store
             .commit(batch("create", json!({}), vec![company(&id, "a")]))
@@ -1962,7 +2089,7 @@ mod tests {
         )
         .unwrap();
         fs::remove_file(path.join("store/journal/00000000000000000001.jnl")).unwrap();
-        let store = Store::open(&path).unwrap();
+        let store = Store::open_legacy_test(&path).unwrap();
         assert!(store.read_only());
         assert_eq!(store.recovery()["lost_range"], json!({"from":"1","to":"1"}));
     }
@@ -2162,7 +2289,7 @@ mod tests {
         ] {
             let temp = tempfile::tempdir().unwrap();
             let path = temp.path().join("workspace");
-            let mut store = Store::create(&path, "test").unwrap();
+            let mut store = Store::create_legacy(&path, "test").unwrap();
             let prior = new_id("company");
             store
                 .commit(batch(
@@ -2184,7 +2311,7 @@ mod tests {
             );
             assert!(store.read_only());
             drop(store);
-            let mut store = Store::open(&path).unwrap();
+            let mut store = Store::open_legacy_test(&path).unwrap();
             assert!(!store.read_only(), "{point}");
             assert!(
                 store.snapshot().get("companies", &prior).is_some(),
@@ -2206,7 +2333,7 @@ mod tests {
         for point in ["checkpoint_after_files", "checkpoint_before_install"] {
             let temp = tempfile::tempdir().unwrap();
             let path = temp.path().join("workspace");
-            let mut store = Store::create(&path, "test").unwrap();
+            let mut store = Store::create_legacy(&path, "test").unwrap();
             let id = new_id("company");
             store
                 .commit(batch("create", json!({}), vec![company(&id, "a")]))
@@ -2214,7 +2341,7 @@ mod tests {
             store.fault = Some(point.into());
             assert!(store.checkpoint().is_err());
             drop(store);
-            let mut store = Store::open(&path).unwrap();
+            let mut store = Store::open_legacy_test(&path).unwrap();
             assert!(!store.read_only());
             assert_eq!(store.snapshot().commit_seq, 1);
             store.checkpoint().unwrap();
@@ -2256,7 +2383,7 @@ mod tests {
     #[test]
     fn credentials_never_reach_journal_even_when_record_has_reference() {
         let temp = tempfile::tempdir().unwrap();
-        let mut store = Store::create(&temp.path().join("workspace"), "test").unwrap();
+        let mut store = Store::create_legacy(&temp.path().join("workspace"), "test").unwrap();
         let id = new_id("asset");
         let secret = json!({"secret_ref":new_id("secret"),"hint":"password"});
         let mut data = default_data("assets").unwrap();

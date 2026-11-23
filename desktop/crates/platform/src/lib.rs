@@ -6,6 +6,28 @@
 use std::fs::File;
 use std::{fs, io, path::Path};
 
+/// Atomically replace a small mutable control file after its replacement has
+/// been synced. Immutable blobs/checkpoints must continue to use install_new.
+#[cfg(unix)]
+pub fn replace_control_file(source: &Path, destination: &Path) -> io::Result<()> {
+    fs::rename(source, destination)?;
+    sync_directory(destination.parent().ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing parent"))?)
+}
+#[cfg(windows)]
+pub fn replace_control_file(source: &Path, destination: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_WRITE_THROUGH, MOVEFILE_REPLACE_EXISTING};
+    let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+    let destination: Vec<u16> = destination.as_os_str().encode_wide().chain(Some(0)).collect();
+    if source[..source.len()-1].contains(&0) || destination[..destination.len()-1].contains(&0) {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Embedded NUL in path"));
+    }
+    // SAFETY: both NUL-terminated buffers remain alive for the OS operation.
+    if unsafe { MoveFileExW(source.as_ptr(), destination.as_ptr(), MOVEFILE_WRITE_THROUGH | MOVEFILE_REPLACE_EXISTING) } == 0 {
+        Err(io::Error::last_os_error())
+    } else { Ok(()) }
+}
+
 #[cfg(unix)]
 pub fn install_new(source: &Path, destination: &Path) -> io::Result<()> {
     if destination.exists() {
