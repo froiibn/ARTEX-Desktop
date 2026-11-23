@@ -38,6 +38,21 @@ SENSITIVE = {
     "private-key": re.compile(rb"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----"),
 }
 
+# Rust may concatenate independently harmless static strings without NULs. The
+# suffix of "new-task-template" then resembles an API key. Review the entire
+# exact span and its committed source literals, never exempt an executable or
+# relax credential detection at identifier boundaries.
+REVIEWED_NATIVE_LITERAL_SPANS = [{
+    "sha256": "106d423f476e2239ce902e051a96464897adbc383bc9032e3d51f248a3fa1369",
+    "segments": [
+        ("desktop/native/src/forms.rs", "native.secret.set"),
+        ("desktop/native/src/model.rs", "task_templates"),
+        ("desktop/native/src/task_creation.rs", "new-task-template"),
+        ("desktop/native/src/task_creation.rs", "task_categories"),
+        ("desktop/native/src/task_creation.rs", "new-task-category"),
+    ],
+}]
+
 
 # Exact original-crate examples reviewed on 2026-10-14. Never exempt a directory,
 # a changed version/hash, source archive contents, or any additional category.
@@ -139,12 +154,52 @@ def privacy_kinds(data: bytes) -> list[str]:
     return [kind for kind, pattern in SENSITIVE.items() if any(pattern.search(view) for view in views)]
 
 
-def check_privacy(data: bytes, name: str, *, reviewed_runtime_examples: bool = False):
+def native_literal_review(data: bytes, repo: Path):
+    """Accept only matches fully covered by exact reviewed public static spans."""
+    spans = []
+    for record in REVIEWED_NATIVE_LITERAL_SPANS:
+        span = b"".join(value.encode("ascii") for _, value in record["segments"])
+        if sha(span) != record["sha256"]:
+            return None
+        for relative, value in record["segments"]:
+            source = repo / relative
+            if not source.is_file() or (b'"' + value.encode("ascii") + b'"') not in source.read_bytes():
+                return None
+        spans.append(span)
+    matched = False
+    for view in (data, data.replace(b"\x00", b"")):
+        for kind, pattern in SENSITIVE.items():
+            for hit in pattern.finditer(view):
+                matched = True
+                if kind != "openai-token":
+                    return None
+                # Check both raw and UTF-16 detection views. Any additional or
+                # extended candidate remains a failure, even in this same PE.
+                covered = False
+                for span in spans:
+                    start = view.rfind(span, 0, hit.start() + len(span))
+                    if 0 <= start <= hit.start() and hit.end() <= start + len(span):
+                        covered = True
+                        break
+                if not covered:
+                    return None
+    if not matched:
+        return None
+    return {"classification": "compiler-coalesced-public-static-identifiers",
+            "categories": ["openai-token"], "spans": REVIEWED_NATIVE_LITERAL_SPANS}
+
+
+def check_privacy(data: bytes, name: str, *, reviewed_runtime_examples: bool = False,
+                  reviewed_native_source: Path | None = None):
     kinds = privacy_kinds(data)
     # Matched values are never printed or persisted. Only the relative entry and categories.
     example = REVIEWED_UPSTREAM_EXAMPLES.get(name) if reviewed_runtime_examples else None
     if kinds and example and sha(data) == example["sha256"] and kinds == example["categories"]:
         return
+    if kinds and reviewed_native_source is not None and name == BUNDLE_NAME + "/ARTEX.exe":
+        review = native_literal_review(data, reviewed_native_source)
+        if review is not None:
+            return review
     require(not kinds, f"Distribution privacy scan rejected entry {name}: {', '.join(kinds)}")
 
 
@@ -394,14 +449,20 @@ def make_payload(repo: Path, commit: str, version: str, report: dict, bundle: Pa
                         "secret_scan_is_exhaustive": False},
              "scope": "Verified Windows x64 GNU build; user-installed external tools, workspaces, API keys and audit logs are excluded."}
     reviewed = []
+    reviewed_native = []
     for name, file in sorted(regular_files(payload).items()):
         entry = BUNDLE_NAME + "/" + name
         data = file.read_bytes()
-        check_privacy(data, entry, reviewed_runtime_examples=True)
+        native_review = check_privacy(data, entry, reviewed_runtime_examples=True,
+                                     reviewed_native_source=repo if name == "ARTEX.exe" else None)
         if privacy_kinds(data):
-            reviewed.append({"file": name, **REVIEWED_UPSTREAM_EXAMPLES[entry]})
+            if native_review is not None:
+                reviewed_native.append({"file": name, **native_review})
+            else:
+                reviewed.append({"file": name, **REVIEWED_UPSTREAM_EXAMPLES[entry]})
     build["privacy_scan"] = {"unreviewed_matches": 0, "matched_values_recorded": False,
-                             "reviewed_upstream_examples": reviewed}
+                             "reviewed_upstream_examples": reviewed,
+                             "reviewed_native_literal_spans": reviewed_native}
     (payload / "BUILD-INFO.json").write_bytes(json_bytes(build))
     source_url = f"https://github.com/{slug}/tree/{commit}"
     intro = f"""# ARTEX Desktop v{version} — Windows x64
@@ -428,10 +489,11 @@ Run `ARTEX.exe` after extracting the entire ZIP. Create a workspace, save the LL
     return regular_files(payload)
 
 
-def runtime_archive(payload: Path, archive: Path, files: dict[str, Path]):
+def runtime_archive(repo: Path, payload: Path, archive: Path, files: dict[str, Path]):
     with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip:
         for name, path in sorted(files.items()):
-            check_privacy(path.read_bytes(), BUNDLE_NAME + "/" + name, reviewed_runtime_examples=True)
+            check_privacy(path.read_bytes(), BUNDLE_NAME + "/" + name, reviewed_runtime_examples=True,
+                          reviewed_native_source=repo if name == "ARTEX.exe" else None)
             zip.write(path, BUNDLE_NAME + "/" + name)
     expected = {BUNDLE_NAME + "/" + name: file_sha(path) for name, path in files.items()}
     with tempfile.TemporaryDirectory(prefix="artex-release-roundtrip-") as temporary:
@@ -501,7 +563,7 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="artex-release-payload-") as temporary:
             payload = Path(temporary) / BUNDLE_NAME
             files = make_payload(repo, commit, version, report, bundle, payload, slug, tree, source_proof)
-            runtime_proof = runtime_archive(payload, runtime_zip, files)
+            runtime_proof = runtime_archive(repo, payload, runtime_zip, files)
             privacy_proof = read_json(payload / "BUILD-INFO.json")["privacy_scan"]
         assets = [{"name": path.name, "sha256": file_sha(path), "bytes": path.stat().st_size}
                   for path in (runtime_zip, source_zip)]

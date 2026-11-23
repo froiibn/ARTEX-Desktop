@@ -12,6 +12,8 @@ LLM·기본 모델·에이전트·도구/MCP·스킬의 공통 설정과 기존 
 
 릴리스 준비는 `verify.ps1 -FullRegression` → 표준 `build.py` → 커밋된 소스의 `package.ps1` → `create-release.py` 순서다. 패키지 검사에는 실제 배포 실행 파일의 자체시험, 23개 화면 렌더링과 정상 종료, 실행 파일·실제 창 아이콘, 고지·런타임 입력·대응 소스·ZIP 무결성이 포함된다. 검증 실패 산출물은 게시하지 않는다. 실행 결과와 소스 commit·체크섬은 GitHub 릴리스 및 패키지 `BUILD-INFO.json`에 기록하며, 이 절차 설명 자체가 실행 성공을 뜻하지 않는다.
 
+첫 ZIP 조립에서는 컴파일러가 연속 배치한 5개 공개 UI 식별자가 API 키 형식으로 오탐되어 게시가 중단됐다. 검사기는 해당 바이트 구간 전체의 고정 SHA-256과 각 소스 문자열을 확인하는 좁은 구분만 추가했다. 실행 파일 전체·문자열 접두사에 대한 예외는 없으며 추가 키, UTF-16 키, 변형된 구간, 다른 파일, 누락·수정된 출처의 거부를 포함한 6개 회귀 시험을 통과했다. 앱 동작·모델·사용자 데이터는 변경하지 않았다.
+
 ## English
 
 This Windows x64 GNU preview combines the SQLite migration and accumulated changes since preview.4. The integrated Rust native application uses bundled SQLite without a database server. Healthy v1 workspaces migrate to v2 after validation on a writable open, preserving legacy files and the original descriptor. Back up the entire workspace and common application settings first; older applications cannot open v2 workspaces.
@@ -20,6 +22,8 @@ Changes include shared LLM/default-model, agent, tool/MCP and skill settings; re
 
 Only 11 of 339 full-path acceptance entries are complete; 328 remain. This is not a stable release or macOS/Arch Linux physical qualification. Code signing, an installer and automatic updates are not included. The release pipeline requires full native regression, the standard build, committed-source packaging, packaged executable/window/icon/notice checks, and exact corresponding-source and ZIP integrity checks. Results and source identity are recorded in the release and bundled BUILD-INFO.json; this procedure description alone is not a passing result.
 
+The first assembly stopped on a false credential match caused by five compiler-coalesced public UI identifiers. The scanner now recognizes only that exact span hash with all original source literals verified. Six regression tests preserve rejection of additional credentials, UTF-16 keys, changed spans, other files and missing/edited provenance. Application behavior and user data are unchanged.
+
 ## 简体中文
 
 此 Windows x64 GNU 预览版包含 preview.4 之后的 SQLite 迁移和累计改进。保持 Rust 一体化原生应用结构，使用内置 SQLite，无需数据库服务器。正常的 v1 工作空间在以可写模式打开时经验证后迁移到 v2，并保留旧文件和原始描述文件副本。请先备份整个工作空间及通用应用设置；旧版应用无法打开 v2 工作空间。
@@ -27,3 +31,5 @@ Only 11 of 339 full-path acceptance entries are complete; 328 remain. This is no
 改进包括 LLM/默认模型、代理、工具/MCP 和技能的通用设置及旧模型恢复，网站综合分析报告查看与导出，流式处理、Windows 命令说明、执行终止错误显示，以及对话/任务列表和完成状态显示。Bypass 仍按工作空间设置。分发文件不包含外部工具、API 密钥或用户工作空间。
 
 339 项完整路径验收中仅完成 11 项，仍有 328 项未完成，因此不是稳定版，也不代表 macOS/Arch Linux 已通过实机验收。不包含代码签名、安装程序或自动更新。发布流程要求完整原生回归、标准构建、已提交源码打包，以及分发程序/窗口/图标/声明、对应源码和 ZIP 完整性检查。实际结果和源码标识记录于发布页面及 BUILD-INFO.json；流程说明本身不表示验证成功。
+
+首次组装因编译器连续放置的五个公开 UI 标识符被误识别为密钥而中止。扫描器仅在完整字节段哈希和全部源码字符串均匹配时识别此误报。六项回归测试确保仍拒绝额外密钥、UTF-16 密钥、变更字节段、其他文件及缺失或修改的来源。应用行为和用户数据未变更。
