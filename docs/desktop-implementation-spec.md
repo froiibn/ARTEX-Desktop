@@ -382,3 +382,15 @@ read 도구는 불변 같은 세대에서 병렬 실행 가능하나 plan mode �
 - 화면의 편집 기준 버전은 해당 DTO를 읽은 세대에 고정한다. 백그라운드 조회는 편집 기준을 갱신하지 않으며, 성공한 자기 저장만 기준을 진행시킨다. 충돌 후 재제출은 차단하고 사용자가 입력을 버리는 명시적 재조회로 복구한다. 봉인된 MCP 환경/추가 도구 헤더는 UI와 SDK·이전·Store 검증 경계에서 같은 SecretRef 규칙을 적용한다.
 
 재생성은 `node scripts/generate-desktop-contracts.mjs`, `node scripts/define-desktop-contracts.mjs`, 검사에는 `node scripts/validate-desktop-contracts.mjs`와 `node scripts/check-language.mjs`를 사용한다. Go 정의를 다시 추출할 때는 scripts/desktop-tools-export_test.go.txt를 임시 server/desktop_contract_dump_test.go로 복사하고 ARTEX_CONTRACT_DUMP를 tools-source.v1.json 경로, ARTEX_PG_DSN을 파싱 불가능한 contract-export-no-database로 지정해 `go test ./server -run '^TestDesktopContractDump$' -count=1 -v`만 실행한 뒤 임시 파일을 제거한다. 이 추출기는 생성자만 호출하며 도구/외부 명령/DB 변경을 실행하지 않는다.
+
+
+### 전체 연결 수락에서 확정한 보존 경계
+
+- 삭제 결과의 assetrule/trigger/conversation ID, ArchiveBatchItem.archive_id 및 CoverageAssetRef.id는 해당 native typed ID다. CoverageAssetRef의 finding도 finding 행이 아닌 graph node를 가리킨다. 원본 DTO 원장은 보존하고 양쪽 wire 계약과 생성 규칙을 함께 맞춘다.
+- report_finding은 영향 자산 anchor와 priority/origin/근거를 같은 변경에 기록한다. deepenFinding은 source_finding_id/source_finding_node_id/asset_ids와 간선·anchor를 보존하며 import와 보관 복구에서도 이 출처 ID를 재매핑한다. 기존 empty-anchor 자료는 명시적 후속 탐색에서만 유효한 저장 자산으로 보완하고 원본 발견 자료는 덮어쓰지 않는다.
+- paused Worker 메시지는 runnable task의 같은 intent에 독립 run과 사용자 turn을 정리 확인·기존 CAS 뒤에 함께 저장한다. 같은 task/intent의 정상 Worker 부모 이력만 오래된 순서로 한 번씩 전달한다. 같은 request ID 재유입·다른 소유권·불확실한 외부 정리는 새 실행으로 이어지지 않는다. 저장 후 공간을 열기만 해서는 재실행하지 않는다.
+- 첨부는 실제 task/conversation 작업 폴더 상대 경로·이름·크기를 원문과 함께 모델에 전달하고 Read 권한은 해당 소유자의 검증된 저장 admission에서만 만든다. SDK TaskOutput/TaskStop의 task_id는 ExecutionId이며 Host run/epoch 소유권을 유지한다. TaskStop의 생략/빈 문자열은 자기 실행의 전체 중지 요청이다. 실제 종료·정리와 요청 수락은 구분한다.
+- MCP 삭제는 동일 resource_kind/resource_id의 enabled/disabled 권한을, Skill 삭제는 성공한 동일 이름의 enabled/disabled 권한을 모든 agent에서 정리한다. Skill은 Prepare·파일 효과 전·실제 성공 완료의 원래 CAS를 유지하고 실패/다른 세대/다른 리소스에는 권한 행을 삭제하지 않는다. 늦은 오류 전 파일 효과가 발생했을 수 있으며 파일 롤백을 보장하지 않는다.
+- ui.controlTasksBatch 일시정지의 자동 시간 행은 명명된 내부 `$artex_writer_clock_v1` 의존성으로 분류한다. 현재 실행 중·live·known인 대상에서 시간 해제만 하는 계획에 한해 writer-current 시간 CAS와 마지막 분율을 사용하고 UI의 사용자/실행/의도 기준은 바꾸지 않는다. 내부 영수증의 그 시간 ID에 한해 분류 당시 writer 버전 이하의 양수 관찰 버전을 논리 재시도에서 비교한다. 0/미래/누락/다른 ID·다른 버전/순서·재개/복구 및 기존 영수증은 엄격한 검사를 유지한다.
+
+구체적인 실행 조건·반대 경계·최종 수락 및 별도 출시 범위는 [전체 318행 결과](acceptance-final-20261127.md)를 따른다. 저장 형식·공개 메서드 수·기본 권한을 바꾸지 않는다.

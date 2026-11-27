@@ -43,6 +43,12 @@ fn about_contents(ui: &mut egui::Ui) {
     ui.label(format!("{}  실행 기록 패널 표시", shortcut("J")));
     ui.label(format!("{}  저장·종료 확인", shortcut("Q")));
     ui.separator();
+    // The old server self-updater must never replace a running native binary.
+    // Until a signed native update channel is configured, use the matching
+    // release package explicitly, including when selecting an older version.
+    ui.label("자동 업데이트는 구성되지 않았습니다. 앱을 종료한 뒤 원하는 버전의 배포 패키지로 교체하세요. 작업 공간은 별도로 보존됩니다.");
+    ui.hyperlink_to("앱 업데이트·이전 버전 다운로드", RELEASE_SOURCE);
+    ui.separator();
     ui.strong("저작권과 라이선스");
     ui.label("원작 ARTEX 저작권: Autumn-27 및 원본 기여자. 원본 소스 백업: mhtsec/ARTEX.");
     ui.label("ARTEX Desktop은 원작을 수정·재구축한 버전입니다. 원작자와 기여자의 권리는 해당 권리자에게 있습니다.");
@@ -89,25 +95,42 @@ mod legal_tests {
         let ctx = egui::Context::default();
         let mut open = true;
         let mut rendered = Vec::new();
-        for _ in 0..3 {
+        let mut contents_clip = egui::Rect::NOTHING;
+        // The bounded About panel scrolls as release guidance and legal text
+        // grow. Observe genuinely visible text before and after user scrolling,
+        // rather than requiring every notice to fit in one initial viewport.
+        for pass in 0..10 {
+            let events = if pass == 3 {
+                vec![
+                    egui::Event::PointerMoved(contents_clip.center()),
+                    egui::Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Point,
+                        delta: egui::vec2(0.0, -600.0),
+                        modifiers: egui::Modifiers::default(),
+                    },
+                ]
+            } else { vec![] };
+            let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(900.0, 900.0));
             let output = ctx.run(
                 egui::RawInput {
-                    screen_rect: Some(egui::Rect::from_min_size(
-                        egui::Pos2::ZERO,
-                        egui::vec2(900.0, 900.0),
-                    )),
+                    screen_rect: Some(viewport),
+                    time: Some(f64::from(pass) / 60.0),
+                    events,
                     ..Default::default()
                 },
                 |ctx| about_window(ctx, &mut open),
             );
-            rendered = output
-                .shapes
-                .iter()
-                .filter_map(|shape| match &shape.shape {
-                    egui::Shape::Text(text) => Some(text.galley.text().to_owned()),
-                    _ => None,
-                })
-                .collect();
+            for shape in &output.shapes {
+                if let egui::Shape::Text(text) = &shape.shape {
+                    let bounds = text.visual_bounding_rect();
+                    if viewport.contains_rect(bounds) && shape.clip_rect.contains_rect(bounds) {
+                        if text.galley.text().contains("Rust 통합형 데스크톱") {
+                            contents_clip = shape.clip_rect.intersect(viewport);
+                        }
+                        rendered.push(text.galley.text().to_owned());
+                    }
+                }
+            }
         }
         for required in [
             "Autumn-27",

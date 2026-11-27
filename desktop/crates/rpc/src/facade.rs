@@ -163,6 +163,9 @@ pub const COMMANDS: &[&str] = &[
     "ui.notifyUpdateChannel",
     "ui.notifyDeleteChannel",
     "ui.notifyRetryDelivery",
+    // These existing effect handlers also need the normal native Prepare path.
+    "ui.notifyTestChannel",
+    "ui.gc",
     "ui.createTask",
     "ui.renameTask",
     "ui.pinTask",

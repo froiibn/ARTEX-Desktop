@@ -319,7 +319,12 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<Value> {
         "ui.mcpTools" => {
             let id = required(p, "id")?;
             record(s, "mcp_servers", id)?;
-            Ok(json!(s.records("mcp_tools_cache").iter().filter(|t|t.data["server_id"]==id).map(|t|json!({"name":t.data["tool_name"],"description":t.data["description"],"schema":t.data["schema"]})).collect::<Vec<_>>()))
+            let mut tools=s.records("mcp_tools_cache").into_iter().filter(|t|t.data["server_id"]==id).collect::<Vec<_>>();
+            // Original db.MCPToolsDetailed exposes only name/description in
+            // tool-name order. Execution still needs the cached input schema;
+            // keep that internal data without leaking it into the strict UI DTO.
+            tools.sort_by(|a,b|text(&a.data,"tool_name").cmp(text(&b.data,"tool_name")));
+            Ok(json!(tools.into_iter().map(|t|json!({"name":t.data["tool_name"],"description":t.data["description"]})).collect::<Vec<_>>()))
         }
         "ui.resourceVisibility" => {
             if p["kind"] != "mcp" {
@@ -766,6 +771,12 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
             let id = required(p, "id")?;
             record(s, "mcp_servers", id)?;
             b.delete("mcp_servers", id);
+            // Original DB.DeleteMCP clears this polymorphic relation explicitly;
+            // resource_id has no FK. Keep cleanup and the server delete in one
+            // CAS plan, without touching another server's permissions.
+            for visibility in s.records("agent_visibility").into_iter().filter(|r|r.data["resource_kind"]=="mcp"&&r.data["resource_id"]==id) {
+                b.delete("agent_visibility",&visibility.header.id);
+            }
             json!({"deleted":id})
         }
         "ui.createTrigger" | "ui.updateTrigger" => {
@@ -1042,4 +1053,70 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
     let mut batch = b.done(result);
     augment_expected(&mut batch, s)?;
     Ok(batch)
+}
+
+#[cfg(test)]
+mod mcp_projection_tests {
+    use super::*;
+
+    #[test]
+    fn mcp_delete_clears_only_target_grants_and_requires_their_cas_versions() {
+        let dir=tempfile::tempdir().unwrap();
+        let mut store=artex_store::Store::create(&dir.path().join("workspace"),"MCP deletion fixture").unwrap();
+        let context=Context{actor:artex_core::Actor{kind:"user".into(),agent_id:None,run_id:None,engine_epoch:new_id("epoch")},
+            task_id:None,intent_id:None,conversation_id:None};
+        let mut bootstrap=bootstrap::bootstrap_plan(&store.snapshot(),&context).unwrap();bootstrap.command_id=new_id("command");store.commit(bootstrap).unwrap();
+        let initial=store.snapshot();
+        let agent=|key:&str|initial.records("agents").into_iter().find(|a|a.data["key"]==key).unwrap().header.id.clone();
+        let mut p=Planner::new(&initial,"fixture.mcp_delete",&json!({}));
+        let mut server=|name:&str|p.insert("mcp_servers",artex_core::collection_prefix("mcp_servers").unwrap(),
+            json!({"name":name,"transport":"http","url":"http://127.0.0.1/mcp","enabled":false,"env":{}})).unwrap();
+        let target=server("target MCP");let control=server("preserved MCP");
+        let mut target_grants=Vec::new();let mut preserved=String::new();
+        for (server_id,agent_id,enabled) in [(&target,agent("auto"),true),(&target,agent("worker"),false),(&control,agent("worker"),true)] {
+            let id=p.insert("agent_visibility",artex_core::collection_prefix("agent_visibility").unwrap(),
+                json!({"agent_id":agent_id,"resource_kind":"mcp","resource_id":server_id,"enabled":enabled})).unwrap();
+            if server_id==&target {target_grants.push(id);} else {preserved=id;}
+        }
+        p.insert("mcp_tools_cache",artex_core::collection_prefix("mcp_tools_cache").unwrap(),
+            json!({"server_id":target,"tool_name":"cached_target","description":"fixture","schema":{"type":"object"}})).unwrap();
+        let mut seed=p.done(json!({}));seed.command_id=new_id("command");store.commit(seed).unwrap();
+        let before=store.snapshot();let preserved_row=before.get("agent_visibility",&preserved).unwrap().clone();
+        let mut deletion=plan("ui.deleteMcpServer",&json!({"id":target}),&before,&context).unwrap();deletion.command_id=new_id("command");
+        for id in &target_grants {assert!(deletion.expected.iter().any(|e|e.collection=="agent_visibility"&&e.id==*id));}
+        let mut incomplete=deletion.clone();incomplete.expected.retain(|e|e.id!=target_grants[0]);
+        assert_eq!(store.commit(incomplete).unwrap_err().code,"VERSION_CONFLICT");
+        assert_eq!(store.snapshot().collections,before.collections,"Missing grant CAS must commit no partial deletion");
+        assert_eq!(store.snapshot().commit_seq,before.commit_seq);
+        store.commit(deletion).unwrap();let after=store.snapshot();
+        assert!(after.get("mcp_servers",&target).is_none());
+        assert!(!after.records("agent_visibility").iter().any(|r|r.data["resource_kind"]=="mcp"&&r.data["resource_id"]==target));
+        assert!(!after.records("mcp_tools_cache").iter().any(|r|r.data["server_id"]==target));
+        assert_eq!(after.get("agent_visibility",&preserved),Some(&preserved_row));
+        assert!(after.get("mcp_servers",&control).is_some());
+    }
+
+    #[test]
+    fn cached_mcp_schema_remains_internal_while_ui_tools_match_source_dto() {
+        let dir=tempfile::tempdir().unwrap();
+        let mut store=artex_store::Store::create(&dir.path().join("workspace"),"MCP projection fixture").unwrap();
+        let snapshot=store.snapshot();let mut planner=Planner::new(&snapshot,"fixture.mcp_projection",&json!({}));
+        let server=planner.insert("mcp_servers",artex_core::collection_prefix("mcp_servers").unwrap(),
+            json!({"name":"fixture MCP","transport":"http","url":"http://127.0.0.1/mcp","env":{},"enabled":false})).unwrap();
+        let schema=json!({"type":"object","properties":{"target":{"type":"string"}},"required":["target"]});
+        for name in ["zeta","alpha"] {
+            planner.insert("mcp_tools_cache",artex_core::collection_prefix("mcp_tools_cache").unwrap(),
+                json!({"server_id":server,"tool_name":name,"description":format!("{name} description"),"schema":schema})).unwrap();
+        }
+        let mut batch=planner.done(json!({}));batch.command_id=new_id("command");store.commit(batch).unwrap();
+        let context=Context{actor:artex_core::Actor{kind:"user".into(),agent_id:None,run_id:None,engine_epoch:new_id("epoch")},
+            task_id:None,intent_id:None,conversation_id:None};
+        let before=store.snapshot();
+        let result=query("ui.mcpTools",&json!({"id":server}),&before,&context).unwrap();
+        assert_eq!(result,json!([{"name":"alpha","description":"alpha description"},{"name":"zeta","description":"zeta description"}]));
+        let rpc=artex_core::contracts::read("rpc.v1.schema.json");
+        artex_core::validate_contract(&rpc["results"]["ui.mcpTools"],&rpc["$defs"],&result).unwrap();
+        let after=store.snapshot();assert_eq!(after.commit_seq,before.commit_seq);
+        assert!(after.records("mcp_tools_cache").iter().all(|r|r.data["schema"]==schema));
+    }
 }

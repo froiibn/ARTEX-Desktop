@@ -441,11 +441,25 @@ pub(super) fn field(
         ui.weak("깊은 구조의 기존 값을 보존합니다.");
         return;
     }
-    let schema = schema::actual(schema_value, value);
+    let schema = schema::for_editor(schema_value, value);
     if schema::is_secret(&schema)
         || sensitive(key) && !matches!(key, "session_header_key" | "secret_ref")
     {
         secret(ui, key, value, path, state);
+        return;
+    }
+    if value.is_null() && schema["type"]=="null" {
+        // Repainting must never turn a valid null into an invalid empty string.
+        // Non-identity nullable values are initialized only by user intent.
+        let resolved=schema::resolve(schema_value);
+        let alternate=resolved["anyOf"].as_array().or_else(||resolved["oneOf"].as_array())
+            .into_iter().flatten().map(schema::resolve).find(|v|v["type"]!="null");
+        crate::theme::field_row(ui,schema::label(key),|ui| {
+            ui.weak("선택 안 함");
+            if let Some(alternate)=alternate {
+                if ui.button("값 설정").clicked() {*value=schema::empty(&alternate);}
+            }
+        });
         return;
     }
     if schema::is_body(&schema) {

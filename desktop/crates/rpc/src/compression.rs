@@ -14,6 +14,52 @@ struct Entry {
     skill_guidance: bool,
 }
 
+fn user_text_with_attachments(admission: &Value, original: &str) -> String {
+    let mut message = admission["text"].as_str().unwrap_or(original).to_owned();
+    let attachments = admission["attachments"].as_array().into_iter().flatten()
+        .filter_map(|attachment| crate::runtime_tools::attachment_path(attachment).map(|path|
+            json!({"name":attachment["name"],"path":path,"size":attachment["size"]})))
+        .collect::<Vec<_>>();
+    if !attachments.is_empty() {
+        // Original composeAgentMessage preserves user text and discloses file
+        // locators. Native task/chat CWDs are scoped, so retain relative paths
+        // and quoted metadata instead of exposing a machine-specific root.
+        message.push_str("\n\nUploaded attachments (paths are relative to this task or conversation's working directory; use Read/Bash when needed):");
+        for attachment in attachments { message.push_str("\n- "); message.push_str(&attachment.to_string()); }
+    }
+    message
+}
+
+#[cfg(test)]
+mod attachment_manifest_regression {
+    use super::*;
+
+    #[test]
+    fn user_attachment_manifest_survives_inline_and_blob_bodies_and_checkpoint_reopen() {
+        for large in [false, true] {
+            let (dir, mut router, run, context) = crate::regression::seeded();
+            let path = format!("attachments/{}-report 한글.txt",new_id("attachment"));
+            let user = if large {"Original user instructions. ".repeat(MAX_CHUNK/"Original user instructions. ".len()+1)} else {"Original user instructions.".into()};
+            let admission=json!({"run_id":run,"text":user,"attachments":[{"name":"report 한글.txt","path":path,"size":37}]});
+            let snapshot=router.snapshot().unwrap();
+            let batch=artex_domain::conversation::append_activity(&snapshot,&context,&run,"user","Attachment admission",&artex_core::body(&admission.to_string()),None).unwrap();
+            let id=router.internal_commit(batch).unwrap()["activity_id"].as_str().unwrap().to_owned();
+            assert_eq!(router.snapshot().unwrap().get("conversation_activities",&id).unwrap().data["detail"]["blob"].is_object(),large);
+            let before=serde_json::to_value(router.compressed_messages(&run).unwrap()).unwrap();
+            for reopened in [false,true] {
+                if reopened {router.store.as_mut().unwrap().checkpoint().unwrap();router.store=None;router.store=Some(Store::open(&dir.path().join("store")).unwrap());}
+                let messages=router.compressed_messages(&run).unwrap();assert_eq!(serde_json::to_value(&messages).unwrap(),before);
+                let text=messages.iter().filter(|m|m.role=="user").flat_map(|m|&m.content).filter_map(|b|b["text"].as_str()).find(|s|s.contains("Uploaded attachments")).unwrap();
+                assert!(text.starts_with(&user));
+                let metadata:Value=serde_json::from_str(text.lines().find_map(|line|line.strip_prefix("- ")).unwrap()).unwrap();
+                assert_eq!(metadata,json!({"name":"report 한글.txt","path":path,"size":37}));
+            }
+        }
+        assert_eq!(user_text_with_attachments(&Value::Null,"Legacy plain user text"),"Legacy plain user text");
+        assert_eq!(user_text_with_attachments(&json!({"text":"Original","attachments":[{"name":"bad","path":"../private.txt","size":0}]}),"ignored"),"Original");
+    }
+}
+
 #[cfg(test)]
 mod skill_guidance_regression {
     use super::*;
@@ -110,6 +156,32 @@ struct Block {
     value: Value,
 }
 impl Router {
+    /// Continue only the same Worker's intent history. Other parent-run uses
+    /// (for example deadline wrap-up) retain their existing one-hop behavior.
+    pub(super) fn parent_context_messages(&self, run: &artex_core::Record, parent: &str) -> Result<Vec<Message>> {
+        let s=self.snapshot()?;
+        let agent=record(&s,"agents",text(&run.data,"agent_id"))?;
+        if run.data.get("purpose").is_some_and(|purpose|purpose!="normal") || agent.data["key"]!="worker" || run.data["intent_id"].is_null() {
+            return self.context_messages(parent);
+        }
+        // Normal purpose was optional in earlier native records; absence is
+        // their ordinary-run representation, not a wrap-up child.
+        let task=text(&run.data,"task_id");let intent=text(&run.data,"intent_id");
+        artex_domain::own_node(&s,task,intent)?;
+        let mut seen=BTreeSet::from([run.header.id.clone()]);let mut chain=Vec::new();let mut next=Some(parent.to_owned());
+        while let Some(id)=next {
+            if !seen.insert(id.clone()) {return Err(Error::new("CORRUPT_STORE","Worker continuation parent cycle"));}
+            let previous=record(&s,"agent_runs",&id)?;
+            if previous.data["task_id"]!=task || previous.data["intent_id"]!=intent || previous.data.get("purpose").is_some_and(|purpose|purpose!="normal") || !previous.data["conversation_id"].is_null() || s.get("agents",text(&previous.data,"agent_id")).is_none_or(|a|a.data["key"]!="worker") {
+                return Err(Error::new("PERMISSION_DENIED","Worker continuation parent is outside this task and intent"));
+            }
+            next=previous.data["parent_run_id"].as_str().map(str::to_owned);chain.push(id);
+        }
+        // Each transcript is stored once under its own run_id. Walk oldest to
+        // newest without deduplicating equal text: repeated human turns can be
+        // intentional, while a repeated/cyclic run reference is never valid.
+        let mut messages=Vec::new();for id in chain.into_iter().rev() {messages.extend(self.context_messages(&id)?);}Ok(messages)
+    }
     fn transcript_entries(&self, rid: &str) -> Result<(Vec<Entry>, Vec<Block>)> {
         let s = self.snapshot()?;
         let run = record(&s, "agent_runs", rid)?;
@@ -157,7 +229,7 @@ impl Router {
                 Some(Message {
                     role: "user".into(),
                     content: vec![
-                        json!({"type":"text","text":v["text"].as_str().unwrap_or(&detail)}),
+                        json!({"type":"text","text":user_text_with_attachments(&v,&detail)}),
                     ],
                 })
             } else {
@@ -541,5 +613,44 @@ impl Router {
         )?;
         batch.result = json!({"blocks":created,"originals_preserved":true,"warnings":warnings,"errors":errors});
         Ok(batch)
+    }
+}
+
+#[cfg(test)]
+mod worker_continuation_regression {
+    use super::*;
+    use artex_domain::Planner;
+
+    #[test]
+    fn worker_continuation_history_keeps_chronological_turns_once_and_rejects_foreign_links_and_cycles_after_reopen() {
+        let (dir,mut router,current,_)=crate::regression::seeded();
+        let s=router.snapshot().unwrap();let mut p=Planner::new(&s,"fixture.worker.continuation",&json!({}));
+        let agent=p.insert("agents","agent",json!({"key":"worker","enabled":true})).unwrap();
+        let exp=p.insert("explorations","exploration",json!({})).unwrap();
+        let task=p.insert("tasks","task",json!({"description":"Continuation history fixture","exploration_id":exp})).unwrap();
+        let intent=p.insert("exploration_nodes","node",json!({"exploration_id":exp,"kind":"intent","state":"running","payload":{"summary":"Fixture continuation"}})).unwrap();
+        let first=p.insert("agent_runs","run",json!({"agent_id":agent,"task_id":task,"intent_id":intent,"engine_epoch":router.engine_epoch,"state":"completed","finished_at":artex_core::now()})).unwrap();
+        let second=new_id("run");let mut previous=artex_core::default_data("agent_runs").unwrap();previous["id"]=json!(second);artex_domain::merge(&mut previous,&json!({"agent_id":agent,"task_id":task,"intent_id":intent,"engine_epoch":router.engine_epoch,"state":"cancelled","finished_at":artex_core::now()}));previous["parent_run_id"]=json!(first);p.put("agent_runs",&second,previous);
+        let mut run=s.get("agent_runs",&current).unwrap().data.clone();run["agent_id"]=json!(agent);run["task_id"]=json!(task);run["intent_id"]=json!(intent);run["conversation_id"]=Value::Null;run["parent_run_id"]=json!(second);p.put("agent_runs",&current,run);
+        let foreign=p.insert("agent_runs","run",json!({"agent_id":agent,"task_id":task,"intent_id":null,"engine_epoch":router.engine_epoch,"state":"completed"})).unwrap();
+        router.internal_commit(p.done(json!({}))).unwrap();
+        let mut expected=Vec::new();
+        for (rid,role,word) in [(&first,"user","First human instruction"),(&first,"assistant","First worker answer"),(&second,"user","Second human instruction")] {
+            let message=Message{role:role.into(),content:vec![json!({"type":"text","text":word})]};expected.push(message.clone());
+            let s=router.snapshot().unwrap();let mut p=Planner::new(&s,"fixture.worker.turn",&json!({}));
+            p.insert("activity","activity",json!({"exploration_id":exp,"node_id":intent,"worker":"worker","kind":if role=="user"{"user"}else{"text"},"summary":word,"detail":artex_core::body(&json!({"run_id":rid,"message":message}).to_string()),"metadata":{"run_id":rid}})).unwrap();
+            router.internal_commit(p.done(json!({}))).unwrap();
+        }
+        for reopened in [false,true] {
+            if reopened {router.store.as_mut().unwrap().checkpoint().unwrap();router.store=None;router.store=Some(Store::open(&dir.path().join("store")).unwrap());}
+            let s=router.snapshot().unwrap();let run=s.get("agent_runs",&current).unwrap();
+            assert_eq!(serde_json::to_value(router.parent_context_messages(run,&second).unwrap()).unwrap(),serde_json::to_value(&expected).unwrap());
+            assert_eq!(router.parent_context_messages(run,&foreign).unwrap_err().code,"PERMISSION_DENIED");
+            assert_eq!(router.parent_context_messages(run,&current).unwrap_err().code,"CORRUPT_STORE");
+            let mut wrapup=run.clone();wrapup.data["purpose"]=json!("run_wrapup");
+            assert_eq!(serde_json::to_value(router.parent_context_messages(&wrapup,&second).unwrap()).unwrap(),serde_json::to_value(vec![expected[2].clone()]).unwrap(),"Other child kinds retain their prior one-hop behavior");
+        }
+        let snapshot=router.snapshot().unwrap();let mut p=Planner::new(&snapshot,"fixture.worker.non_normal_parent",&json!({}));let mut previous=snapshot.get("agent_runs",&second).unwrap().data.clone();previous["purpose"]=json!("run_wrapup");p.put("agent_runs",&second,previous);router.internal_commit(p.done(json!({}))).unwrap();
+        let snapshot=router.snapshot().unwrap();assert_eq!(router.parent_context_messages(snapshot.get("agent_runs",&current).unwrap(),&second).unwrap_err().code,"PERMISSION_DENIED");
     }
 }

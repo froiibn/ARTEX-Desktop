@@ -172,7 +172,17 @@ mod navigation_tests {
 }
 
 pub fn display_name(record: &Record) -> String {
-    for field in [
+    if record.header.collection == "tools" {
+        if let Some(key)=record.data["key"].as_str().filter(|s|!s.trim().is_empty()) {
+            // The callable key is the tool's identity. Like the original tool
+            // list, retain its description as context without hiding the key
+            // from selection or the native list's text search.
+            let description=record.data["description"].as_str().unwrap_or("").lines().next().unwrap_or("");
+            let label=if description.trim().is_empty() {key.to_owned()} else {format!("{key} · {description}")};
+            return label.chars().take(100).collect();
+        }
+    }
+    let explicit = [
         "title",
         "name",
         "description",
@@ -180,9 +190,22 @@ pub fn display_name(record: &Record) -> String {
         "url",
         "host",
         "summary",
-        "kind",
-    ] {
-        if let Some(text) = record.data[field].as_str().filter(|s| !s.trim().is_empty()) {
+    ].into_iter().map(|field| &record.data[field]);
+    // Domain/IP/application assets have no top-level name or URL. Keep their
+    // canonical identity visible and searchable instead of displaying only ID.
+    let assets=["domain","ip","app_name","bundle_id"].into_iter()
+        .filter(|_|record.header.collection=="assets").map(|field|&record.data[field]);
+    // Exploration nodes keep their human description in the typed payload.
+    // Prefer it to the generic kind in task lists and graph labels, while
+    // preserving explicit top-level names and all other collection priorities.
+    let payload = [&record.data["payload"]["summary"], &record.data["payload"]["text"]]
+        .into_iter().filter(|_| record.header.collection == "exploration_nodes");
+    // Task constraints are selected by their actual rule text. A kind or opaque
+    // ID cannot distinguish two rules in the native list or its text search.
+    let constraint=std::iter::once(&record.data["text"])
+        .filter(|_|record.header.collection=="task_constraints");
+    for value in explicit.chain(assets).chain(payload).chain(constraint).chain(std::iter::once(&record.data["kind"])) {
+        if let Some(text) = value.as_str().filter(|s| !s.trim().is_empty()) {
             return text
                 .lines()
                 .next()
@@ -243,6 +266,40 @@ pub fn records<'a>(snapshot: &'a Snapshot, section: Section, search: &str) -> Ve
 mod visibility_tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn exploration_labels_show_saved_payload_without_changing_other_collection_names() {
+        let make=|collection:&str,data:Value| -> Record {
+            serde_json::from_value(json!({"header":{"id":artex_core::new_id(artex_core::collection_prefix(collection).unwrap()),
+                "collection":collection,"version":"1","commit_seq":"1","created_at":"2026-11-26T00:00:00Z","updated_at":"2026-11-26T00:00:00Z","legacy_key":null},"data":data})).unwrap()
+        };
+        for (kind,field,content) in [("goal","text","Check saved goal"),("intent","summary","Check saved intent"),
+            ("fact","summary","Recorded fact"),("digest","summary","Saved context digest")] {
+            let mut payload=json!({});payload[field]=json!(content);
+            let node=make("exploration_nodes",json!({"kind":kind,"payload":payload}));
+            assert_eq!(display_name(&node),content);
+        }
+        assert_eq!(display_name(&make("exploration_nodes",json!({"name":"Explicit name","kind":"fact","payload":{"summary":"Payload name"}}))),"Explicit name");
+        assert_eq!(display_name(&make("exploration_nodes",json!({"kind":"begin","payload":{}}))),"begin");
+        assert_eq!(display_name(&make("exploration_nodes",json!({"kind":"fact","payload":{"summary":"한".repeat(101)}}))),"한".repeat(100));
+        assert_eq!(display_name(&make("tasks",json!({"name":"Task name","kind":"task","payload":{"summary":"Ignore foreign payload"}}))),"Task name");
+        assert_eq!(display_name(&make("tools",json!({"kind":"command","payload":{"summary":"Ignore foreign payload"}}))),"command");
+        assert_eq!(display_name(&make("task_constraints",json!({"text":"Actual user constraint\nSecond line","kind":"deny"}))),"Actual user constraint");
+        assert_eq!(display_name(&make("task_constraints",json!({"name":"Explicit constraint","text":"Rule text","kind":"allow"}))),"Explicit constraint");
+        assert_eq!(display_name(&make("task_constraints",json!({"text":"한".repeat(101),"kind":"deny"}))),"한".repeat(100));
+        assert_eq!(display_name(&make("tasks",json!({"text":"Do not adopt a foreign field","kind":"task"}))),"task");
+        let tool=make("tools",json!({"key":"Read","description":"저장된 파일 읽기","kind":"builtin"}));
+        assert_eq!(display_name(&tool),"Read · 저장된 파일 읽기");
+        let snapshot=Snapshot {workspace_id:artex_core::new_id("workspace"),commit_seq:1,
+            collections:std::collections::BTreeMap::from([("tools".into(),std::collections::BTreeMap::from([(tool.header.id.clone(),tool.clone())]))])};
+        assert_eq!(records(&snapshot,Section::Tools,"read")[0].header.id,tool.header.id);
+        assert_eq!(records(&snapshot,Section::Tools,"파일 읽기")[0].header.id,tool.header.id);
+        for data in [json!({"type":"root_domain","domain":"asset-fixture.invalid"}),
+            json!({"type":"ip","ip":"192.0.2.3"}),json!({"type":"app","app_name":"Fixture application"})] {
+            let asset=make("assets",data.clone());
+            let expected=data["domain"].as_str().or_else(||data["ip"].as_str()).or_else(||data["app_name"].as_str()).unwrap();
+            assert_eq!(display_name(&asset),expected);
+        }
+    }
     #[test]
     fn trash_and_archived_tasks_leave_live_lists_and_restore_the_same_record_identity() {
         let make = |collection: &str, patch: Value| -> Record {

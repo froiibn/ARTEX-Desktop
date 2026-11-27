@@ -295,8 +295,8 @@ impl SharedConfiguration {
                 .filter(|r| r.data["agent_id"] == *id)
             {
                 let server_id = string(&v.data, "resource_id")?;
-                // The original deleteMcpServer can leave this polymorphic relation
-                // orphaned. An absent server grants nothing; do not resurrect it.
+                // Older native snapshots can contain orphaned polymorphic grants.
+                // An absent server grants nothing; do not resurrect legacy damage.
                 let Some(server) = server_names.get(server_id) else {
                     continue;
                 };

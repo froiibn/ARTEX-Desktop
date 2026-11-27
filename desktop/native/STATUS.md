@@ -1,5 +1,38 @@
 # Rust 통합형 데스크톱 구현 상태
 
+## 2026-11-27 전체 318행 추가 수락과 회귀 완료
+
+기존 21행과 남은 318행을 최종 고정 소스에서 검증해 **339/339행, 잔여 0**을 수락했다. 원본 UI 258개·도구 81개이며 목록을 줄이거나 validator를 완화하지 않았다. 실제 NativeApp 입력·정책/CAS·실행·SQLite/파일 저장·재열기·해당 결과 표시를 연결하고, 네이티브 대체 경로는 변경점 통과로 분리했다. [최종 보고서](../../docs/acceptance-final-20261127.md)와 [완료 목록](../../docs/e2e-acceptance-completed-20261127.csv)을 따른다.
+
+새 전체 실행은 서비스 45·호스트 81·UI 245·공유 491건 및 별도 알림 1건, 실제 격리 창 23개 화면을 통과했다. 묶음은 중복되므로 합산하지 않는다. 이전 공유 결과는 재사용하지 않았고 고정 입력 261개가 일치했다. 근거: `desktop/native/test-results/f29a3a65f7424ad9b25095418318602d/verification-result.json`.
+
+표준 실행 파일 `desktop/dist/ARTEX-Windows/ARTEX.exe`는 63,692,735바이트, SHA-256 `380dc8942ad58cc8fc52eac9de706bdd225404dc962d16a4c5c970d4accd8733`다. 해당 EXE 자체시험도 통과했다. `ad9a20c` 기반 dirty 로컬 개발 빌드이며 원격 게시·안정판 태그는 수행하지 않았다. 이 수락은 기재한 Windows 격리 시나리오다. 실제 공급자/OS 선택기·키 저장·장시간 기본 fan-out·macOS/Arch 실기기와 원본 독립 수동 HTTP 2개 대응은 보고서의 별도 출시 범위를 따른다. 아래는 각 시점의 과거 기록이다.
+
+
+## 2026-11-26 완료 분석·보고서 내보내기 연결 수락
+
+`ad9a20c` 기반 dirty 작업 트리에서 실제 재개→loopback 모델의 Read/report_finding/update_finding_report/goal_met→SQLite 저장→종료 보고서 표시→파일 저장/취소→다른 작업 격리→읽기 전용 재열기/내보내기를 연결해 통과했다. 모델 요청 4회, 실제 파일 읽기 1회, 저장된 도구 완료 4건을 확인했다. 명시적으로 설정한 planner의 짧은 UTF-8 보고서 사례이며, 자동 reporter fan-out·OS 저장 대화상자·실제 사이트/공급자·대용량 보고서의 수락으로 확대하지 않는다. 제품의 업무 로직·기본 바인딩·스키마·의존성 결함은 새로 확인하지 않았다. 코드 변경은 연결 시험과 테스트 전용 저장 위치 입력 경계다. 제품은 기존 rfd 동작을 유지한다.
+
+원본 287개 해시·계약 1,283개 검증, CI 조건(`RUST_TEST_THREADS=1`)의 서비스 45건·호스트 79건·UI 160건이 통과했다. 공유 회귀 460건은 183개 입력 해시 일치·누락 검사 후 이전 결과를 재사용했다. 시험 묶음은 서로 겹치므로 합산하지 않는다. 격리 native 창 23개 화면·아이콘·중복 실행 전달·정상 종료도 통과했다. 최종 소스/리소스 입력 250개 해시를 확인했다. 첫 기본 병렬 UI 실행의 152통과/8시간초과 실패는 전체 통과에서 제외하고 로그를 보존했다. CI 조건의 통과는 병렬 부하 안정성을 보장하지 않는다.
+
+도구 3행을 추가 수락하고 기존 UI138의 근거를 보강해 **21/339행 제한 수락, 318행 미완료**다. [최신 수락·실패 근거](../../docs/e2e-feature-verification.md), [남은 318행](../../docs/e2e-pending-acceptance-report-20261126.csv), [보고서 상세 범위](../../docs/site-assessment-report.md). 실제 공급자·설정 폼 전체, 외부 자손 실행의 중지/정리/삭제, 자동 reporter fan-out, 대용량/장시간/오류 복구, macOS/Arch 실기기와 원본의 별도 대응 과제는 남아 있다. 안정판 완료 판정은 아니다.
+
+현재 표준 실행 파일은 `desktop/dist/ARTEX-Windows/ARTEX.exe`, **64,273,200바이트**, SHA-256 `e6a0be027d81c3a976d9aa624bab94d53a1e305f5533f6ca759c947e196349ca`다. 표준 build.py 최적화 빌드와 이 EXE 자체의 격리 자체시험(로컬 공급자 요청 4회·승인/Bypass·도구·저장·복구·정상 종료)이 통과했다. BUILD-INFO는 `ad9a20c1f1ea46580b6624ebd40c192a2d388569` + dirty, `local-development-build`, `distribution_ready: false`다. 커밋·푸시·태그·릴리스 교체는 수행하지 않았다.
+
+상세 증거는 저장소 밖 `.organization/stable-report-20261126/verification.json`과 `desktop/native/test-results/b4020e7bf64e421ba7a20aa080aff8dd/verification-result.json`에 연결했다. 사용자 키·실제 작업 공간·운영 사이트는 이번 연결 사례에 사용하지 않았다. 아래는 각 시점의 고정 기록이다.
+
+## 2026-11-24 안정판 핵심 흐름 1차 검증·수정
+
+`ad9a20c` 기반 로컬 변경이다. 사용자 전용 `agent.features.set`의 Prepare 연결 누락과 최초 설정 시 agent CAS 누락을 보완하고, 대화 화면에서 현재 대화/작업·실행 epoch에 속한 질문·승인을 표시하도록 수정했다. 읽기 전용에서는 제출하지 않는다. 기존 opt-in·명시적 deny·승인·소유권·저장 계약을 유지하며 의존성/저장 스키마를 변경하지 않았다.
+
+실제 NativeApp 입력→서비스→loopback 모델/도구→SQLite 저장→재열기→표시의 5개 연결 사례를 추가했다. 모델 수정·활성화/공간 전환, 작업 제어·중지/삭제, 질문 답변, Write 승인/Bypass와 deny, 승인 대기 중 대화 중지에 한정해 수락표 7행을 추가 통과시켰다. 현재 **18/339행 통과, 321행 미완료**다. 전체 기능 동등성이나 안정판 완료 판정은 아니다. [범위·결함·수락 근거](../../docs/e2e-feature-verification.md), [잔여 목록](../../docs/e2e-pending-acceptance-core-20261124.csv).
+
+최종 소스에서 서비스 45건·호스트 79건·네이티브 UI 159건·공유 workspace 460건을 결과 재사용 없이 순차 통과했다. 서로 겹치는 묶음이므로 합산하지 않는다. 실제 native 창 23개 화면·중복 실행 전달·아이콘·정상 종료, 계약 1,283개, 원본 manifest 287개 및 검증 입력 소스/리소스 250개 해시를 확인했다. 최초 공유 회귀의 Windows 시험 서버 소켓 실패는 fixture의 blocking 모드를 명시해 수정했으며 제품 timeout은 변경하지 않았다. 실패 로그도 보존했다.
+
+표준 `build.py`로 만든 현재 로컬 실행 파일은 `desktop/dist/ARTEX-Windows/ARTEX.exe`다. **64,271,269바이트**, SHA-256 `93c0395a8ec66dde5f121f2f956b82c020a3ec709db5be44c57e8266a5a707fb`. BUILD-INFO는 `ad9a20c1f1ea46580b6624ebd40c192a2d388569` + dirty 상태의 `local-development-build`로 식별한다. 해당 EXE 자체시험도 격리된 프로필/작업 공간에서 통과했다: 로컬 공급자 요청 4회, 실제 승인/Bypass·도구 실행·CAS·보관/복구·정상 종료. GitHub preview.5는 교체하지 않았고 커밋·푸시·릴리스 업로드도 하지 않았다.
+
+실제 사용자 모델 키/작업 공간/사이트는 이번 연결 사례에 사용하지 않았다. 실제 공급자·OS 파일 선택기/키 입력 전체, 외부 도구 자손 실행과 중지·삭제의 동일 흐름, 완료된 사이트 분석→종합 보고서 내보내기, 장시간/복구 및 macOS·Arch 실기기 수락은 남아 있다. 상세 증거는 저장소 밖 `.organization/stable-core-20261124/verification.json`과 최종 `desktop/native/test-results/8137cdc6d9854af99d6fd88ca8c1c2fa/verification-result.json`에서 추적한다. 아래는 당시 결과를 보존한 과거 기록이다.
+
 ## 2026-11-24 현재 저장 구현: SQLite v2
 
 사용자가 자체 파일 엔진 대신 SQLite 사용을 요청해 변경했다. 새 작업공간과 공통 설정은 앱에 번들한 `rusqlite 0.40.2 / SQLite 3.53.2`를 사용한다. 객체/RPC/에이전트/권한 의미는 유지한다. 기존 v1은 검증·이전 입력이며 원본 파일을 보존한다. [저장 구조와 이전 명세](../../docs/sqlite-storage.md).

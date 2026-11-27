@@ -528,9 +528,12 @@ fn rewrite_json(v: &mut Value, m: &BTreeMap<(String, String), String>) -> Result
         for (k, v) in o {
             let target = match k.as_str() {
                 "node_id" | "intent_id" | "goal_id" | "evidence_id" | "finding_node_id"
-                | "proof_node_id" => Some("exploration_nodes"),
+                | "proof_node_id" | "source_finding_node_id" => Some("exploration_nodes"),
                 "task_id" | "source_task_id" => Some("tasks"),
-                "finding_id" => Some("findings"),
+                // Follow-up provenance is embedded JSON in both the original
+                // source and portable archives. Fresh typed restore identities
+                // must remain aligned with its graph edge and finding row.
+                "finding_id" | "source_finding_id" => Some("findings"),
                 "asset_id" => Some("assets"),
                 "traffic_id" | "source_traffic_id" => Some("exchanges"),
                 "snapshot_id" => Some("traffic_evidence_snapshots"),
@@ -1212,4 +1215,33 @@ pub fn migrate_new(
     drop(store);
     artex_platform::install_new(&stage, destination)?;
     Ok(p.report)
+}
+
+#[cfg(test)]
+mod followup_provenance_regression {
+    use super::*;
+
+    fn verify(store:&Store,note:&str)->(String,String,String) {
+        let snapshot=store.snapshot();let finding=snapshot.records("findings").into_iter().find(|f|f.data["name"]=="Imported finding provenance").unwrap();let intent=snapshot.records("exploration_nodes").into_iter().find(|n|n.data["kind"]=="intent").unwrap();let source=finding.data["node_id"].as_str().unwrap();let asset=&snapshot.records("assets")[0].header.id;
+        assert_eq!(intent.data["payload"]["source_finding_id"],finding.header.id);assert_eq!(intent.data["payload"]["source_finding_node_id"],source);assert_eq!(intent.data["payload"]["asset_ids"],json!([asset]));assert_eq!(intent.data["payload"]["summary"],"Investigate original finding");assert_eq!(intent.data["payload"]["operator_note"],note);assert_eq!(finding.data["evidence"],artex_core::body("Original evidence stays exact"));
+        let task=snapshot.get("tasks",finding.data["task_id"].as_str().unwrap()).unwrap();assert_eq!(intent.data["exploration_id"],task.data["exploration_id"]);assert_eq!(snapshot.get("exploration_nodes",source).unwrap().data["exploration_id"],task.data["exploration_id"]);
+        let anchors=snapshot.records("exploration_anchors");for node in [source,intent.header.id.as_str()] {assert_eq!(anchors.iter().filter(|a|a.data["node_id"]==node&&a.data["asset_id"]==*asset).count(),1);}
+        assert!(snapshot.records("exploration_edges").iter().any(|e|e.data["src_id"]==source&&e.data["dst_id"]==intent.header.id&&e.data["rel"]=="derived_from"));
+        (finding.header.id.clone(),source.to_owned(),task.header.id.clone())
+    }
+    #[test]
+    fn followup_provenance_maps_numeric_and_native_ids_through_real_import_archive_restore_and_readonly_reopen() {
+        for native in [false,true] {
+            let dir=tempfile::tempdir().unwrap();let id=|prefix:&str,n:u64|if native {json!(new_id(prefix))} else {json!(n)};
+            let exp=id("exploration",1);let task=id("task",2);let finding_node=id("node",3);let follow_node=id("node",4);let fid=id("finding",5);let asset=id("asset",6);let note=format!("Literal reference-like text must stay unchanged: {fid} / {finding_node}");
+            let mut source=LegacyExport{source_instance:format!("followup/source/{native}"),format_version:1,..Default::default()};
+            source.tables.insert("explorations".into(),vec![json!({"id":exp})]);source.tables.insert("tasks".into(),vec![json!({"id":task,"description":"Imported follow-up task","exploration_id":exp,"status":"paused","paused":true})]);source.tables.insert("assets".into(),vec![json!({"id":asset,"type":"root_domain","domain":"followup-fixture.invalid"})]);
+            source.tables.insert("exploration_nodes".into(),vec![json!({"id":finding_node,"exploration_id":exp,"kind":"finding","state":"confirmed","payload":{"summary":"Original finding summary","evidence":{"by":"worker","poc":"Original evidence stays exact"}}}),json!({"id":follow_node,"exploration_id":exp,"kind":"intent","state":"paused","payload":{"summary":"Investigate original finding","source_finding_id":fid,"source_finding_node_id":finding_node,"asset_ids":[asset],"operator_note":note}})]);
+            source.tables.insert("findings".into(),vec![json!({"id":fid,"task_id":task,"node_id":finding_node,"name":"Imported finding provenance","vulnclass":"fixture","severity":"high","summary":"Original finding summary","evidence":"Original evidence stays exact","asset_ids":[asset]})]);
+            source.tables.insert("exploration_anchors".into(),vec![json!({"id":id("anchor",7),"node_id":finding_node,"asset_id":asset}),json!({"id":id("anchor",8),"node_id":follow_node,"asset_id":asset})]);source.tables.insert("exploration_edges".into(),vec![json!({"id":id("edge",9),"exploration_id":exp,"src_id":finding_node,"dst_id":follow_node,"rel":"derived_from"})]);
+            let mut imported=Store::create(&dir.path().join("imported"),"Imported provenance").unwrap();assert!(import_into(&mut imported,&source,&mut PendingSecrets,LegacyOptions::default()).unwrap().complete);let (mapped_finding,mapped_node,mapped_task)=verify(&imported,&note);assert_ne!(json!(mapped_finding),fid);assert_ne!(json!(mapped_node),finding_node);
+            let package=dir.path().join("followup.zip");crate::export_task_archive(&imported,&mapped_task,&package).unwrap();let bytes=fs::read(&package).unwrap();let archive=crate::read_archive(&package,&format!("followup/archive/{native}")).unwrap();let restored_path=dir.path().join("restored");let mut restored=Store::create(&restored_path,"Restored provenance").unwrap();assert!(import_into_bounded(&mut restored,&archive,&mut PendingSecrets,LegacyOptions::default()).unwrap().complete);let (restored_finding,restored_node,_)=verify(&restored,&note);assert_ne!(restored_finding,mapped_finding);assert_ne!(restored_node,mapped_node);assert_eq!(fs::read(&package).unwrap(),bytes);
+            restored.checkpoint().unwrap();drop(restored);let readonly=Store::open_read_only(&restored_path).unwrap();verify(&readonly,&note);
+        }
+    }
 }

@@ -60,7 +60,9 @@ pub(super) fn initial(
             "ui.createAgent",
             json!({"key":"","name":"","description":""}),
         ),
-        "tools" if data["system"] == true => {
+        // SQL defaults mark system tools true; a fresh editor still creates a
+        // custom definition, while only an existing builtin uses saveTool.
+        "tools" if existing && data["system"] == true => {
             ("ui.saveTool", json!({"key":data["key"],"patch":data}))
         }
         "tools" if existing => ("ui.updateCustomTool", json!({"key":data["key"],"t":data})),
@@ -185,7 +187,10 @@ pub(super) fn baseline(
         .iter()
         .flat_map(|table| snapshot.records(table))
         .filter(|row| match row.header.collection.as_str() {
-            "agent_prompts" | "agent_triggers" | "agent_visibility" | "agent_skill_visibility"
+            "agent_triggers" if collection=="agents" => {
+                selected.is_none_or(|id|snapshot.get("agents",id).is_some_and(|agent|row.data["agent_key"]==agent.data["key"]))
+            }
+            "agent_prompts" | "agent_visibility" | "agent_skill_visibility"
                 if collection == "agents" =>
             {
                 selected.is_none_or(|id| row.data["agent_id"] == id)

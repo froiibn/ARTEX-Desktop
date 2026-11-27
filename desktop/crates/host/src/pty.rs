@@ -702,7 +702,12 @@ fn wait(
         }) {
             return "prompt";
         }
-        if start.elapsed() >= grace && st.last.elapsed() >= quiet {
+        // A newly submitted command must receive its own quiet interval. An
+        // idle session's previous output timestamp cannot prove that queued
+        // input has already been written or that its response has settled.
+        // Prompt, exit, cancellation and the caller's timeout still take their
+        // existing paths; an explicitly zero quiet interval remains immediate.
+        if start.elapsed() >= grace.max(quiet) && st.last.elapsed() >= quiet {
             return "quiet";
         }
         if start.elapsed() >= timeout {
@@ -1160,6 +1165,27 @@ mod backend {
 mod tests {
     use super::*;
     use artex_core::Actor;
+    #[test]
+    fn quiet_wait_does_not_reuse_idle_time_before_the_current_request() {
+        let (writes,_receiver)=mpsc::sync_channel(1);
+        let session=Session {
+            id:new_id("shell"),execution_id:new_id("exec"),directory:PathBuf::new(),
+            fingerprint:String::new(),command:String::new(),mode:"interactive".into(),
+            run:new_id("run"),epoch:new_id("epoch"),rows:24,cols:80,prompt:None,
+            state:Mutex::new(State {bytes:vec![],total:0,cursor:0,parser:vt100::Parser::new(24,80,0),
+                state:"running".into(),exit:None,last:Instant::now()-Duration::from_secs(1),ended:None,error:None,
+                leader_exited:false,group_empty:false}),
+            stop:AtomicBool::new(false),force:AtomicBool::new(false),drain_done:AtomicBool::new(false),
+            writer_done:AtomicBool::new(false),writer_stop:AtomicBool::new(false),terminal_closed:AtomicBool::new(false),
+            pid:0,writes,output_path:String::new(),
+        };
+        let quiet=Duration::from_millis(80);let started=Instant::now();
+        assert_eq!(wait(&session,quiet,Duration::ZERO,Duration::from_secs(1),None,0),"quiet");
+        assert!(started.elapsed()>=quiet,"Pre-request idle time incorrectly satisfied a fresh quiet wait");
+        // An old quiet session must also honor a shorter explicit timeout.
+        assert_eq!(wait(&session,Duration::from_secs(1),Duration::ZERO,Duration::from_millis(30),None,0),"timeout");
+        assert_eq!(wait(&session,Duration::ZERO,Duration::ZERO,Duration::from_secs(1),None,0),"quiet");
+    }
     #[test]
     fn forced_terminal_receipt_is_scoped_and_kept_after_terminal_exit() {
         let dir = tempfile::tempdir().unwrap();

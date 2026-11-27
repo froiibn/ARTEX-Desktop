@@ -1013,6 +1013,8 @@ impl NativeApp {
                 token,
                 scope,
             } => {
+                #[cfg(all(test,windows))]
+                println!("ACCEPT_SOURCE_FAILURE method={method} code={} required={}",error.code,error.details["required"]);
                 if self.handle.scope().as_ref() == Some(scope) {
                     self.source_operations
                         .error(scope, token, method, &error.code, &error.message);
@@ -1163,13 +1165,7 @@ impl NativeApp {
             self.workspace_choice_busy();
             return;
         }
-        if let Some(folder) = rfd::FileDialog::new()
-            .set_title(if create {
-                "새 작업 공간을 만들 상위 폴더"
-            } else {
-                "작업 공간 열기"
-            })
-            .pick_folder()
+        if let Some(folder) = choose_workspace_directory(create)
         {
             let path = if create {
                 folder.join(format!(
@@ -1370,9 +1366,7 @@ impl NativeApp {
                 }
                 Effect::StageFile { purpose } => {
                     if let Some(scope) = self.handle.scope() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .set_title("가져올 파일 선택")
-                            .pick_file()
+                        if let Some(path) = choose_input_file()
                         {
                             self.submit(
                                 NativeAction::StageFile {
@@ -1392,8 +1386,7 @@ impl NativeApp {
                 }
                 Effect::SaveStagedFile { token, name } => {
                     if let Some(scope) = self.handle.scope() {
-                        if let Some(destination) =
-                            rfd::FileDialog::new().set_file_name(&name).save_file()
+                        if let Some(destination) = choose_export_destination(&name)
                         {
                             self.submit(
                                 NativeAction::SaveFile {
@@ -2252,6 +2245,34 @@ impl eframe::App for NativeApp {
         }
     }
 }
+#[cfg(test)]
+thread_local! {
+    // Only the native picker is substituted. Tests still click Export, stage
+    // the original Body, and save/release the real service capability.
+    static TEST_EXPORT_DESTINATIONS: std::cell::RefCell<VecDeque<Option<PathBuf>>> = Default::default();
+    static TEST_INPUT_FILES:std::cell::RefCell<VecDeque<Option<PathBuf>>>=Default::default();
+    static TEST_WORKSPACE_DIRECTORIES:std::cell::RefCell<VecDeque<Option<PathBuf>>>=Default::default();
+}
+
+fn choose_input_file()->Option<PathBuf> {
+    #[cfg(test)]
+    if let Some(path)=TEST_INPUT_FILES.with(|q|q.borrow_mut().pop_front()) {return path;}
+    rfd::FileDialog::new().set_title("가져올 파일 선택").pick_file()
+}
+fn choose_workspace_directory(create:bool)->Option<PathBuf> {
+    #[cfg(test)]
+    if let Some(path)=TEST_WORKSPACE_DIRECTORIES.with(|q|q.borrow_mut().pop_front()) {return path;}
+    rfd::FileDialog::new().set_title(if create {"새 작업 공간을 만들 상위 폴더"} else {"작업 공간 열기"}).pick_folder()
+}
+
+fn choose_export_destination(name: &str) -> Option<PathBuf> {
+    #[cfg(test)]
+    if let Some(destination) = TEST_EXPORT_DESTINATIONS.with(|queue| queue.borrow_mut().pop_front()) {
+        return destination;
+    }
+    rfd::FileDialog::new().set_file_name(name).save_file()
+}
+
 fn purpose_label(purpose: &Purpose) -> &str {
     match purpose {
         Purpose::Prepare { .. } => "참조 버전 검사",

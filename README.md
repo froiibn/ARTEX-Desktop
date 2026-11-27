@@ -6,9 +6,11 @@
 
 LLM 연결·기본 모델·일반 설정·에이전트·도구/MCP·스킬 구성은 작업 공간과 관계없이 앱 전체에서 공통으로 사용한다. 최근 사용 기록에 있는 공간의 모델은 첫 이전 때 자동으로 가져오며, 기록 밖의 공간은 직접 열어 이전한다. Bypass와 작업·대화 기록은 현재 작업 공간에 유지한다. [공통 설정 안내](docs/shared-application-settings.md)는 한국어로 제공한다.
 
+이번 버전의 명명된 UI·도구 수락표는 **339/339, 잔여 0**이다. [preview.6 변경 내역과 검증 범위](docs/release-preview6.md)를 참고한다.
+
 사이트 분석 결과는 **작업 → 종합 보고서**에서 검사 내역·발견 문제·개선 우선순위·미검증 항목을 확인하고 Markdown 파일로 내보낼 수 있다. [보고서 사용 안내](docs/site-assessment-report.md)는 한국어로 제공한다.
 
-GitHub: [froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop). 현재는 **공개 Windows 시험 배포 단계**다. Windows `v0.2.0-preview.5` 시험 빌드와 대응 소스를 Releases에서 제공하며 로그인 없이 다운로드할 수 있다. 원본 README의 별도 사용 제한은 [처리 방침](docs/license-policy.md)에 따라 파생 프로젝트의 추가 라이선스 조건으로 채택하지 않는다. 2026-10-15에 저장소를 공개로 전환했다. 이전 개발 이력과 `preview.1`의 GitHub 저장소는 제거했으며, 정리한 소스와 검증한 Windows 시험 배포를 GitHub에서 제공한다. [저장소 이력 안내](docs/repository-history.md)를 참고한다. 원본 ARTEX의 저자는 **Autumn-27**이다. [원작자·출처와 수정 사항](ARTEX_NOTICE.md)을 참고한다.
+GitHub: [froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop). 현재는 **공개 Windows 시험 배포 단계**다. Windows `v0.2.0-preview.6` 시험 빌드와 대응 소스를 Releases에서 제공하며 로그인 없이 다운로드할 수 있다. 원본 README의 별도 사용 제한은 [처리 방침](docs/license-policy.md)에 따라 파생 프로젝트의 추가 라이선스 조건으로 채택하지 않는다. 2026-10-15에 저장소를 공개로 전환했다. 이전 개발 이력과 `preview.1`의 GitHub 저장소는 제거했으며, 정리한 소스와 검증한 Windows 시험 배포를 GitHub에서 제공한다. [저장소 이력 안내](docs/repository-history.md)를 참고한다. 원본 ARTEX의 저자는 **Autumn-27**이다. [원작자·출처와 수정 사항](ARTEX_NOTICE.md)을 참고한다.
 
 현재 개발 대상은 단일 Rust 프로세스의 네이티브 데스크톱 앱이다. Rust 네이티브 UI와 객체 모델·SQLite 저장, LLM·도구 실행 서비스가 같은 앱 안에서 동작한다. 기본 UI 실행에 Go, Node/npm, WebView, PostgreSQL 서버는 필요하지 않다. Python/Nmap 등 개별 외부 도구는 해당 기능을 사용할 때 별도로 필요하다.
 
@@ -53,7 +55,7 @@ LLM은 모델마다 지시를 해석하고 도구를 호출하는 방식이 달�
 
 ## 빌드 파일 다운로드
 
-[Windows x64 시험 버전 v0.2.0-preview.5](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.5)의 Assets에서 `ARTEX-Desktop-v0.2.0-preview.5-windows-x64.zip`을 다운로드한다. 압축을 모두 풀고 `ARTEX-Windows-x64/ARTEX.exe`를 실행한다. 소스 빌드 도구 없이 기본 앱을 실행할 수 있다. 같은 릴리스에 해당 소스 ZIP과 SHA256SUMS.txt도 제공한다.
+[Windows x64 시험 버전 v0.2.0-preview.6](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.6)의 Assets에서 `ARTEX-Desktop-v0.2.0-preview.6-windows-x64.zip`을 다운로드한다. 압축을 모두 풀고 `ARTEX-Windows-x64/ARTEX.exe`를 실행한다. 소스 빌드 도구 없이 기본 앱을 실행할 수 있다. 같은 릴리스에 해당 소스 ZIP과 SHA256SUMS.txt도 제공한다.
 
 이 버전은 서명되지 않은 Windows 시험 빌드이며 설치 프로그램·자동 업데이트는 포함하지 않는다. macOS·Linux 실행 파일은 아직 제공하지 않는다. [첫 실행 안내](docs/download-and-run.md)를 참고한다.
 

@@ -6,9 +6,11 @@
 
 LLM 连接、默认模型、常规设置、智能体、工具/MCP 和技能配置在同一应用配置目录的所有工作区中共享。首次迁移会自动导入最近使用过的工作区中的模型；其他工作区可通过直接打开来迁移其设置。免审批（Bypass）及任务和对话历史仍保留在各自工作区。[共享设置说明](docs/shared-application-settings.md)目前以韩语提供。
 
+命名UI/工具验收表已完成 **339/339，剩余0项**。请参阅[preview.6更新与验证范围](docs/release-preview6.md)。
+
 在**任务 → 综合报告**中查看网站分析的检查记录、发现的问题、修复优先级和未验证项目，并导出完整 Markdown 报告。[报告使用说明](docs/site-assessment-report.md)目前以韩语提供。
 
-GitHub：[froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop)。项目目前处于**公开 Windows 预览版分发阶段**。Windows `v0.2.0-preview.5` 预览版及其对应源代码已通过 Releases 提供，无需登录即可下载。根据[处理方针](docs/license-policy.md)，不将原版 README 的单独使用限制采纳为本派生项目的附加许可证条件。仓库已于 2026-10-15 转为公开。保存旧开发历史及 `preview.1` 的 GitHub 仓库已删除；GitHub 提供整理后的源码及已验证的 Windows 预览版。请参阅[仓库历史说明](docs/repository-history.md)。原版 ARTEX 的作者是 **Autumn-27**。请参阅[原作者、来源与修改说明](ARTEX_NOTICE.zh-CN.md)。
+GitHub：[froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop)。项目目前处于**公开 Windows 预览版分发阶段**。Windows `v0.2.0-preview.6` 预览版及其对应源代码已通过 Releases 提供，无需登录即可下载。根据[处理方针](docs/license-policy.md)，不将原版 README 的单独使用限制采纳为本派生项目的附加许可证条件。仓库已于 2026-10-15 转为公开。保存旧开发历史及 `preview.1` 的 GitHub 仓库已删除；GitHub 提供整理后的源码及已验证的 Windows 预览版。请参阅[仓库历史说明](docs/repository-history.md)。原版 ARTEX 的作者是 **Autumn-27**。请参阅[原作者、来源与修改说明](ARTEX_NOTICE.zh-CN.md)。
 
 当前开发目标是在单个 Rust 进程中运行的原生桌面应用。原生 UI、对象模型与 SQLite 存储、LLM 服务及工具执行服务都在同一应用内运行。基本界面的运行不需要 Go、Node/npm、WebView 或 PostgreSQL 服务器。Python、Nmap 等外部工具在使用相应功能时仍需单独准备。
 
@@ -53,7 +55,7 @@ GitHub：[froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop)。项
 
 ## 下载构建版本
 
-在 [Windows x64 预览版 v0.2.0-preview.5](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.5) 的 Assets 中下载 `ARTEX-Desktop-v0.2.0-preview.5-windows-x64.zip`。完整解压后运行 `ARTEX-Windows-x64/ARTEX.exe`。基本应用运行不需要源码构建工具。同一发布版本还提供对应的源码 ZIP 和 `SHA256SUMS.txt`。
+在 [Windows x64 预览版 v0.2.0-preview.6](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.6) 的 Assets 中下载 `ARTEX-Desktop-v0.2.0-preview.6-windows-x64.zip`。完整解压后运行 `ARTEX-Windows-x64/ARTEX.exe`。基本应用运行不需要源码构建工具。同一发布版本还提供对应的源码 ZIP 和 `SHA256SUMS.txt`。
 
 该版本为未签名的 Windows 预览版本，不包含安装程序或自动更新。目前尚未提供 macOS 和 Linux 可执行文件。请参阅[首次运行指南](docs/download-and-run.md)（韩语）。
 

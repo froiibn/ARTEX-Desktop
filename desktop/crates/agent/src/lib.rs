@@ -1133,9 +1133,8 @@ fn features_set(params: &Value, state: &Snapshot, context: &Context) -> Result<C
         return Err(denied("Only the user can opt in to agent features"));
     }
     let aid = field(params, "agent_id")?;
-    if state.get("agents", aid).is_none() {
-        return Err(Error::new("NOT_FOUND", "Agent not found"));
-    }
+    let agent = state.get("agents", aid)
+        .ok_or_else(|| Error::new("NOT_FOUND", "Agent not found"))?;
     for key in ["questions", "plan_mode", "memory"] {
         if !params[key].is_boolean() {
             return Err(invalid("Feature flags must be booleans"));
@@ -1148,6 +1147,10 @@ fn features_set(params: &Value, state: &Snapshot, context: &Context) -> Result<C
         .map(|r| r.header.id.clone())
         .unwrap_or_else(|| new_id("agentfeature"));
     let mut b = batch("agent.features.set", params);
+    // Opt-in belongs to the agent version shown to the user, including the
+    // first insert where there is no feature row yet to provide a CAS token.
+    b.expected.push(Expected { collection: "agents".into(), id: aid.into(),
+        version: agent.header.version.clone() });
     b.result = params.clone();
     put(&mut b, state, "agent_features", &id, params.clone());
     Ok(b)

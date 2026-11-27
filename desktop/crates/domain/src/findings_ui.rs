@@ -438,20 +438,25 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
                 ));
             }
             let exp = exploration_id(s, task)?;
-            let id=b.insert("exploration_nodes","node",json!({"exploration_id":exp,"kind":"intent","state":"open","origin":"human","priority":10,"payload":{"summary":description}}))?;
+            let mut assets=s.records("exploration_anchors").into_iter().filter(|a|a.data["node_id"]==node).map(|a|required(&a.data,"asset_id").map(str::to_owned)).collect::<Result<BTreeSet<_>>>()?;
+            // Earlier native reports retained authoritative affected-asset IDs
+            // but omitted every finding anchor. Recover only that empty-anchor
+            // case on this explicit action; an existing graph set remains the
+            // source authority, rather than unioning stale row associations.
+            if assets.is_empty() {assets.extend(ids(&f.data,"asset_ids").into_iter().filter(|id|s.get("assets",id).is_some()));}
+            for asset in &assets {record(s,"assets",asset)?;}
+            // Original AddFindingFollowUpIntent passes both provenance IDs and
+            // asset_ids to the Worker, as well as storing the graph relations.
+            let mut payload=json!({"summary":description,"source_finding_id":fid,"source_finding_node_id":node});
+            if !assets.is_empty() {payload["asset_ids"]=json!(assets);}
+            let id=b.insert("exploration_nodes","node",json!({"exploration_id":exp,"kind":"intent","state":"open","origin":"human","priority":10,"payload":payload}))?;
             b.insert(
                 "exploration_edges",
                 "edge",
                 json!({"exploration_id":exp,"src_id":node,"dst_id":id,"rel":"derived_from"}),
             )?;
-            for a in s.records("exploration_anchors") {
-                if a.data["node_id"] == node {
-                    b.insert(
-                        "exploration_anchors",
-                        "anchor",
-                        json!({"node_id":id,"asset_id":a.data["asset_id"]}),
-                    )?;
-                }
+            for asset in assets {
+                b.insert("exploration_anchors","anchor",json!({"node_id":id,"asset_id":asset}))?;
             }
             b.insert("activity","activity",json!({"exploration_id":exp,"node_id":id,"worker":"system","kind":"text","summary":"User submitted a finding follow-up intent","detail":artex_core::body(description)}))?;
             task_control_ui::revive(&mut b, task, c)?;
@@ -463,4 +468,64 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
     let mut out = b.done(result);
     augment_expected(&mut out, s)?;
     Ok(out)
+}
+
+#[cfg(test)]
+mod followup_scope_regression {
+    use super::*;
+    use artex_core::Actor;
+    use artex_store::Store;
+
+    fn apply(store:&mut Store,method:&str,input:Value,context:&Context)->Value {
+        let snapshot=store.snapshot();
+        let mut batch=if method=="ui.deepenFinding" {crate::findings_ui::plan(method,&input,&snapshot,context)} else {crate::plan(method,&input,&snapshot,context)}.unwrap();
+        crate::augment_expected(&mut batch,&snapshot).unwrap();batch.command_id=new_id("command");store.commit(batch).unwrap().result
+    }
+    fn report(store:&mut Store,context:&Context,name:&str,assets:Vec<String>)->String {
+        apply(store,"report_finding",json!({"name":name,"vulnclass":"fixture","severity":"high","summary":name,"evidence":format!("Exact evidence for {name}"),"asset_ids":assets}),context)["finding_id"].as_str().unwrap().to_owned()
+    }
+    fn anchors(snapshot:&Snapshot,node:&str)->BTreeSet<String> {
+        snapshot.records("exploration_anchors").into_iter().filter(|r|r.data["node_id"]==node).map(|r|r.data["asset_id"].as_str().unwrap().to_owned()).collect()
+    }
+    fn verify(store:&Store,finding:&str,intent:&str,expected:BTreeSet<String>,description:&str) {
+        let snapshot=store.snapshot();let f=snapshot.get("findings",finding).unwrap();let node=snapshot.get("exploration_nodes",intent).unwrap();
+        assert_eq!(node.data["priority"],10);assert_eq!(node.data["origin"],"human");assert_eq!(node.data["payload"]["summary"],description);
+        assert_eq!(node.data["payload"]["source_finding_id"],finding);assert_eq!(node.data["payload"]["source_finding_node_id"],f.data["node_id"]);
+        if expected.is_empty() {assert!(node.data["payload"].get("asset_ids").is_none());} else {assert_eq!(node.data["payload"]["asset_ids"],json!(expected));}
+        assert_eq!(anchors(&snapshot,intent),expected);
+        assert!(snapshot.records("exploration_edges").iter().any(|r|r.data["src_id"]==f.data["node_id"]&&r.data["dst_id"]==intent&&r.data["rel"]=="derived_from"));
+        let task=snapshot.get("tasks",f.data["task_id"].as_str().unwrap()).unwrap();assert_eq!(node.data["exploration_id"],task.data["exploration_id"]);
+        let audits=snapshot.records("activity").into_iter().filter(|r|r.data["node_id"]==intent&&r.data["worker"]=="system").collect::<Vec<_>>();assert_eq!(audits.len(),1);assert_eq!(audits[0].data["detail"],artex_core::body(description));
+    }
+
+    #[test]
+    fn finding_report_anchors_and_followup_provenance_preserve_source_scope_and_legacy_empty_graph_after_reopen() {
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("workspace");let mut store=Store::create(&path,"Finding follow-up scope").unwrap();
+        let mut user=Context{actor:Actor{kind:"user".into(),agent_id:None,run_id:None,engine_epoch:new_id("epoch")},task_id:None,intent_id:None,conversation_id:None};
+        let mut bootstrap=crate::bootstrap_plan(&store.snapshot(),&user).unwrap();bootstrap.command_id=new_id("command");store.commit(bootstrap).unwrap();
+        let task=apply(&mut store,"task.create",json!({"description":"Finding scope fixture","goal":"Only selected fixture assets","seed_first_intent":false}),&user)["task_id"].as_str().unwrap().to_owned();user.task_id=Some(task);
+        let assets=apply(&mut store,"insert_assets",json!({"assets":[{"type":"root_domain","domain":"one-fixture.invalid"},{"type":"root_domain","domain":"two-fixture.invalid"}]}),&user)["ids"].as_array().unwrap().iter().map(|v|v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        let mut worker=user.clone();worker.actor.kind="agent".into();worker.actor.agent_id=Some(store.snapshot().records("agents").into_iter().find(|r|r.data["key"]=="worker").unwrap().header.id.clone());
+        let mut results=Vec::new();
+        for (kind,declared,expected) in [("fresh",vec![assets[0].clone(),assets[0].clone()],BTreeSet::from([assets[0].clone()])),("legacy",vec![assets[1].clone()],BTreeSet::from([assets[1].clone()])),("current_graph",vec![assets[0].clone()],BTreeSet::from([assets[1].clone()])),("empty",vec![],BTreeSet::new())] {
+            let fid=report(&mut store,&worker,kind,declared.clone());let snapshot=store.snapshot();let finding=snapshot.get("findings",&fid).unwrap().clone();let source=finding.data["node_id"].as_str().unwrap();let node=snapshot.get("exploration_nodes",source).unwrap();
+            assert_eq!(node.data["priority"],9);assert_eq!(node.data["origin"],"worker");assert_eq!(node.data["owner"],json!(worker.actor.agent_id));assert_eq!(finding.data["worker"],"worker");assert_eq!(anchors(&snapshot,source),declared.iter().cloned().collect());assert_eq!(node.data["payload"]["evidence"],json!({"by":"worker","poc":format!("Exact evidence for {kind}")}));
+            if kind=="legacy"||kind=="current_graph" {
+                // Valid old/current records are initial context. The explicit
+                // follow-up action itself must preserve the authoritative set.
+                let mut p=Planner::new(&snapshot,"fixture.preexisting_finding_graph",&json!({}));
+                for anchor in snapshot.records("exploration_anchors").into_iter().filter(|r|r.data["node_id"]==source) {p.delete("exploration_anchors",&anchor.header.id);}
+                if kind=="legacy" {let mut old=node.data.clone();old["priority"]=json!(5);old["origin"]=json!("");old["payload"]["evidence"]=json!(format!("Exact evidence for {kind}"));p.put("exploration_nodes",source,old);}
+                if kind=="current_graph" {p.insert("exploration_anchors","anchor",json!({"node_id":source,"asset_id":assets[1]})).unwrap();}
+                let mut batch=p.done(json!({}));crate::augment_expected(&mut batch,&snapshot).unwrap();batch.command_id=new_id("command");store.commit(batch).unwrap();
+            }
+            let original_source=store.snapshot().get("exploration_nodes",source).unwrap().clone();
+            let description=format!("Follow up {kind}");let result=apply(&mut store,"ui.deepenFinding",json!({"id":fid,"description":description}),&user);let intent=result["intent_id"].as_str().unwrap().to_owned();
+            verify(&store,&fid,&intent,expected.clone(),&description);assert_eq!(store.snapshot().get("findings",&fid).unwrap(),&finding);assert_eq!(store.snapshot().get("exploration_nodes",source).unwrap(),&original_source);
+            if kind=="legacy" {assert!(anchors(&store.snapshot(),source).is_empty(),"No implicit rewrite of the old source node");}
+            results.push((fid,intent,expected,description,finding,original_source));
+        }
+        store.checkpoint().unwrap();drop(store);let store=Store::open_read_only(&path).unwrap();
+        for (fid,intent,expected,description,finding,original_source) in results {verify(&store,&fid,&intent,expected,&description);assert_eq!(store.snapshot().get("findings",&fid).unwrap(),&finding);assert_eq!(store.snapshot().get("exploration_nodes",&original_source.header.id).unwrap(),&original_source);}
+    }
 }

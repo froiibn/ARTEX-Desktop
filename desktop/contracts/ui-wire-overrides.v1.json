@@ -122,6 +122,12 @@
       "role": "params"
     },
     {
+      "method": "ui.sendWorkerMessage",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
       "method": "ui.taskLLMResolution",
       "field": "id",
       "prefix": "task",
@@ -672,6 +678,12 @@
       "field": "id",
       "prefix": "conversation",
       "role": "params"
+    },
+    {
+      "method": "ui.deleteConversation",
+      "field": "deleted",
+      "prefix": "conversation",
+      "role": "result"
     },
     {
       "method": "ui.deleteConversations",
@@ -2174,6 +2186,12 @@
       "role": "result"
     },
     {
+      "method": "ui.deleteTrigger",
+      "field": "deleted",
+      "prefix": "trigger",
+      "role": "result"
+    },
+    {
       "method": "ui.deleteMcpServer",
       "field": "deleted",
       "prefix": "mcp",
@@ -2410,6 +2428,12 @@
     {
       "method": "ui.updateAssetInterceptRule",
       "field": "id",
+      "prefix": "assetrule",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteAssetInterceptRule",
+      "field": "deleted",
       "prefix": "assetrule",
       "role": "result"
     },
@@ -2657,6 +2681,36 @@
       "method": "ui.chatMentions",
       "field": "id",
       "prefix": "company|finding|asset",
+      "role": "result"
+    },
+    {
+      "method": "ui.archiveTasks",
+      "field": "archive_id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.restoreTaskArchives",
+      "field": "archive_id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.deleteTaskArchives",
+      "field": "archive_id",
+      "prefix": "archive",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskAssetRefs",
+      "field": "id",
+      "prefix": "node",
+      "role": "result"
+    },
+    {
+      "method": "ui.taskAssetRefs",
+      "field": "id",
+      "prefix": "node",
       "role": "result"
     }
   ],

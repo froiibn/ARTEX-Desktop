@@ -71,7 +71,9 @@ impl Editor {
         }
         if collection == "agents" && selected.is_some() {
             extras["metadata"] = json!({"key":source["key"],"name":source["name"],"description":source["description"]});
-            extras["triggers"]=json!(s.records("agent_triggers").into_iter().filter(|r|r.data["agent_id"]==selected.unwrap()).map(|r|json!({"id":r.header.id,"t":schema::shape(&r.data,&schema::resolve(&schema::method("ui.updateTrigger")["properties"]["t"]))})).collect::<Vec<_>>());
+            // Triggers are owned by the stable agent key in the source schema,
+            // not by a synthetic agent_id. Reopen must retain these conditions.
+            extras["triggers"]=json!(s.records("agent_triggers").into_iter().filter(|r|r.data["agent_key"]==source["key"]).map(|r|json!({"id":r.header.id,"t":schema::shape(&r.data,&schema::resolve(&schema::method("ui.updateTrigger")["properties"]["t"]))})).collect::<Vec<_>>());
         }
         Some(Self {
             token,
@@ -271,6 +273,38 @@ pub struct Forms {
 }
 
 impl Forms {
+    #[cfg(all(test,windows))]
+    pub(crate) fn patch_active_params_for_app_test(&mut self,patch:Value) {
+        let key=self.active.as_ref().expect("Active real editor");let editor=self.editors.get_mut(key).unwrap();
+        assert!(!editor.busy && !editor.file_loading && editor.pending_reads.is_empty() && editor.pending_secrets.is_empty());
+        artex_domain::merge(&mut editor.params,&patch);
+    }
+    #[cfg(all(test,windows))]
+    pub(crate) fn seed_skill_file_inputs_for_app_test(&mut self,new_path:Option<&str>,content:Option<&str>) {
+        let key=self.active.as_ref().expect("Active real skill editor");
+        let editor=self.editors.get_mut(key).unwrap();assert_eq!(editor.collection,"skills");
+        assert!(!editor.file_loading,"Await the actual selected file response");
+        if let Some(path)=new_path {editor.new_file=path.into();}
+        if let Some(content)=content {editor.file_content=content.into();}
+    }
+    /// Seed an editable input draft, not saved values or asynchronous results.
+    /// Original revisions and default values retain their production meaning.
+    #[cfg(all(test,windows))]
+    pub(crate) fn seed_editor_for_app_test(&mut self, collection:&str, selected:Option<&str>, snapshot:&Snapshot,
+        params:Value, extras:Option<Value>) {
+        if self.workspace.as_deref()!=Some(&snapshot.workspace_id) {
+            self.editors.clear(); self.requests.clear(); self.workspace=Some(snapshot.workspace_id.clone());
+        }
+        let collection=spec::collection_alias(collection);
+        self.next_token+=1;
+        let token=format!("{}:{}",snapshot.workspace_id,self.next_token);
+        let mut editor=Editor::new(token,collection,selected,snapshot).expect("Actual supported editor");
+        if !params.is_null() { editor.params=params; }
+        if let Some(extras)=extras {
+            for (key,value) in extras.as_object().expect("Editor extras input object") { editor.extras[key]=value.clone(); }
+        }
+        let key=editor_key(collection,selected); self.active=Some(key.clone()); self.editors.insert(key,editor);
+    }
     pub fn all_known_operations() -> Vec<String> {
         [
             "ui.saveLLMProfile",

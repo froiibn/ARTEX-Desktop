@@ -1,5 +1,9 @@
 use crate::*;
 use std::collections::BTreeMap;
+// Source sendWorkerMessage accepts at most 4000 Unicode scalar values and an
+// ASCII correlation ID; these are protocol limits, not a model-specific cap.
+const WORKER_MESSAGE_CHAR_LIMIT: usize = 4000;
+const WORKER_REQUEST_ID_LIMIT: usize = 128;
 pub const QUERIES: &[&str] = &["ui.taskGoals", "ui.taskScope"];
 pub const COMMANDS: &[&str] = &[
     "ui.recoverTaskBudget",
@@ -532,21 +536,60 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
         }
         "ui.sendWorkerMessage" => {
             let task = required(p, "taskId")?;
-            live(s, task)?;
+            let t = live(s, task)?;
             let id = required(p, "intentId")?;
             let n = own_node(s, task, id)?;
-            if n.data["kind"] != "intent" || n.data["state"] != "running" {
-                return Err(Error::new("VERSION_CONFLICT", "Worker is not running"));
-            }
-            let request = required(p, "requestId")?;
+            let request = required(p, "requestId")?.trim();
             let message = required(p, "message")?.trim();
-            let next = exploration::plan(
-                "steer_work",
-                &json!({"task_id":task,"intent_id":id,"message":message}),
-                s,
-                c,
-            )?;
-            absorb(&mut b, next);
+            if message.chars().count() > WORKER_MESSAGE_CHAR_LIMIT {
+                return Err(Error::new("INVALID_PARAMS", "Message exceeds 4000 characters"));
+            }
+            if request.is_empty() || request.len() > WORKER_REQUEST_ID_LIMIT || !request.bytes().all(|ch|ch.is_ascii_alphanumeric() || matches!(ch,b'-'|b'_'|b'.'|b':')) {
+                return Err(Error::new("INVALID_PARAMS", "requestId must be 1-128 ASCII letters, numbers, -, _, . or :"));
+            }
+            if t.data["status"] != "running" || t.data["paused"] == true || t.data["queued"] == true {
+                return Err(Error::new("VERSION_CONFLICT", "Resume the runnable task before sending a Worker message"));
+            }
+            if n.data["kind"] != "intent" {
+                return Err(Error::new("VERSION_CONFLICT", "Intent node required"));
+            }
+            // Command receipts cover exact retries; a new command cannot replay
+            // an already-admitted human turn with the same intent-scoped ID.
+            if s.records("activity").iter().any(|a|a.data["exploration_id"]==t.data["exploration_id"]&&a.data["node_id"]==id&&a.data["metadata"]["worker_message_request_id"]==request) {
+                return Err(Error::new("VERSION_CONFLICT", "Worker requestId was already admitted for this intent"));
+            }
+            b.expect(t);b.expect(n);
+            if n.data["state"] == "running" {
+                // Retain native live steering as an extension. The original UI
+                // pause-then-send path below admits its own dedicated run.
+                let next=exploration::plan("steer_work",&json!({"task_id":task,"intent_id":id,"message":message}),s,c)?;
+                absorb(&mut b,next);
+            } else {
+                if n.data["state"] != "paused" {
+                    return Err(Error::new("VERSION_CONFLICT", "Pause the intent before sending a Worker message"));
+                }
+                if s.records("agent_runs").iter().any(|r|r.data["task_id"]==task&&r.data["intent_id"]==id&&matches!(text(&r.data,"state"),"queued"|"running"|"waiting"|"paused"|"interrupted"|"recovery_required"|"cancel_requested")) {
+                    return Err(Error::new("BUSY", "Previous intent run has not stopped"));
+                }
+                let agent=conversation::agent_by_key(s,"worker")?;
+                if agent.data["enabled"] != true {return Err(Error::new("FEATURE_DISABLED","Worker is disabled"));}
+                let profile=conversation::effective_profile(s,agent,None,Some(t))?;
+                b.expect(agent);b.expect(profile);
+                let parent=s.records("agent_runs").into_iter().filter(|r|r.data["task_id"]==task&&r.data["intent_id"]==id&&r.data.get("purpose").is_none_or(|purpose|purpose=="normal")&&s.get("agents",text(&r.data,"agent_id")).is_some_and(|a|a.data["key"]=="worker")).max_by_key(|r|r.header.commit_seq.parse::<u64>().unwrap_or(0));
+                if let Some(parent)=parent {b.expect(parent);}
+                let seconds=agent.data["run_seconds"].as_i64().filter(|n|*n>0).unwrap_or(default_data("agents")?["run_seconds"].as_i64().expect("agent deadline default"));
+                let deadline=(chrono::Utc::now()+chrono::Duration::seconds(seconds)).to_rfc3339_opts(chrono::SecondsFormat::Millis,true);
+                // Planner::insert deliberately merges only required/default
+                // fields. Explicitly retain the optional continuation fields.
+                let run=new_id("run");let mut run_data=default_data("agent_runs")?;run_data["id"]=json!(run);merge(&mut run_data,&json!({"agent_id":agent.header.id,"task_id":task,"intent_id":id,"engine_epoch":c.actor.engine_epoch,"state":"queued","deadline_at":deadline}));run_data["purpose"]=json!("normal");run_data["parent_run_id"]=json!(parent.map(|r|r.header.id.as_str()));b.put("agent_runs",&run,run_data);
+                let mut node=n.data.clone();node["state"]=json!("running");node["owner"]=json!(agent.header.id);node["completed_at"]=Value::Null;node["blocked_reason"]=Value::Null;node["content_version"]=json!(node["content_version"].as_i64().unwrap_or(0)+1);b.put("exploration_nodes",id,node);
+                let referenced=mentions_ui::compose(&mut b,message)?;
+                // The durable run and user turn are committed together. Runtime
+                // consumes this exact run-scoped packet after queue admission,
+                // bypassing frontier capacity without bypassing global fences.
+                b.insert("activity","activity",json!({"exploration_id":t.data["exploration_id"],"node_id":id,"worker":"user","kind":"user","summary":message.chars().take(200).collect::<String>(),"detail":artex_core::body(&json!({"text":referenced,"display_text":message,"run_id":run,"request_id":request}).to_string()),"metadata":{"run_id":run,"turn_id":run,"worker_message_request_id":request}}))?;
+                conversation::push_event(&mut b.batch,s,c,"RunQueued","agent_runs",&run)?;
+            }
             json!({"id":id,"state":"running","accepted":true,"request_id":request})
         }
         "ui.updateTaskLLMProfiles" => {
@@ -669,4 +712,44 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
     let mut out = b.done(result);
     augment_expected(&mut out, s)?;
     Ok(out)
+}
+
+#[cfg(test)]
+mod worker_message_regression {
+    use super::*;
+    use artex_core::Actor;
+    use artex_store::Store;
+
+    fn commit(store:&mut Store,mut batch:CommandBatch)->Value {augment_expected(&mut batch,&store.snapshot()).unwrap();batch.command_id=new_id("command");store.commit(batch).unwrap().result}
+    #[test]
+    fn paused_worker_message_admits_atomic_scoped_run_turn_with_source_validation_cas_and_no_replay_after_reopen() {
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("workspace");let mut store=Store::create(&path,"Paused worker message").unwrap();
+        let mut c=Context{actor:Actor{kind:"user".into(),agent_id:None,run_id:None,engine_epoch:new_id("epoch")},task_id:None,intent_id:None,conversation_id:None};
+        let b=crate::bootstrap_plan(&store.snapshot(),&c).unwrap();commit(&mut store,b);
+        let b=crate::plan("task.create",&json!({"description":"Paused message fixture","goal":"Only fixture assets","seed_first_intent":false}),&store.snapshot(),&c).unwrap();let task=commit(&mut store,b)["task_id"].as_str().unwrap().to_owned();c.task_id=Some(task.clone());
+        let s=store.snapshot();let agent=s.records("agents").into_iter().find(|a|a.data["key"]=="worker").unwrap().clone();let mut p=Planner::new(&s,"fixture.worker.paused",&json!({}));
+        p.insert("llm_profiles","profile",json!({"name":"Fixture","format":"openai","model":"fixture","is_default":true,"api_key":{"secret_ref":new_id("secret"),"hint":"fixture"}})).unwrap();
+        let mut t=s.get("tasks",&task).unwrap().data.clone();t["status"]=json!("running");t["paused"]=json!(false);p.put("tasks",&task,t.clone());
+        let node=p.insert("exploration_nodes","node",json!({"exploration_id":t["exploration_id"],"kind":"intent","state":"paused","payload":{"summary":"Paused fixture intent"}})).unwrap();
+        let sibling=p.insert("exploration_nodes","node",json!({"exploration_id":t["exploration_id"],"kind":"intent","state":"running","payload":{"summary":"Independent worker remains active"}})).unwrap();
+        let unrelated_run=p.insert("agent_runs","run",json!({"agent_id":agent.header.id,"task_id":task,"intent_id":sibling,"engine_epoch":c.actor.engine_epoch,"state":"waiting"})).unwrap();
+        p.insert("activity","activity",json!({"exploration_id":t["exploration_id"],"node_id":sibling,"kind":"user","summary":"Other intent's request ID","metadata":{"run_id":unrelated_run,"worker_message_request_id":"safe_request:1"}})).unwrap();
+        let foreign_exp=p.insert("explorations","exploration",json!({})).unwrap();p.insert("tasks","task",json!({"description":"Foreign owner","exploration_id":foreign_exp})).unwrap();let foreign_node=p.insert("exploration_nodes","node",json!({"exploration_id":foreign_exp,"kind":"intent","state":"paused"})).unwrap();
+        commit(&mut store,p.done(json!({})));
+        let mut newest_parent=String::new();
+        for _ in 0..2 {let prior=store.snapshot();let mut p=Planner::new(&prior,"fixture.worker.prior_run",&json!({}));newest_parent=p.insert("agent_runs","run",json!({"agent_id":agent.header.id,"task_id":task,"intent_id":node,"engine_epoch":c.actor.engine_epoch,"state":"cancelled","finished_at":artex_core::now()})).unwrap();commit(&mut store,p.done(json!({})));}
+        let input=json!({"taskId":task,"intentId":node,"requestId":"  safe_request:1  ","message":"  인간의 추가 지시 🧪  "});let s=store.snapshot();
+        for (field,value) in [("message",json!("🧪".repeat(WORKER_MESSAGE_CHAR_LIMIT+1))),("message",json!("  ")),("requestId",json!("bad/request")),("requestId",json!("한글")),("requestId",json!("x".repeat(WORKER_REQUEST_ID_LIMIT+1))),("requestId",json!("  "))] {let mut bad=input.clone();bad[field]=value;assert_eq!(plan("ui.sendWorkerMessage",&bad,&s,&c).unwrap_err().code,"INVALID_PARAMS");}
+        for (field,value) in [("paused",json!(true)),("queued",json!(true)),("status",json!("done"))] {let mut guarded=s.clone();guarded.collections.get_mut("tasks").unwrap().get_mut(&task).unwrap().data[field]=value;assert_eq!(plan("ui.sendWorkerMessage",&input,&guarded,&c).unwrap_err().code,"VERSION_CONFLICT");}
+        let mut active=s.clone();let mut existing=active.get("agent_runs",&unrelated_run).unwrap().clone();existing.data["intent_id"]=json!(node);active.collections.get_mut("agent_runs").unwrap().insert(unrelated_run.clone(),existing);assert_eq!(plan("ui.sendWorkerMessage",&input,&active,&c).unwrap_err().code,"BUSY");
+        let mut foreign=input.clone();foreign["intentId"]=json!(foreign_node);assert_eq!(plan("ui.sendWorkerMessage",&foreign,&s,&c).unwrap_err().code,"PERMISSION_DENIED");
+        println!("WORKER_PARENT_RECORDS {}",json!(s.records("agent_runs").iter().map(|r|json!({"id":r.header.id,"task":r.data["task_id"],"intent":r.data["intent_id"],"purpose":r.data.get("purpose"),"purpose_present":r.data.get("purpose").is_some(),"agent":s.get("agents",text(&r.data,"agent_id")).map(|a|a.data["key"].clone())})).collect::<Vec<_>>()));
+        let before=chrono::Utc::now();let b=plan("ui.sendWorkerMessage",&input,&s,&c).unwrap();let mut stale_input=input.clone();stale_input["requestId"]=json!("second-request");let mut stale=plan("ui.sendWorkerMessage",&stale_input,&s,&c).unwrap();stale.command_id=new_id("command");let result=commit(&mut store,b);let after=chrono::Utc::now();assert_eq!(result,json!({"id":node,"state":"running","accepted":true,"request_id":"safe_request:1"}));
+        let admitted=store.snapshot();let run=admitted.records("agent_runs").into_iter().find(|r|r.data["intent_id"]==node&&r.data["state"]=="queued").unwrap();assert_eq!(run.data["state"],"queued");assert_eq!(run.data["agent_id"],agent.header.id);assert_eq!(run.data["engine_epoch"],c.actor.engine_epoch);assert_eq!(run.data["parent_run_id"],newest_parent);
+        let seconds=agent.data["run_seconds"].as_i64().unwrap();let deadline=chrono::DateTime::parse_from_rfc3339(run.data["deadline_at"].as_str().unwrap()).unwrap().with_timezone(&chrono::Utc);assert!(deadline>=before+chrono::Duration::seconds(seconds)-chrono::Duration::milliseconds(1)&&deadline<=after+chrono::Duration::seconds(seconds));
+        let turns=admitted.records("activity").into_iter().filter(|a|a.data["node_id"]==node&&a.data["kind"]=="user").collect::<Vec<_>>();assert_eq!(turns.len(),1);let body:Value=serde_json::from_str(turns[0].data["detail"]["text"].as_str().unwrap()).unwrap();assert_eq!(body["text"],"인간의 추가 지시 🧪");assert_eq!(body["display_text"],body["text"]);assert_eq!(body["run_id"],run.header.id);assert_eq!(turns[0].data["metadata"]["worker_message_request_id"],"safe_request:1");
+        assert_eq!(admitted.get("exploration_nodes",&node).unwrap().data["owner"],agent.header.id);assert_eq!(admitted.get("agent_runs",&unrelated_run),s.get("agent_runs",&unrelated_run));
+        assert_eq!(store.commit(stale).unwrap_err().code,"VERSION_CONFLICT");assert_eq!(store.snapshot().commit_seq,admitted.commit_seq);assert_eq!(plan("ui.sendWorkerMessage",&input,&admitted,&c).unwrap_err().code,"VERSION_CONFLICT");
+        store.checkpoint().unwrap();drop(store);let reopened=Store::open_read_only(&path).unwrap();assert_eq!(reopened.snapshot().records("agent_runs").len(),admitted.records("agent_runs").len());assert_eq!(reopened.snapshot().get("agent_runs",&run.header.id),Some(run));assert_eq!(plan("ui.sendWorkerMessage",&input,&reopened.snapshot(),&c).unwrap_err().code,"VERSION_CONFLICT");
+    }
 }

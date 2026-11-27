@@ -1,5 +1,14 @@
 # Native host parity boundaries
 
+## 2026-11-27 connected acceptance of all remaining 318 rows
+
+All 258 named UI operations and 81 tools now have a bounded connected NativeApp acceptance case, including the previous 21 freshly rerun qualifications: **339/339, zero remaining**. The strict inventory gate is unchanged. Native OS-session access, snapshot navigation, typed file adapters and package handoff are explicitly changed-behavior passes; uncalled legacy HTTP/RPC endpoints are never claimed as executed. The final source run passed services 45, host 81, native UI 245 and shared workspace 491, plus one separately opted-in local notification case and the 23-section own native window checks. Suites overlap and are not summed.
+
+Retained source behavior was repaired at the actual boundaries: typed result identities, nullable drafts, tool/MCP/trigger ownership, evidence lifetime, attachment locators and file ownership, finding anchors/follow-up provenance, paused Worker continuation, SDK execution ownership, successful Skill/self-pause receipts, deletion grants and asset-reference DTOs. A narrowly classified writer-owned pause-clock admission retains stable user CAS and durable logical retry identity; archive/import now remaps follow-up finding/node references. No UI baseline refresh, fake successful result or global CAS exception was used.
+
+See the [final scope and evidence](../../docs/acceptance-final-20261127.md) and [per-row source/log hashes](../../docs/e2e-acceptance-completed-20261127.csv). Physical platform/provider/install/vault, long-running/default fan-out and two separately tracked manual HTTP mappings remain release gates outside these named-case qualifications. This does not publish a stable tag or certify every parameter/environment combination. Earlier entries below retain their historical counts.
+
+
 ## 2026-10-21 legacy model recovery and compact model display
 
 An empty current workspace no longer hides model connections saved in other
@@ -164,3 +173,55 @@ compile or synthetic-event tests alone do not certify it.
 ## 2026-11-24 SQLite 저장 전환
 
 사용자 요청에 따라 자체 저널·스냅샷 엔진을 SQLite 영속화로 대체한다. Rust 객체 ID 모델·RPC·에이전트 메시지·실행 권한 의미는 유지하며 저장 형식의 차이는 명시적 변경으로 판정한다. 새 작업공간과 공통 설정은 v2, 기존 v1은 검증·이전 입력이다. 원본 보존·원자적 이전·읽기 전용·WAL 복구·명령 영수증의 동작과 검증 범위는 [SQLite 명세](../../docs/sqlite-storage.md) 및 [현황](STATUS.md)에 기록한다. 이 변경을 전체 기능 수락이나 macOS/Arch 실기기 통과로 계산하지 않는다.
+
+## 2026-11-24 stable-core acceptance corrections
+
+The native Prepare path now admits the existing user-only `agent.features.set`
+command through the same agent planner as commit. The target agent version is
+pinned even when creating the first feature row. User opt-in, tool enablement,
+agent authorization, stale CAS rejection and receipt deduplication remain in
+force; default tool permissions are unchanged.
+
+Conversation transcripts now render the existing structured-question and tool
+approval controls for their own active runs in the current execution epoch.
+Questions do not appear in unrelated conversations, selected-run controls reject
+old epochs, and read-only question/plan/tool-approval controls cannot emit answers.
+The original `user.answer` generation and ownership checks remain authoritative.
+
+Five connected Windows headless NativeApp cases add seven limited operation
+qualifications: model Save/Activate, task pause/resume/native deletion,
+conversation cancellation, AskUserQuestion and Write. Qualification is now
+18/339, with 321 remaining. This does not qualify every parameter/error case,
+the OS picker/vault, actual external providers or physical macOS/Arch operation.
+Final Windows regression passed service 45, host 79, UI 159 and shared workspace
+460 tests (overlapping suites), plus the actual 23-section native window checks.
+An initial shared-suite failure was a Windows nonblocking test socket race;
+only the fixture's accepted socket mode was corrected, retaining its original
+5-second read and 20-second request bounds. The failed run remains separate.
+
+See the [core acceptance record](../../docs/e2e-feature-verification.md#2026-11-24-안정판-핵심-흐름-1차-수정수락)
+and [remaining-operation snapshot](../../docs/e2e-pending-acceptance-core-20261124.csv).
+
+## 2026-11-26 completed assessment and export acceptance
+
+A connected headless NativeApp case now follows an actual Resume click through
+the loopback model's offered Read, report_finding, update_finding_report and
+goal_met calls, persisted results, completed report display, original-Body file
+export, save cancellation, task isolation and read-only reopen/export. Returned
+node/evidence versions are used for the report update. File bytes match the
+displayed full report, including the recorded UTF-8 evidence and remediation.
+
+The goal and planner bindings are explicit public fixture configuration, with
+automatic reporter fan-out disabled; their configuration forms and default
+multi-agent behavior are not qualified by this case. Only the native save-picker
+result is substituted in tests; production retains rfd and the same capability
+save/release path. No business logic, schema, dependency or default binding was
+changed, and no new product defect was found in this case.
+
+Native retirement adds one verified cleanup receipt and advances the generation;
+all prior objects remain unchanged. The reconstructed report differs only in its
+own pinned read-generation label. Qualification is now 21/339, with 318 remaining.
+This is a short-report scenario, not large-page/export-failure, actual-provider,
+operating-website, OS-dialog or physical macOS/Arch acceptance. Failed fixture and
+non-CI parallel runs remain separate from passing evidence. The CI serial
+regression/build outcome is recorded in the [latest acceptance record](../../docs/e2e-feature-verification.md).

@@ -9684,11 +9684,8 @@
           "type": "string"
         },
         "archive_id": {
-          "anyOf": [
-            {
-              "type": "number"
-            }
-          ]
+          "type": "string",
+          "pattern": "^archive_[0-9a-f]{32}$"
         },
         "ok": {
           "anyOf": [
@@ -10036,11 +10033,8 @@
           "type": "string"
         },
         "archive_id": {
-          "anyOf": [
-            {
-              "type": "number"
-            }
-          ]
+          "type": "string",
+          "pattern": "^archive_[0-9a-f]{32}$"
         },
         "ok": {
           "anyOf": [
@@ -10388,11 +10382,8 @@
           "type": "string"
         },
         "archive_id": {
-          "anyOf": [
-            {
-              "type": "number"
-            }
-          ]
+          "type": "string",
+          "pattern": "^archive_[0-9a-f]{32}$"
         },
         "ok": {
           "anyOf": [
@@ -10497,7 +10488,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^node_[0-9a-f]{32}$"
         },
         "state": {
           "const": "running"
@@ -12284,7 +12276,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^node_[0-9a-f]{32}$"
         },
         "kind": {
           "type": "string"
@@ -12323,7 +12316,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^node_[0-9a-f]{32}$"
         },
         "kind": {
           "type": "string"
@@ -22130,7 +22124,8 @@
       "type": "object",
       "properties": {
         "deleted": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^conversation_[0-9a-f]{32}$"
         }
       },
       "required": [
@@ -23218,7 +23213,8 @@
       "type": "object",
       "properties": {
         "deleted": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^trigger_[0-9a-f]{32}$"
         }
       },
       "required": [
@@ -24959,7 +24955,8 @@
       "type": "object",
       "properties": {
         "deleted": {
-          "type": "number"
+          "type": "string",
+          "pattern": "^assetrule_[0-9a-f]{32}$"
         }
       },
       "required": [

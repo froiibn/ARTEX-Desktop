@@ -26,7 +26,11 @@ impl HostGateway for MemoryGateway {
                input: Value, timeout: Duration) -> Result<Value> {
         // Even an unknown secret operation must never fall through to OS vault.
         if operation.starts_with("secret.") {
-            return if operation == "secret.resolve" {
+            // User model probes use a separate operation from scheduled runs.
+            // Admit only that actor and our explicit fixture references; never
+            // fall back to the OS vault even for an unknown reference.
+            return if operation == "secret.resolve"
+                || (operation == "secret.resolve_user" && context.actor.kind == "user") {
                 input["secret_ref"].as_str().and_then(|id| self.secrets.get(id))
                     .map(|value| json!({"value":value}))
                     .ok_or_else(|| Error::new("PERMISSION_DENIED", "Fixture secret is not admitted"))

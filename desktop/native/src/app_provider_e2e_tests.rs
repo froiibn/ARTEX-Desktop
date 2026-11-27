@@ -45,7 +45,7 @@ fn fixture(probe: Probe, secrets: BTreeMap<String,String>) -> Fixture {
         host_factory:Some(factory(profile,secrets,probe)),wake_ui:None,
     })
 }
-fn profile(f:&mut Fixture,name:&str,format:&str,url:&str,secret:&str,streaming:bool)->String {
+pub(super) fn profile(f:&mut Fixture,name:&str,format:&str,url:&str,secret:&str,streaming:bool)->String {
     f.setup("ui.saveLLMProfile",json!({"p":{"name":name,"format":format,"model":"fixture","base_url":url,"streaming":streaming,"api_key":{"secret_ref":secret,"hint":"memory fixture"},"retry":{"connect":{"attempts":-1,"interval_ms":0},"empty":{"attempts":-1,"interval_ms":0},"stream":{"attempts":-1,"interval_ms":0}}}}))["id"].as_str().unwrap().into()
 }
 fn conversation(f:&mut Fixture,profile:&str,title:&str)->String {

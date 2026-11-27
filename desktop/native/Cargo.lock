@@ -247,12 +247,14 @@ dependencies = [
 
 [[package]]
 name = "artex-native"
-version = "0.2.0-preview.5"
+version = "0.2.0-preview.6"
 dependencies = [
  "artex-core",
+ "artex-domain",
  "artex-host",
  "artex-native-core",
  "artex-runtime",
+ "artex-store",
  "chrono",
  "directories",
  "eframe",
@@ -264,6 +266,7 @@ dependencies = [
  "tray-icon",
  "uuid",
  "zbus 4.4.0",
+ "zip 2.4.2",
 ]
 
 [[package]]

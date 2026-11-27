@@ -483,7 +483,9 @@ pub fn check_access(name: &str, input: &Value, state: &Snapshot, context: &Conte
             "plan mode forbids workspace mutations and external effects",
         ));
     }
-    if let Some(request_task) = input["task_id"].as_str() {
+    // These SDK fields name a background ExecutionId returned by Monitor/Bash,
+    // not a workspace TaskId. The host still checks their owning run and epoch.
+    if let Some(request_task) = input["task_id"].as_str().filter(|_| !matches!(name,"TaskOutput"|"TaskStop")) {
         if !["auto", "reporter"].contains(&role) && context.task_id.as_deref() != Some(request_task)
         {
             return Err(Error::new(
@@ -896,6 +898,22 @@ mod tests {
         );
         assert!(check_access("Read", &json!({"file_path":"a"}), &s, &c).is_ok());
         assert!(check_access("TodoWrite", &json!({"todos":[]}), &s, &c).is_ok());
+    }
+    #[test]
+    fn background_sdk_execution_ids_are_distinct_from_workspace_task_scope() {
+        let (mut s,mut c)=fixture("mainagent");let task=artex_core::new_id("task");c.task_id=Some(task.clone());s.collections.get_mut("agent_runs").unwrap().get_mut(c.actor.run_id.as_ref().unwrap()).unwrap().data["task_id"]=json!(task);
+        let mut binding=(*s.records("agents")[0]).clone();let id=artex_core::new_id("toolconfig");binding.header.id=id.clone();binding.header.collection="tools".into();binding.data=json!({"id":id,"key":"pause_task","enabled":true,"agents":["mainagent"]});s.collections.entry("tools".into()).or_default().insert(id,binding);
+        let execution=artex_core::new_id("exec");
+        for name in ["TaskOutput","TaskStop"] {
+            assert!(matches!(dispatch(name,&json!({"task_id":execution}),&s,&c),Ok(ToolDispatch::HostIntent{..})),"{name} must reach the host's execution-owner check");
+        }
+        assert!(check_access("TaskStop",&json!({"task_id":""}),&s,&c).is_ok(),"The documented stop-own-background-tasks form remains admitted");
+        assert!(check_access("TaskStop",&json!({}),&s,&c).is_ok(),"Omission also stops only this run's background commands");
+        assert!(check_access("pause_task",&json!({"task_id":task}),&s,&c).is_ok(),"The domain control must be admitted for its own task before testing the foreign task rejection");
+        assert_eq!(check_access("pause_task",&json!({"task_id":artex_core::new_id("task")}),&s,&c).unwrap_err().code,"PERMISSION_DENIED","Workspace task scope remains enforced for domain tools");
+        for name in ["TaskOutput","TaskStop"] {for invalid in [json!({"task_id":123}),json!({"task_id":"arbitrary-background-id"}),json!({"task_id":artex_core::new_id("task")})] {assert_eq!(check_access(name,&invalid,&s,&c).unwrap_err().code,"INVALID_PARAMS","SDK execution-handle schema remains enforced");}}
+        s.collections.get_mut("agent_runs").unwrap().get_mut(c.actor.run_id.as_ref().unwrap()).unwrap().data["permission_mode"]=json!("plan");
+        assert_eq!(check_access("TaskStop",&json!({"task_id":execution}),&s,&c).unwrap_err().code,"PERMISSION_DENIED","The exception is only an ID namespace correction, not plan-mode authority");
     }
     #[test]
     fn nondeferred_custom_tool_schema_binding_and_plan_gate() {

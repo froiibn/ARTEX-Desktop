@@ -417,6 +417,10 @@ fn unlimited_turns_make_a_real_model_request_past_one_hundred_while_finite_budge
                     Err(e) => panic!("{e}"),
                 }
             };
+            // Windows can inherit the listener's nonblocking mode. This fixture
+            // uses blocking read_exact with a finite socket timeout; otherwise
+            // a split/late first header byte races accept and returns WouldBlock.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();

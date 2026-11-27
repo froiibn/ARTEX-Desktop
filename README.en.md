@@ -6,9 +6,11 @@ Development and verification follow the [technology stack and working rules](AGE
 
 LLM connections, the default model, general settings, agents, tools/MCP and Skill configuration are shared across workspaces within the app profile. Models from recently opened workspaces are imported on the first migration; open any other workspace to import its saved settings. Approval bypass and task/conversation history remain workspace-specific. See the [shared settings guide](docs/shared-application-settings.md), available in Korean.
 
+The named UI/tool acceptance matrix is **339/339, zero remaining**. See the [preview.6 changes and verification scope](docs/release-preview6.md).
+
 Open **Tasks → Comprehensive report** to review performed checks, findings, remediation priorities, and unverified items for a site assessment, then export the complete Markdown report. See the [report guide](docs/site-assessment-report.md), available in Korean.
 
-GitHub: [froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop). The project is currently in **public Windows preview distribution**. The Windows `v0.2.0-preview.5` preview and its corresponding source are available through Releases without requiring login. Under the [handling policy](docs/license-policy.md), the original README's separate use restrictions are not adopted as additional license conditions for this derivative project. The repository was made public on 2026-10-15. The GitHub repository containing earlier development history and `preview.1` has been removed; the cleaned source and verified Windows previews are provided on GitHub. See [repository history](docs/repository-history.md). The original ARTEX author is **Autumn-27**. See [original author, source, and modifications](ARTEX_NOTICE.en.md).
+GitHub: [froiibn/ARTEX-Desktop](https://github.com/froiibn/ARTEX-Desktop). The project is currently in **public Windows preview distribution**. The Windows `v0.2.0-preview.6` preview and its corresponding source are available through Releases without requiring login. Under the [handling policy](docs/license-policy.md), the original README's separate use restrictions are not adopted as additional license conditions for this derivative project. The repository was made public on 2026-10-15. The GitHub repository containing earlier development history and `preview.1` has been removed; the cleaned source and verified Windows previews are provided on GitHub. See [repository history](docs/repository-history.md). The original ARTEX author is **Autumn-27**. See [original author, source, and modifications](ARTEX_NOTICE.en.md).
 
 The current development target is a native desktop application running in a single Rust process. The native UI, object models and SQLite storage, and LLM and tool execution services run within the same application. Basic UI operation does not require Go, Node/npm, WebView, or a PostgreSQL server. Individual external tools such as Python and Nmap are required separately when their corresponding features are used.
 
@@ -53,7 +55,7 @@ The previous Tauri/React application and separate engine client have been remove
 
 ## Download a build
 
-Download `ARTEX-Desktop-v0.2.0-preview.5-windows-x64.zip` from the Assets section of the [Windows x64 preview v0.2.0-preview.5](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.5). Extract the entire archive and run `ARTEX-Windows-x64/ARTEX.exe`. The basic application runs without source build tools. The same release also provides its corresponding source ZIP and `SHA256SUMS.txt`.
+Download `ARTEX-Desktop-v0.2.0-preview.6-windows-x64.zip` from the Assets section of the [Windows x64 preview v0.2.0-preview.6](https://github.com/froiibn/ARTEX-Desktop/releases/tag/v0.2.0-preview.6). Extract the entire archive and run `ARTEX-Windows-x64/ARTEX.exe`. The basic application runs without source build tools. The same release also provides its corresponding source ZIP and `SHA256SUMS.txt`.
 
 This is an unsigned Windows preview build without an installer or automatic updates. macOS and Linux executables are not yet provided. See the [first-run guide](docs/download-and-run.md) (Korean).
 

@@ -754,12 +754,13 @@ fn deleting_finding_removes_canonical_graph_node_and_cascades_with_cas() {
     let node = finding["node_id"].as_str().unwrap();
     let s = st.snapshot();
     let exp = s.get("tasks", c.task_id.as_deref().unwrap()).unwrap().data["exploration_id"].clone();
-    let anchor = raw_put(
-        &mut st,
-        "exploration_anchors",
-        "anchor",
-        json!({"node_id":node,"asset_id":asset}),
-    );
+    // report_finding commits the affected-asset anchor itself. Reuse that
+    // production row while retaining the deletion CAS and cascade assertions.
+    let anchors = s.records("exploration_anchors").into_iter()
+        .filter(|r| r.data["node_id"] == node && r.data["asset_id"] == asset)
+        .collect::<Vec<_>>();
+    assert_eq!(anchors.len(), 1, "report_finding must create one exact node/asset anchor");
+    let anchor = anchors[0].header.id.clone();
     let proof = raw_put(
         &mut st,
         "exploration_edges",

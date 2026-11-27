@@ -648,13 +648,23 @@ impl Store {
                         data,
                     };
                     validate_record(&record)?;
-                    if collection == "traffic_evidence_snapshots"
-                        && previous.is_some_and(|r| r.data != record.data)
-                    {
-                        return Err(Error::new(
-                            "PERMISSION_DENIED",
-                            "Evidence snapshots are immutable",
-                        ));
+                    if collection == "traffic_evidence_snapshots" {
+                        if let Some(previous) = previous {
+                            // Removing the last binding and reusing a snapshot
+                            // change its GC eligibility, not captured evidence.
+                            // Keep every payload field immutable; the ordinary
+                            // version CAS still owns this lifecycle-only write.
+                            let mut before = previous.data.clone();
+                            let mut after = record.data.clone();
+                            before.as_object_mut().unwrap().remove("unreferenced_at");
+                            after.as_object_mut().unwrap().remove("unreferenced_at");
+                            if before != after {
+                                return Err(Error::new(
+                                    "PERMISSION_DENIED",
+                                    "Evidence snapshots are immutable",
+                                ));
+                            }
+                        }
                     }
                     candidate
                         .collections
@@ -1937,6 +1947,70 @@ mod tests {
             "VERSION_CONFLICT"
         );
         assert_eq!(store.snapshot().commit_seq, 2);
+    }
+    #[test]
+    fn evidence_gc_lifecycle_preserves_payload_rejects_mixed_changes_and_stale_cas_after_reopen() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("workspace");
+        let mut store = Store::create(&path, "Evidence lifecycle").unwrap();
+        assert!(store.database.is_some(), "Exercise the normal SQLite store");
+        let bytes = b"Immutable captured response";
+        let response = store.blob_put(bytes, "text/plain").unwrap();
+        let request = store.blob_put(b"", "application/octet-stream").unwrap();
+        let id = new_id("evidence");
+        let put = |data: Value| Change::Put { collection: "traffic_evidence_snapshots".into(), id: id.clone(), data };
+        let mut data = default_data("traffic_evidence_snapshots").unwrap();
+        for (key, value) in [
+            ("id", json!(id)), ("source_traffic_id", json!(new_id("traffic"))),
+            ("captured_at", json!("1")), ("url", json!("https://evidence-fixture.invalid/")),
+            ("method", json!("GET")), ("status", json!(200)), ("content_type", json!("text/plain")),
+            ("req_head", artex_core::body("GET / HTTP/1.1\r\n")),
+            ("resp_head", artex_core::body("HTTP/1.1 200 OK\r\n")),
+            ("req_hash", request["sha256"].clone()), ("resp_hash", response["sha256"].clone()),
+            ("req_len", json!("0")), ("resp_len", json!(bytes.len().to_string())),
+        ] { data[key] = value; }
+        store.commit(batch("fixture.evidence", json!({}), vec![put(data)])).unwrap();
+        let original = store.snapshot().get("traffic_evidence_snapshots", &id).unwrap().clone();
+        let cas = |version: &str| Expected {collection:"traffic_evidence_snapshots".into(),id:id.clone(),version:version.into()};
+        let mut marked = original.data.clone();
+        marked["unreferenced_at"] = json!(artex_core::now());
+        let mut mark = batch("evidence.unreferenced", json!({}), vec![put(marked.clone())]);
+        mark.expected.push(cas(&original.header.version));
+        store.commit(mark).unwrap();
+        let marked_record = store.snapshot().get("traffic_evidence_snapshots", &id).unwrap().clone();
+        assert_eq!(marked_record.data, marked);
+        for (field, value) in [
+            ("url", json!("https://changed-fixture.invalid/")),
+            ("resp_hash", json!("f".repeat(64))),
+            ("req_head", artex_core::body("GET /changed HTTP/1.1\r\n")),
+            ("resp_head", artex_core::body("HTTP/1.1 500 Altered\r\n")),
+        ] {
+            let before = store.snapshot();
+            let mut changed = marked.clone();
+            changed["unreferenced_at"] = Value::Null;
+            changed[field] = value;
+            let mut command = batch("evidence.mixed_change", json!({"field":field}), vec![put(changed)]);
+            command.expected.push(cas(&marked_record.header.version));
+            assert_eq!(store.commit(command).unwrap_err().code, "PERMISSION_DENIED");
+            assert_eq!(store.snapshot().commit_seq, before.commit_seq);
+            assert_eq!(store.snapshot().get("traffic_evidence_snapshots", &id).unwrap(), &marked_record);
+        }
+        let unrelated = new_id("company");
+        let mut stale = batch("evidence.stale_clear", json!({}), vec![company(&unrelated,"Atomic rejected lifecycle"),put(original.data.clone())]);
+        stale.expected.push(cas(&original.header.version));
+        assert_eq!(store.commit(stale).unwrap_err().code, "VERSION_CONFLICT");
+        assert!(store.snapshot().get("companies", &unrelated).is_none());
+        store.checkpoint().unwrap(); drop(store);
+        let mut store = Store::open(&path).unwrap();
+        assert_eq!(store.snapshot().get("traffic_evidence_snapshots", &id).unwrap(), &marked_record);
+        assert_eq!(store.blob_read(&response, 0, bytes.len()).unwrap(), bytes);
+        let mut reuse = batch("evidence.reused", json!({}), vec![put(original.data.clone())]);
+        reuse.expected.push(cas(&marked_record.header.version));
+        store.commit(reuse).unwrap();
+        store.checkpoint().unwrap(); drop(store);
+        let store = Store::open_read_only(&path).unwrap();
+        assert_eq!(store.snapshot().get("traffic_evidence_snapshots", &id).unwrap().data, original.data);
+        assert_eq!(store.blob_read(&response, 0, bytes.len()).unwrap(), bytes);
     }
     #[test]
     fn incomplete_tail_is_preserved_complete_corruption_is_read_only() {

@@ -1,6 +1,6 @@
 [package]
 name = "artex-native"
-version = "0.2.0-preview.5"
+version = "0.2.0-preview.6"
 edition = "2024"
 license = "AGPL-3.0-only"
 description = "Integrated Rust desktop application for ARTEX"
@@ -30,6 +30,10 @@ zbus = { version = "4.4", default-features = false, features = ["blocking", "asy
 [dev-dependencies]
 # Local fixture gateways intercept synthetic secrets without touching OS credentials.
 artex-runtime = { path = "../crates/runtime" }
+# Valid durable initial graphs are fixtures, never injected UI projections.
+artex-store = { path = "../crates/store" }
+artex-domain = { path = "../crates/domain" }
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
 tempfile = "3"
 
 [profile.release]

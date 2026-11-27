@@ -13,9 +13,22 @@ impl Fixture {
         Self::configured(|_| ServiceConfig::default())
     }
     fn configured(config: impl FnOnce(&std::path::Path) -> ServiceConfig) -> Self {
+        Self::with_workspace(config, |_| false)
+    }
+    fn configured_seeded(
+        config: impl FnOnce(&std::path::Path) -> ServiceConfig,
+        seed: impl FnOnce(&std::path::Path),
+    ) -> Self {
+        Self::with_workspace(config, |path| { seed(path); true })
+    }
+    fn with_workspace(
+        config: impl FnOnce(&std::path::Path) -> ServiceConfig,
+        initialize: impl FnOnce(&std::path::Path) -> bool,
+    ) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let profile = dir.path().join("profile");
         let path = dir.path().join("workspace");
+        let existing = initialize(&path);
         let instance = Arc::new(ProfileInstanceLock::acquire(&profile).unwrap());
         let ctx = egui::Context::default();
         configure(&ctx);
@@ -103,9 +116,9 @@ impl Fixture {
         fixture.app.submit(
             NativeAction::Open(OpenOptions {
                 path: fixture.path.clone(),
-                mode: OpenMode::Create {
+                mode: if existing { OpenMode::Existing } else { OpenMode::Create {
                     name: "App workflow fixture".into(),
-                },
+                } },
                 read_only: false,
             }),
             Purpose::Open(fixture.path.clone()),
@@ -253,15 +266,18 @@ impl Fixture {
         self.frame(vec![])
     }
     fn reopen_same_workspace(&mut self) {
+        self.reopen_acceptance(true);
+    }
+    fn reopen_acceptance(&mut self, read_only: bool) {
         let old=self.app.handle.scope().unwrap();
         self.app.close();
         self.until(|app|app.handle.status().phase==ServicePhase::Closed && app.pending.is_empty());
-        self.app.submit(NativeAction::Open(OpenOptions{path:self.path.clone(),mode:OpenMode::Existing,read_only:true}),Purpose::Open(self.path.clone()));
+        self.app.submit(NativeAction::Open(OpenOptions{path:self.path.clone(),mode:OpenMode::Existing,read_only}),Purpose::Open(self.path.clone()));
         self.until(|app|app.handle.status().phase==ServicePhase::Ready && app.pending.is_empty());
         let view=self.app.handle.view().unwrap();
-        assert!(view.workspace.read_only);
+        assert_eq!(view.workspace.read_only, read_only);
         assert_ne!(view.workspace.scope.open_generation,old.open_generation);
-        println!("APP_CONNECTED same workspace read-only reopen");
+        println!("APP_CONNECTED same workspace reopen read_only={read_only}");
     }
     fn assert_tool_result_visible(&mut self,cid:&str,label:&str,needle:&str) {
         self.app.drawer.open=false;select(self,Section::Chat,Some(cid));
@@ -899,3 +915,15 @@ mod feedback;
 mod site_report;
 #[path="app_model_migration_tests.rs"]
 mod model_migration;
+#[path="app_stable_core_e2e_tests.rs"]
+mod stable_core;
+#[path="app_acceptance_helpers.rs"]
+mod acceptance_helpers;
+#[path="app_acceptance_domain_tests.rs"]
+mod acceptance_domain;
+#[path="app_acceptance_config_tests.rs"]
+mod acceptance_config;
+#[path="app_acceptance_tools_tests.rs"]
+mod acceptance_tools;
+#[path="app_acceptance_general_tests.rs"]
+mod acceptance_general;

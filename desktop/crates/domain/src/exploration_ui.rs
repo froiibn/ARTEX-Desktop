@@ -504,7 +504,13 @@ pub fn query(m: &str, p: &Value, s: &Snapshot, _: &Context) -> Result<Value> {
                     "finding" => "findings",
                     _ => continue,
                 };
-                out[key].as_array_mut().unwrap().push(node(n, s, task));
+                // CoverageAssetRefDTO is not the generic graph NodeDTO. Keep
+                // the original asset drawer's concise summary and provenance;
+                // IDs identify graph nodes even in the findings category.
+                let summary=["summary","text"].into_iter().map(|field|text(&n.data["payload"],field)).find(|value|!value.trim().is_empty()).unwrap_or("");
+                let mut reference=json!({"id":n.header.id,"kind":n.data["kind"],"state":n.data["state"],"summary":summary});
+                if let Some(source)=s.records("tasks").into_iter().find(|owner|owner.data["exploration_id"]==n.data["exploration_id"]&&owner.header.id!=task) {reference["source_task_id"]=json!(source.header.id);reference["inherited"]=json!(true);}
+                out[key].as_array_mut().unwrap().push(reference);
             }
             Ok(out)
         }
@@ -536,4 +542,34 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
         &task.header.id,
     )?;
     Ok(b.done(json!({"seq":seq,"created_at":stamp,"current":seq})))
+}
+
+#[cfg(test)]
+mod coverage_asset_ref_regression {
+    use super::*;
+    use artex_core::Actor;
+    use artex_store::Store;
+
+    #[test]
+    fn coverage_asset_refs_use_original_concise_dto_for_all_kinds_and_preserve_direct_source_visibility_after_reopen() {
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("workspace");let mut store=Store::create(&path,"Coverage asset references").unwrap();let snapshot=store.snapshot();let mut p=Planner::new(&snapshot,"fixture.coverage_refs",&json!({}));
+        let exp=p.insert("explorations","exploration",json!({})).unwrap();let task=p.insert("tasks","task",json!({"description":"Current task","exploration_id":exp})).unwrap();
+        let source_exp=p.insert("explorations","exploration",json!({})).unwrap();let source=p.insert("tasks","task",json!({"description":"Direct source task","exploration_id":source_exp})).unwrap();p.insert("task_relations","relation",json!({"task_id":task,"source_task_id":source})).unwrap();
+        let foreign_exp=p.insert("explorations","exploration",json!({})).unwrap();p.insert("tasks","task",json!({"description":"Unrelated task","exploration_id":foreign_exp})).unwrap();
+        let asset=p.insert("assets","asset",json!({"type":"root_domain","domain":"refs-fixture.invalid"})).unwrap();let other_asset=p.insert("assets","asset",json!({"type":"root_domain","domain":"other-refs-fixture.invalid"})).unwrap();
+        let mut expected=Vec::new();
+        for (exploration,kind,state,summary,fallback,inherited) in [(&exp,"intent","open","Current intent summary","",false),(&exp,"fact","confirmed","   ","Current fact text",false),(&exp,"finding","confirmed","Current finding summary","",false),(&source_exp,"intent","done","Inherited terminal intent","",true),(&source_exp,"fact","confirmed","Inherited fact","",true),(&source_exp,"finding","confirmed","Inherited finding","",true)] {
+            let id=p.insert("exploration_nodes","node",json!({"exploration_id":exploration,"kind":kind,"state":state,"payload":{"summary":summary,"text":fallback}})).unwrap();p.insert("exploration_anchors","anchor",json!({"node_id":id,"asset_id":asset})).unwrap();let mut value=json!({"id":id,"kind":kind,"state":state,"summary":if summary.trim().is_empty(){fallback}else{summary}});if inherited {value["source_task_id"]=json!(source);value["inherited"]=json!(true);}expected.push(value);
+        }
+        for (exploration,kind,state,asset_id,marker) in [(&source_exp,"intent","open",&asset,"PRIVATE ACTIVE SOURCE INTENT"),(&foreign_exp,"fact","confirmed",&asset,"PRIVATE UNRELATED TASK FACT"),(&exp,"fact","confirmed",&other_asset,"PRIVATE OTHER ASSET FACT")] {let node=p.insert("exploration_nodes","node",json!({"exploration_id":exploration,"kind":kind,"state":state,"payload":{"summary":marker}})).unwrap();p.insert("exploration_anchors","anchor",json!({"node_id":node,"asset_id":asset_id})).unwrap();}
+        let mut batch=p.done(json!({}));batch.command_id=new_id("command");store.commit(batch).unwrap();
+        let c=Context{actor:Actor{kind:"user".into(),agent_id:None,run_id:None,engine_epoch:new_id("epoch")},task_id:None,intent_id:None,conversation_id:None};
+        for reopened in [false,true] {
+            if reopened {store.checkpoint().unwrap();drop(store);store=Store::open_read_only(&path).unwrap();}
+            let snapshot=store.snapshot();let before=snapshot.commit_seq;let value=query("ui.taskAssetRefs",&json!({"id":task,"assetId":asset}),&snapshot,&c).unwrap();assert_eq!(value.as_object().unwrap().len(),3);
+            let contract=artex_core::contracts::read("rpc.v1.schema.json");artex_core::validate_contract(&contract["results"]["ui.taskAssetRefs"],&contract,&value).unwrap();
+            for (key,kind) in [("intents","intent"),("facts","fact"),("findings","finding")] {let rows=value[key].as_array().unwrap();assert_eq!(rows.len(),2);for row in rows {assert_eq!(row["kind"],kind);assert!(artex_core::valid_id(row["id"].as_str().unwrap(),"node"));assert_eq!(row,expected.iter().find(|v|v["id"]==row["id"]).unwrap());assert!(row.get("payload").is_none()&&row.get("priority").is_none()&&row.get("type").is_none());}}
+            assert!(!value.to_string().contains("PRIVATE"));assert_eq!(store.snapshot().commit_seq,before,"Read-only DTO projection does not rewrite graph/provenance");
+        }
+    }
 }

@@ -28,12 +28,15 @@ mod result_contract_tests;
 mod runtime_tool_tests;
 mod runtime_tools;
 mod scopesentry;
+#[cfg(test)]
+mod self_pause_receipt_tests;
 mod shared_configuration;
 mod shared_settings;
 mod side_runtime;
 mod skill_runtime;
 mod stream_runtime;
 mod task_delete_runtime;
+mod task_clock_admission;
 #[cfg(test)]
 mod tool_e2e_tests;
 mod traffic_runtime;
@@ -715,7 +718,7 @@ impl Router {
                     || !(method.starts_with("ui.")
                         || artex_domain::is_mutation(method)
                         || facade::COMMANDS.contains(&method)
-                        || method == "user.answer")
+                        || matches!(method, "user.answer" | "agent.features.set"))
                 {
                     return Err(Error::new(
                         "INVALID_PARAMS",
@@ -742,6 +745,9 @@ impl Router {
                         })
                         .collect();
                     json!({"expected":expected,"read_seq":state.commit_seq.to_string()})
+                } else if method == "ui.deleteSkill" {
+                    let batch=self.skill_delete_visibility_plan(&p["params"],&state)?;
+                    json!({"expected":batch.expected,"read_seq":state.commit_seq.to_string()})
                 } else if controller::NATIVE_UI.contains(&method)
                     || matches!(method, "ui.testLLM" | "ui.fetchLLMModels")
                 {
@@ -750,7 +756,10 @@ impl Router {
                     let mut batch = facade::plan(method, &p["params"], &state, &context)?;
                     artex_domain::augment_expected(&mut batch, &state)?;
                     json!({"expected":batch.expected,"read_seq":state.commit_seq.to_string()})
-                } else if method == "user.answer" {
+                } else if matches!(method, "user.answer" | "agent.features.set") {
+                    // Both are user-owned agent commands. Prepare must use the
+                    // same planner as commit so opt-in keeps its role check and
+                    // exact feature/agent CAS dependencies in the native UI.
                     let mut batch = artex_agent::plan(method, &p["params"], &state, &context)?;
                     artex_domain::augment_expected(&mut batch, &state)?;
                     json!({"expected":batch.expected,"read_seq":state.commit_seq.to_string()})
@@ -990,6 +999,12 @@ impl Router {
                         json!({"ok":true,"service":"ARTEX Desktop","version":env!("CARGO_PKG_VERSION")}),
                     );
                 }
+                if matches!(m,"ui.checkUpdate" | "ui.applyUpdate" | "ui.rollbackUpdate") {
+                    // A Go server self-replacement cannot update this native
+                    // process. Keep the documented unconfigured capability
+                    // explicit; package selection is the native release handoff.
+                    return Err(Error::new("FEATURE_DISABLED","NATIVE_PACKAGE_UPDATE_NOT_CONFIGURED"));
+                }
                 if matches!(m, "ui.testLLM" | "ui.fetchLLMModels") {
                     return self.handle_llm_network(&request, &context);
                 }
@@ -1007,6 +1022,16 @@ impl Router {
                     return self.handle_lifecycle_legacy(&request, &context);
                 }
                 if matches!(m, "ui.deleteConversation" | "ui.deleteConversations") {
+                    return self.handle_lifecycle_legacy(&request, &context);
+                }
+                if m == "ui.sendWorkerMessage"
+                    && self.snapshot()?.get("exploration_nodes", p["intentId"].as_str().unwrap_or(""))
+                        .is_some_and(|node| node.data["state"] == "paused")
+                {
+                    // Continuing a paused worker reuses its task files. The
+                    // new run and user turn must wait for the existing native
+                    // cleanup proof and the original read-version CAS. Live
+                    // steering keeps its ordinary active-run command path.
                     return self.handle_lifecycle_legacy(&request, &context);
                 }
                 if matches!(m, "legacy.handleSideQuestions" | "legacy.cancelSideRequest") {
@@ -1126,12 +1151,11 @@ impl Router {
             .into_iter()
             .find(|v| v.data["command_id"] == id)
         {
-            if old.data["method"] != r.method
-                || old.data["normalized_params"] != r.params
-                || old.data["expected"]
-                    != serde_json::to_value(&r.expected)
-                        .map_err(|_| Error::new("INVALID_PARAMS", "Invalid expected versions"))?
-            {
+            let same_intent = match Self::task_clock_receipt_matches(old,r)? {
+                Some(matches)=>matches,
+                None=>old.data["normalized_params"]==r.params&&old.data["expected"]==serde_json::to_value(&r.expected).map_err(|_|Error::new("INVALID_PARAMS","Invalid expected versions"))?,
+            };
+            if old.data["method"] != r.method || !same_intent {
                 return Err(Error::new(
                     "COMMAND_ID_REUSE",
                     "Command ID has different normalized input",
@@ -1150,8 +1174,9 @@ impl Router {
         if supplied.len() != r.expected.len() {
             return Err(Error::new("INVALID_PARAMS", "Duplicate expected object"));
         }
+        let clocks=self.task_pause_clock_admission(r,b)?;
         for e in &b.expected {
-            if !supplied.contains(&(&e.collection, &e.id, &e.version)) {
+            if !(e.collection=="task_runtime"&&clocks.contains_key(&e.id))&&!supplied.contains(&(&e.collection, &e.id, &e.version)) {
                 let mut error = Error::new(
                     "VERSION_CONFLICT",
                     "Missing expected version for a referenced object",
@@ -1172,8 +1197,8 @@ impl Router {
         }
         b.command_id = r.command_id.clone().unwrap();
         b.method = r.method.clone();
-        b.normalized_params = r.params.clone();
-        b.expected = r.expected.clone();
+        b.normalized_params = Self::task_pause_clock_params(&r.params,&clocks);
+        b.expected = r.expected.iter().map(|e|Expected {collection:e.collection.clone(),id:e.id.clone(),version:if e.collection=="task_runtime" {clocks.get(&e.id).cloned().unwrap_or_else(||e.version.clone())} else {e.version.clone()}}).collect();
         self.externalize_batch(b)?;
         let value = self.commit_with_shared_settings(b.clone())?;
         let result = self.hydrate_result(&value.result)?;
@@ -1347,6 +1372,42 @@ impl Router {
         let created = artex_core::now();
         let external = status == "prepared";
         let invocation = json!({"id":invocation_id,"run_id":rid,"tool_use_id":tool_use_id,"ordinal":ordinal.to_string(),"name":name,"input":p["input"],"raw_input":p["raw_input"],"state":status,"execution_id":if external{json!(new_id("exec"))}else{Value::Null},"input_ref":null,"result_ref":if external{Value::Null}else{result_ref.clone()},"created_at":created});
+        if name == "pause_task" && !external && batch.changes.iter().any(|change| {
+            matches!(change,Change::Put{collection,id,data} if collection=="agent_runs" && id==rid && data["state"]=="cancelled")
+        }) {
+            // The pause transaction cancels this actor. Preserve its exact
+            // successful receipt while the pre-command owner is still active;
+            // no later cancelled-run transcript authority is introduced.
+            let message = artex_runtime::Message {role:"user".into(),content:vec![json!({"type":"tool_result","tool_use_id":tool_use_id,"content":self.tool_result_text(&tool_result)?,"is_error":false})]};
+            let receipt = self.transcript_batch(&state, context, rid, "tool_result", "pause_task completed", &message, None, Some(&invocation))?;
+            for change in receipt.changes {
+                let mut change = change;
+                if let Change::Put {collection,id,data} = &mut change {
+                    if collection == "intercept_pending" {
+                        if let Some(mut planned) = batch.changes.iter().rev().find_map(|change|match change {
+                            Change::Put{collection:c,id:i,data} if c.as_str()==collection.as_str() && i.as_str()==id.as_str()=>Some(data.clone()),_=>None,
+                        }) {
+                            // Keep cancellation/decision state already planned
+                            // for this row; only attach the confirmed output.
+                            for key in ["output","output_truncated","execution_status","execution_ended_at"] {planned["audit"][key]=data["audit"][key].clone();}
+                            *data=planned;
+                            batch.changes.retain(|change|!matches!(change,Change::Put{collection:c,id:i,..} if c.as_str()==collection.as_str()&&i.as_str()==id.as_str()));
+                        }
+                    }
+                }
+                batch.changes.push(change);
+            }
+            for expected in receipt.expected {
+                if !batch.expected.iter().any(|e|e.collection==expected.collection&&e.id==expected.id) {batch.expected.push(expected);}
+            }
+            // Each independently built batch starts event ordinals at the same
+            // snapshot. Reissue its event in the joined batch's ordering.
+            for event in receipt.events {
+                artex_domain::conversation::push_event(&mut batch,&state,context,
+                    event.data["kind"].as_str().unwrap(),event.data["subject_collection"].as_str().unwrap(),event.data["subject_id"].as_str().unwrap())?;
+            }
+            batch.deliveries.extend(receipt.deliveries);
+        }
         batch.changes.push(Change::Put {
             collection: "tool_invocations".into(),
             id: invocation_id.clone(),

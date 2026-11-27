@@ -969,7 +969,16 @@ impl Router {
             return Ok(v);
         }
         let s = self.snapshot()?;
-        let (mut batch, runs, quarantine) = if r.method == "ui.deleteTask" {
+        let (mut batch, runs, quarantine) = if r.method == "ui.sendWorkerMessage" {
+            let task=artex_domain::required(&r.params,"taskId")?;
+            let intent=artex_domain::required(&r.params,"intentId")?;
+            let batch=facade::plan(&r.method,&r.params,&s,c)?;
+            // A cancelled row does not prove retirement of its model/PTY/MCP
+            // requests. Keep the new run and human turn uncommitted until the
+            // existing strict lifecycle worker confirms every old owned run.
+            let runs=s.records("agent_runs").into_iter().filter(|run|run.data["task_id"]==task&&run.data["intent_id"]==intent).map(|run|run.header.id.clone()).collect();
+            (batch,runs,vec![])
+        } else if r.method == "ui.deleteTask" {
             let id = artex_domain::required(&r.params, "id")?;
             let batch = artex_domain::task_delete_ui::plan(&r.method, &r.params, &s, c)?;
             let runs = s
@@ -1461,5 +1470,38 @@ mod batch_tests {
         assert_eq!(value["cleanup_confirmed"], true);
         assert_eq!(value["runs"].as_array().unwrap().len(), 2);
         assert_eq!(host.0.load(Ordering::SeqCst), 2);
+    }
+}
+
+#[cfg(test)]
+mod worker_message_cleanup_regression {
+    use super::*;
+    use artex_domain::Planner;
+    use std::sync::atomic::{AtomicUsize,Ordering};
+    struct UnknownCleanup(AtomicUsize);
+    impl HostGateway for UnknownCleanup {
+        fn request(&self,_:&str,c:&Context,operation:&str,_:Value,_:Duration)->Result<Value> {
+            assert_eq!(operation,"run.stop");self.0.fetch_add(1,Ordering::SeqCst);
+            Ok(json!({"run_id":c.actor.run_id,"engine_epoch":c.actor.engine_epoch,"cleanup_confirmed":false,"external_cleanup_confirmed":false,"run_requests_quiesced":false,"active_host_calls":1,"executions":[]}))
+        }
+    }
+    #[test]
+    fn paused_worker_message_uncertain_cleanup_keeps_intent_user_turn_and_new_run_uncommitted_after_reopen() {
+        let (dir,mut r,old,_)=crate::regression::seeded();r.enable_native();
+        let s=r.snapshot().unwrap();let mut p=Planner::new(&s,"fixture.worker.unknown_cleanup",&json!({}));
+        let agent=p.insert("agents","agent",json!({"key":"worker","enabled":true})).unwrap();
+        p.insert("llm_profiles","profile",json!({"name":"Fixture","format":"openai","model":"fixture","is_default":true,"api_key":{"secret_ref":new_id("secret"),"hint":"fixture"}})).unwrap();
+        let exp=p.insert("explorations","exploration",json!({})).unwrap();let task=p.insert("tasks","task",json!({"description":"Unknown cleanup fixture","exploration_id":exp,"status":"running","paused":false})).unwrap();
+        let node=p.insert("exploration_nodes","node",json!({"exploration_id":exp,"kind":"intent","state":"paused","payload":{"summary":"Paused old worker"}})).unwrap();
+        let mut run=s.get("agent_runs",&old).unwrap().data.clone();run["agent_id"]=json!(agent);run["task_id"]=json!(task);run["intent_id"]=json!(node);run["conversation_id"]=Value::Null;run["state"]=json!("cancelled");p.put("agent_runs",&old,run);r.internal_commit(p.done(json!({}))).unwrap();
+        let host=Arc::new(UnknownCleanup(AtomicUsize::new(0)));r.attach_host(host.clone());let before=r.snapshot().unwrap();let scope=r.native_scope().unwrap();
+        let params=json!({"taskId":task,"intentId":node,"requestId":"uncertain-cleanup-1","message":"Must never reach a new worker"});
+        let NativeDispatch::Complete(prepared)=r.native_query(&NativeTicket::new(),&scope,NativeQuery::Prepare{method:"ui.sendWorkerMessage".into(),params:params.clone()}).unwrap() else {panic!("Pure prepare must complete");};
+        let command=NativeCommand::new("ui.sendWorkerMessage",params,serde_json::from_value(prepared.value["expected"].clone()).unwrap());let ticket=NativeTicket::new();
+        assert!(matches!(r.native_command(&ticket,&scope,&command).unwrap(),NativeDispatch::Deferred));
+        let end=Instant::now()+Duration::from_secs(5);let error=loop {r.native_poll_retirement().unwrap();if let Some(done)=r.drain_native_completions().into_iter().find(|done|done.ticket==ticket) {break done.result.unwrap_err();}assert!(Instant::now()<end);std::thread::sleep(Duration::from_millis(1));};
+        assert_eq!(error.code,"RECOVERY_REQUIRED");assert_eq!(host.0.load(Ordering::SeqCst),1);
+        let after=r.snapshot().unwrap();assert_eq!(after.get("exploration_nodes",&node),before.get("exploration_nodes",&node));assert_eq!(after.records("agent_runs"),before.records("agent_runs"));assert_eq!(after.records("activity"),before.records("activity"));assert!(after.records("command_receipts").iter().any(|receipt|receipt.data["method"]=="native.lifecycle.cleanup"&&receipt.data["result"]["cleanup_confirmed"]==false));
+        r.store.as_mut().unwrap().checkpoint().unwrap();r.store=None;let reopened=Store::open_read_only(&dir.path().join("store")).unwrap();let saved=reopened.snapshot();assert_eq!(saved.get("exploration_nodes",&node),before.get("exploration_nodes",&node));assert_eq!(saved.records("agent_runs"),before.records("agent_runs"));assert_eq!(saved.records("activity"),before.records("activity"));
     }
 }

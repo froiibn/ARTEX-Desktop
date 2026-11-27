@@ -1,6 +1,75 @@
 //! Resolve executable configurations inside the trusted engine boundary.
 use super::*;
 use artex_domain::{ids, record, text};
+
+/// Only host-minted attachment basenames may become prompt locators or legacy
+/// promotion grants. Keep both consumers on this same narrow path boundary.
+pub(super) fn attachment_path(attachment: &Value) -> Option<&str> {
+    let path = attachment["path"].as_str()?;
+    let filename = path.strip_prefix("attachments/")?;
+    let (id, name) = filename.split_once('-')?;
+    (artex_core::valid_id(id, "attachment")
+        && !name.is_empty()
+        && !name.contains(['/', '\\', '\0'])
+        && !name.contains(".."))
+        .then_some(path)
+}
+
+#[cfg(test)]
+mod attachment_scope_regression {
+    use super::*;
+    use artex_domain::Planner;
+
+    fn attachment(name:&str)->Value {json!({"name":name,"path":format!("attachments/{}-{name}",new_id("attachment")),"size":9})}
+    fn user(p:&mut Planner<'_>,collection:&str,owner:&str,run:Option<&str>,items:Vec<Value>,large:bool)->String {
+        let mut data=json!({"worker":"mainagent","kind":"user","summary":"Attachment scope fixture","detail":artex_core::body(&json!({"run_id":run,"text":if large{"blob admission ".repeat(MAX_CHUNK/"blob admission ".len()+1)}else{"inline admission".into()},"attachments":items}).to_string())});
+        data[if collection=="activity"{"exploration_id"}else{"conversation_id"}]=json!(owner);
+        if collection=="activity" {data["metadata"]=json!({"run_id":run});}
+        p.insert(collection,artex_core::collection_prefix(collection).unwrap(),data).unwrap()
+    }
+
+    #[test]
+    fn attachment_body_resolution_preserves_owner_run_boundaries_and_rejects_arbitrary_paths_after_reopen() {
+        let (dir,mut router,run,context)=crate::regression::seeded();
+        let conversation=context.conversation_id.as_deref().unwrap();let agent=context.actor.agent_id.as_deref().unwrap();
+        let mut tasks=Vec::new();
+        for name in ["Owned attachment task","Unrelated attachment task"] {
+            let snapshot=router.snapshot().unwrap();let batch=artex_domain::tasks::plan("task.create",&json!({"description":name,"seed_first_intent":false}),&snapshot,&context).unwrap();
+            tasks.push(batch.result["task_id"].as_str().unwrap().to_owned());router.internal_commit(batch).unwrap();
+        }
+        let snapshot=router.snapshot().unwrap();let mut p=Planner::new(&snapshot,"fixture.attachment_scopes",&json!({}));
+        let other=p.insert("conversations","conversation",json!({"agent_key":"mainagent","title":"Unrelated owner"})).unwrap();
+        let foreign_run=p.insert("agent_runs","run",json!({"agent_id":agent,"conversation_id":other,"engine_epoch":router.engine_epoch,"state":"completed"})).unwrap();
+        let history_run=p.insert("agent_runs","run",json!({"agent_id":agent,"conversation_id":conversation,"engine_epoch":router.engine_epoch,"state":"completed"})).unwrap();
+        let task_run=p.insert("agent_runs","run",json!({"agent_id":agent,"task_id":tasks[0],"engine_epoch":router.engine_epoch,"state":"running"})).unwrap();
+        let sibling_run=p.insert("agent_runs","run",json!({"agent_id":agent,"task_id":tasks[0],"engine_epoch":router.engine_epoch,"state":"completed"})).unwrap();
+        let inline=attachment("inline.txt");let blob=attachment("blob 한글.txt");let historical=attachment("historical.txt");let legacy=attachment("legacy.txt");let task_file=attachment("task.txt");
+        let invalid_id=new_id("attachment");
+        let mut inline_items=vec![inline.clone()];
+        for path in ["/absolute/private.txt".into(),"C:\\private.txt".into(),"../private.txt".into(),"attachments/not-an-id-file.txt".into(),format!("attachments/{invalid_id}-../private.txt"),format!("attachments/{invalid_id}-..\\private.txt"),format!("attachments/{invalid_id}-"),format!("attachments/{invalid_id}-bad\0.txt")] {inline_items.push(json!({"name":"denied","path":path,"size":0}));}
+        user(&mut p,"conversation_activities",conversation,Some(&run),inline_items,false);
+        let blob_row=user(&mut p,"conversation_activities",conversation,Some(&run),vec![blob.clone()],true);
+        user(&mut p,"conversation_activities",conversation,Some(&history_run),vec![historical.clone()],false);
+        user(&mut p,"conversation_activities",conversation,None,vec![legacy.clone()],false);
+        user(&mut p,"conversation_activities",&other,Some(&run),vec![attachment("foreign-owner-forged-run.txt")],false);
+        user(&mut p,"conversation_activities",conversation,Some(&foreign_run),vec![attachment("foreign-run-forged-owner.txt")],false);
+        let own_exp=snapshot.get("tasks",&tasks[0]).unwrap().data["exploration_id"].as_str().unwrap();
+        let other_exp=snapshot.get("tasks",&tasks[1]).unwrap().data["exploration_id"].as_str().unwrap();
+        user(&mut p,"activity",own_exp,Some(&task_run),vec![task_file.clone()],true);
+        user(&mut p,"activity",own_exp,Some(&sibling_run),vec![attachment("other-run.txt")],false);
+        let forged_metadata=user(&mut p,"activity",own_exp,Some(&task_run),vec![attachment("forged-run-metadata.txt")],false);
+        let mut data=p.data("activity",&forged_metadata).unwrap();data["metadata"]=json!({"run_id":sibling_run});p.put("activity",&forged_metadata,data);
+        user(&mut p,"activity",other_exp,Some(&task_run),vec![attachment("other-task-forged-run.txt")],false);
+        router.internal_commit(p.done(json!({}))).unwrap();
+        assert!(router.snapshot().unwrap().get("conversation_activities",&blob_row).unwrap().data["detail"]["blob"].is_object());
+        let mut expected=[inline,blob,historical,legacy].into_iter().map(|a|a["path"].as_str().unwrap().to_owned()).collect::<Vec<_>>();expected.sort();
+        for reopened in [false,true] {
+            if reopened {router.store.as_mut().unwrap().checkpoint().unwrap();router.store=None;router.store=Some(Store::open(&dir.path().join("store")).unwrap());}
+            assert_eq!(router.run_attachment_paths(&run).unwrap(),expected);
+            assert_eq!(router.run_attachment_paths(&task_run).unwrap(),vec![task_file["path"].as_str().unwrap().to_owned()]);
+        }
+    }
+}
 impl Router {
     pub(super) fn run_attachment_paths(&self, rid: &str) -> Result<Vec<String>> {
         let s = self.snapshot()?;
@@ -14,28 +83,38 @@ impl Router {
             if row.data["kind"] != "user" {
                 continue;
             }
-            let Ok(admission) = self.read_json_blob(&row.data["detail"]) else {
+            // A claimed run_id inside a body cannot override the owning
+            // activity's task/conversation. Conversation history remains
+            // readable within that same session; task admissions are per run.
+            let owner_matches = if let Some(conversation) = run.data["conversation_id"].as_str() {
+                row.header.collection == "conversation_activities"
+                    && row.data["conversation_id"] == conversation
+            } else if let Some(task) = run.data["task_id"].as_str().and_then(|id| s.get("tasks", id)) {
+                row.header.collection == "activity"
+                    && row.data["exploration_id"] == task.data["exploration_id"]
+            } else { false };
+            if !owner_matches { continue; }
+            // detail is a Body, not a BlobRef. Resolve inline/verified blob
+            // text first; ordinary legacy text has no attachment admission.
+            let detail = self.body_text(&row.data["detail"])?;
+            let Ok(admission) = serde_json::from_str::<Value>(&detail) else {
                 continue;
             };
-            let own = admission["run_id"] == rid
-                || (!run.data["conversation_id"].is_null()
-                    && row.data["conversation_id"] == run.data["conversation_id"]);
-            if !own {
+            if let Some(conversation) = run.data["conversation_id"].as_str() {
+                if let Some(admitted_run) = admission["run_id"].as_str() {
+                    if s.get("agent_runs", admitted_run).is_none_or(|r| r.data["conversation_id"] != conversation) {
+                        continue;
+                    }
+                }
+            }
+            if run.data["conversation_id"].is_null()
+                && (admission["run_id"] != rid
+                    || row.data["metadata"]["run_id"].as_str().is_some_and(|owner| owner != rid))
+            {
                 continue;
             }
             for attachment in admission["attachments"].as_array().into_iter().flatten() {
-                let path = text(attachment, "path");
-                let Some(filename) = path.strip_prefix("attachments/") else {
-                    continue;
-                };
-                let Some((id, name)) = filename.split_once('-') else {
-                    continue;
-                };
-                if artex_core::valid_id(id, "attachment")
-                    && !name.is_empty()
-                    && !name.contains(['/', '\\'])
-                    && !name.contains("..")
-                {
+                if let Some(path) = attachment_path(attachment) {
                     paths.insert(path.to_owned());
                 }
             }

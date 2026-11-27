@@ -100,6 +100,14 @@ fn audit(d: &Value) -> Value {
     if let Some(model) = out.get_mut("model_input").and_then(Value::as_object_mut) {
         model.remove("captured_config");
     }
+    // Native invocation states are retained in durable audit records. The
+    // original InterceptAudit DTO (web types.ts / intercept/trace.go) exposes
+    // result outcomes as succeeded/failed, independently of approval decisions.
+    match out["execution_status"].as_str() {
+        Some("completed") => out["execution_status"] = json!("succeeded"),
+        Some("error") => out["execution_status"] = json!("failed"),
+        _ => {}
+    }
     out
 }
 fn ordered<'a>(mut rows: Vec<&'a Record>) -> Vec<&'a Record> {
@@ -523,4 +531,36 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
     let mut batch = b.done(result);
     augment_expected(&mut batch, s)?;
     Ok(batch)
+}
+
+#[cfg(test)]
+mod audit_projection_tests {
+    use super::*;
+
+    #[test]
+    fn interception_detail_projects_native_outcomes_without_rewriting_audit_identity_or_output() {
+        let directory=tempfile::tempdir().unwrap();let mut store=artex_store::Store::create(&directory.path().join("workspace"),"Audit DTO projection").unwrap();
+        let context=Context {actor:artex_core::Actor{kind:"user".into(),agent_id:None,run_id:None,engine_epoch:new_id("epoch")},task_id:None,intent_id:None,conversation_id:None};
+        let rpc=artex_core::contracts::read("rpc.v1.schema.json");
+        for (native,public) in [("completed","succeeded"),("error","failed"),("not_executed","not_executed"),("awaiting_result","awaiting_result"),("not_started","not_started"),("unknown","unknown")] {
+            let run=new_id("run");let saved_audit=json!({"run_id":run,"tool_use_id":"projection-call","correlation":"exact","input_digest":"fixture-input-digest","user_message":"","context":[],"captured_at":artex_core::now(),"initial_action":"ask","initial_reason":"APPROVAL_REASON_MARKER","effective_action":"allow","execution_status":native,"output":"PRESERVED_OUTPUT_MARKER","output_truncated":true,"execution_ended_at":artex_core::now(),"timeout_enabled":false,"timeout_action":"deny","deadline_at":null});
+            let before=store.snapshot();let mut planner=Planner::new(&before,"fixture.completed_audit",&json!({}));let approval=planner.insert("intercept_pending",artex_core::collection_prefix("intercept_pending").unwrap(),json!({"agent_name":"mainagent","tool_name":"Read","tool_input":{"file_path":"fixture.txt"},"status":"allowed","reason":"APPROVAL_REASON_MARKER","created_at":artex_core::now(),"decided_at":artex_core::now(),"audit":saved_audit})).unwrap();let mut batch=planner.done(json!({}));batch.command_id=new_id("command");store.commit(batch).unwrap();
+            let snapshot=store.snapshot();let original=snapshot.get("intercept_pending",&approval).unwrap().clone();
+            let detail=query("ui.interceptDetail",&json!({"id":approval}),&snapshot,&context).unwrap();
+            artex_core::validate_contract(&rpc["results"]["ui.interceptDetail"],&rpc["$defs"],&detail).unwrap();
+            if native!=public {
+                let mut unmapped=detail.clone();unmapped["audit"]["execution_status"]=json!(native);let failure=artex_core::validate_contract(&rpc["results"]["ui.interceptDetail"],&rpc["$defs"],&unmapped).unwrap_err();
+                eprintln!("AUDIT_DTO_NATIVE_STATE_REJECTED {native}: {}",failure.details);
+            }
+            assert_eq!(detail["audit"]["execution_status"],public);assert_eq!(detail["audit"]["run_id"],run);assert_eq!(detail["audit"]["tool_use_id"],"projection-call");assert_eq!(detail["audit"]["output"],"PRESERVED_OUTPUT_MARKER");assert_eq!(detail["audit"]["output_truncated"],true);assert_eq!(detail["status"],"allowed");assert!(detail["audit"].get("timeout_enabled").is_none());
+            assert_eq!(store.snapshot().get("intercept_pending",&approval).unwrap(),&original);assert_eq!(original.data["audit"]["execution_status"],native);
+        }
+    }
+
+    #[test]
+    fn interception_audit_does_not_hide_unknown_states_and_keeps_legacy_null() {
+        assert_eq!(audit(&Value::Null),Value::Null);
+        let unknown=audit(&json!({"correlation":"exact","input_digest":"d","user_message":"","context":null,"captured_at":"fixture","initial_action":"ask","initial_reason":"requires approval","execution_status":"unexpected_native_state"}));
+        assert_eq!(unknown["execution_status"],"unexpected_native_state");let rpc=artex_core::contracts::read("rpc.v1.schema.json");assert!(artex_core::validate_contract(&rpc["$defs"]["W467"],&rpc["$defs"],&unknown).is_err());
+    }
 }

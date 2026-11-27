@@ -12,6 +12,19 @@ use std::{
     sync::OnceLock,
 };
 
+#[cfg(all(test,windows))]
+#[derive(Clone,Debug)]
+pub(crate) struct ResultHeaderObservation {
+    pub path:Vec<String>, pub rect:egui::Rect, pub clip:egui::Rect, pub open:bool, pub body:Option<egui::Rect>,
+}
+#[cfg(all(test,windows))]
+thread_local! {
+    // Read-only telemetry of actual rendered widgets, never expansion state
+    // supplied by a fixture. This keeps assertions out of the input form above.
+    static RESULT_HEADERS:std::cell::RefCell<Vec<ResultHeaderObservation>>=Default::default();
+    static RESULT_BOUNDS:std::cell::Cell<Option<egui::Rect>>=Default::default();
+}
+
 #[derive(Clone)]
 pub struct OperationSubmission {
     pub method: String,
@@ -121,6 +134,8 @@ pub fn catalog() -> &'static [SourceAction] {
             "ui.controlTasksBatch"=>"여러 작업 일괄 제어", "ui.updateTasksCategory"=>"여러 작업 분류 변경",
             "ui.updateTaskCategory"=>"작업 분류 변경", "ui.taskCategories"=>"분류 목록",
             "ui.taskTemplates"=>"작업 템플릿 목록", "ui.taskGoals"=>"작업 목표 목록",
+            "ui.taskScope"=>"작업 허용 범위 조회", "ui.taskConstraints"=>"작업 제약 목록",
+            "ui.frontier"=>"대기 중인 검사 우선순위",
             "ui.addGoal"=>"목표 추가", "ui.updateGoal"=>"목표 내용 수정", "ui.deleteGoal"=>"목표 삭제",
             "ui.intentsPage"=>"의도 목록·페이지", "ui.controlIntent"=>"의도 일시 중지·재개·취소",
             "ui.rerunIntent"=>"의도 다시 실행", "ui.rerunBlocked"=>"차단된 의도 다시 실행",
@@ -162,7 +177,11 @@ pub fn catalog() -> &'static [SourceAction] {
             "ui.getAgent"=>"에이전트 설정·프롬프트·변수 상세",
             "ui.agentVariables"=>"프롬프트에서 사용할 변수 안내",
             "ui.previewAgentPrompt"=>"현재 프롬프트 템플릿 미리보기");
-        actions!(Logs, "ui.commands"=>"작업별 도구 명령 기록 검색");
+        actions!(Logs, "ui.commands"=>"작업별 도구 명령 기록 검색",
+            "ui.activity"=>"작업 활동 조건 조회", "ui.activityHistory"=>"작업 활동 이전 기록",
+            "ui.activityDetail"=>"작업 활동 전체 본문");
+        actions!(Logs,"ui.audit"=>"도구 방어 판정과 귀속 기록");
+        actions!(Traffic,"ui.trafficDeleteHosts"=>"선택 호스트의 트래픽 일괄 삭제");
         actions!(Approvals,
             "ui.interceptGetOne"=>"대기 승인 상세", "ui.interceptExecution"=>"실행 내역",
             "ui.interceptDetail"=>"승인 상세·입력·출력", "ui.interceptHistoryPage"=>"승인 이력 페이지",
@@ -190,6 +209,7 @@ pub fn catalog() -> &'static [SourceAction] {
             "ui.taskArchives"=>"보관된 작업 검색", "ui.taskArchive"=>"보관 작업 상세",
             "ui.archiveTasks"=>"여러 작업 보관", "ui.restoreTaskArchives"=>"여러 보관 작업 복원",
             "ui.deleteTaskArchive"=>"보관 작업 삭제", "ui.deleteTaskArchives"=>"여러 보관 작업 삭제");
+        actions!(Archives,"ui.gc"=>"참조되지 않는 오래된 자료 정리");
         actions!(Models,
             "ui.fetchLLMModels"=>"제공자 모델 목록 조회", "ui.testLLM"=>"모델 연결 시험",
             "ui.llmPool"=>"모델 풀 상태", "ui.resetLLMPool"=>"모델 풀 실패 상태 초기화",
@@ -197,6 +217,7 @@ pub fn catalog() -> &'static [SourceAction] {
             "ui.llmTasks"=>"모델 기록이 있는 작업",
             "ui.tokensByModel"=>"모델별 토큰 통계", "ui.conversationTokens"=>"대화별 토큰 통계");
         actions!(Overview,
+            "ui.health"=>"앱 서비스 상태 확인",
             "ui.stats"=>"작업 실행 통계", "ui.usageStats"=>"기간별 모델 사용량",
             "ui.tokenStats"=>"작업 토큰 통계", "ui.tokenDaily"=>"일별 토큰 사용량",
             "ui.commandStats"=>"도구 실행 통계", "ui.findingStats"=>"발견 사항 통계");
@@ -232,6 +253,8 @@ fn destructive(method: &str) -> bool {
                 | "ui.detachTaskAsset"
                 | "ui.updateCompanyScope"
                 | "ui.resetLLMPool"
+                | "ui.gc"
+                | "ui.trafficDeleteHosts"
         )
 }
 
@@ -350,6 +373,13 @@ impl SourceOperations {
     pub(crate) fn seed_query_for_app_test(&mut self,view:&NativeReadView,section:Section,selected:Option<&str>,method:&str,params:Value) {
         let action=catalog().iter().find(|a|a.section==section && a.method==method).unwrap();
         assert!(!action.mutation);
+        self.seed_action_for_app_test(view,section,selected,method,params);
+    }
+    /// Initial input only. Submission, read-time CAS, policy and completion
+    /// still run through the displayed production widgets and application.
+    #[cfg(all(test,windows))]
+    pub(crate) fn seed_action_for_app_test(&mut self,view:&NativeReadView,section:Section,selected:Option<&str>,method:&str,params:Value) {
+        let action=catalog().iter().find(|a|a.section==section && a.method==method).unwrap();
         if self.workspace_id.as_deref()!=Some(&view.workspace.scope.workspace_id) {
             self.drafts.clear();self.choices.clear();self.exports.clear();
             self.workspace_id=Some(view.workspace.scope.workspace_id.clone());
@@ -358,6 +388,20 @@ impl SourceOperations {
         draft.params=params;
         self.choices.insert(section,action.key.clone());
         self.drafts.insert(format!("{}:{}",action.key,selected.unwrap_or("")),draft);
+    }
+    #[cfg(all(test,windows))]
+    pub(crate) fn result_widgets_for_app_test()->(Option<egui::Rect>,Vec<ResultHeaderObservation>) {
+        (RESULT_BOUNDS.with(|v|v.get()),RESULT_HEADERS.with(|v|v.borrow().clone()))
+    }
+    #[cfg(all(test,windows))]
+    pub(crate) fn action_result_for_app_test(&self,method:&str,selected:Option<&str>)->Option<Value> {
+        let draft=self.drafts.get(&format!("{}:{}",method,selected.unwrap_or("")))?;
+        if draft.busy || !draft.pending_reads.is_empty() { return None; }
+        // A committed mutation deliberately retains a reload-required notice.
+        // It is not a failed callback; other failures have no result to observe.
+        if let Some(result)=&draft.result { return Some(result.clone()); }
+        assert!(draft.error.is_none(),"Actual Source operation failed: {:?}",draft.error);
+        None
     }
     /// Observe the actual callback-owned result; never supplies or hydrates it.
     #[cfg(all(test,windows))]
@@ -394,6 +438,8 @@ impl SourceOperations {
         selected: Option<&str>,
         expanded: bool,
     ) -> Vec<OperationSubmission> {
+        #[cfg(all(test,windows))]
+        { RESULT_HEADERS.with(|v|v.borrow_mut().clear()); RESULT_BOUNDS.with(|v|v.set(None)); }
         if self.workspace_id.as_deref() != Some(&view.workspace.scope.workspace_id) {
             self.drafts.clear();
             self.choices.clear();
@@ -554,7 +600,14 @@ impl SourceOperations {
                 ui.separator();
                 ui.strong("조회·실행 결과");
                 let mut body_requests = Vec::new();
+                #[cfg(all(test,windows))]
+                let result_top=ui.cursor().top();
                 display_result(ui, result, &["@result".into()], &mut body_requests, 0);
+                #[cfg(all(test,windows))]
+                RESULT_BOUNDS.with(|v|v.set(Some(egui::Rect::from_min_max(
+                    egui::pos2(ui.clip_rect().left(),result_top),
+                    egui::pos2(ui.clip_rect().right(),ui.cursor().top()),
+                ))));
                 for (path, body) in body_requests {
                     let locator = serde_json::to_string(&path).unwrap();
                     if draft.pending_reads.insert(locator) {
@@ -967,7 +1020,13 @@ fn input(
         ui.weak("필드 구조가 깊어 기존 값을 유지합니다.");
         return;
     }
-    let shape = schema::actual(shape, value);
+    let nullable=schema::nullable(shape);
+    let editor_shape=schema::for_editor(shape,value);
+    if value.is_null() && editor_shape["type"]=="null" {
+        widgets::field(ui,key,value,shape,path,state,depth);
+        return;
+    }
+    let shape = editor_shape;
     if key == "key" && shape["type"] == "string" {
         let current = value.as_str().unwrap_or("");
         let selected = view
@@ -1008,6 +1067,7 @@ fn input(
                 .width(ui.available_width())
                 .selected_text(selected)
                 .show_ui(ui, |ui| {
+                    if nullable { ui.selectable_value(value,Value::Null,"선택 안 함"); }
                     for row in view
                         .generation
                         .collections
@@ -1195,19 +1255,29 @@ fn display_result(
             for (key, child) in fields {
                 let mut p = path.to_vec();
                 p.push(key.clone());
-                egui::CollapsingHeader::new(schema::label(key))
+                let _rendered=egui::CollapsingHeader::new(schema::label(key))
                     .id_salt(&p)
                     .default_open(depth < 1)
                     .show(ui, |ui| display_result(ui, child, &p, requests, depth + 1));
+                #[cfg(all(test,windows))]
+                RESULT_HEADERS.with(|v|v.borrow_mut().push(ResultHeaderObservation {
+                    path:p,rect:_rendered.header_response.rect,clip:ui.clip_rect(),open:_rendered.body_returned.is_some(),
+                    body:_rendered.body_response.as_ref().map(|r|r.rect),
+                }));
             }
         }
         Value::Array(items) => {
             for (i, child) in items.iter().take(100).enumerate() {
                 let mut p = path.to_vec();
                 p.push(i.to_string());
-                egui::CollapsingHeader::new(format!("항목 {}", i + 1))
+                let _rendered=egui::CollapsingHeader::new(format!("항목 {}", i + 1))
                     .id_salt(&p)
                     .show(ui, |ui| display_result(ui, child, &p, requests, depth + 1));
+                #[cfg(all(test,windows))]
+                RESULT_HEADERS.with(|v|v.borrow_mut().push(ResultHeaderObservation {
+                    path:p,rect:_rendered.header_response.rect,clip:ui.clip_rect(),open:_rendered.body_returned.is_some(),
+                    body:_rendered.body_response.as_ref().map(|r|r.rect),
+                }));
             }
             if items.len() > 100 {
                 ui.weak("처음 100개를 표시합니다. 다음 페이지 조건으로 나머지를 조회하세요.");
@@ -1399,6 +1469,23 @@ mod tests {
         }
         assert!(!action("ui.findingTrafficBody").mutation);
         assert!(action("ui.editFindingTraffic").mutation);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn nullable_judge_profile_is_not_rewritten_by_rendering_its_input() {
+        let (_dir,service,handle,view)=fixture();
+        let mut operations=SourceOperations::default();
+        let params=json!({"cfg":{"enabled":false,"profile_id":null,"prompt":"Nullable profile fixture",
+            "timeout_seconds":15,"fail_action":"deny","ask_timeout_seconds":20,"ask_timeout_action":"deny"}});
+        operations.seed_action_for_app_test(&view,Section::Approvals,None,"ui.interceptSetJudgeConfig",params.clone());
+        let ctx=egui::Context::default();crate::app::configure(&ctx);
+        let _=ctx.run(egui::RawInput {screen_rect:Some(egui::Rect::from_min_size(egui::Pos2::ZERO,egui::vec2(1200.,3000.))),..Default::default()},|ctx| {
+            egui::CentralPanel::default().show(ctx,|ui|operations.show_expanded(ui,&view,Section::Approvals,None));
+        });
+        let actual=operations.drafts["ui.interceptSetJudgeConfig:"].params.clone();
+        finish(service,&handle);
+        assert_eq!(actual,params,"Painting an optional model must not convert None into an invalid empty ID");
     }
     #[test]
     fn draft_pinned_revisions_survive_real_store_refresh_and_do_not_rebase() {

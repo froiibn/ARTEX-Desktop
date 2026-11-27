@@ -8,6 +8,26 @@ use eframe::egui::{self, RichText};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Read-only paint telemetry lets acceptance tests bind a disclosure to the
+/// actual durable activity, rather than matching similar text elsewhere.
+#[cfg(all(test, windows))]
+#[derive(Clone, Debug)]
+pub(crate) struct ToolResultObservation {
+    pub activity_id: String,
+    pub name: String,
+    pub header: egui::Rect,
+    pub body: Option<egui::Rect>,
+    pub clip: egui::Rect,
+}
+#[cfg(all(test, windows))]
+thread_local! {
+    static TOOL_RESULT_OBSERVATIONS: std::cell::RefCell<Vec<ToolResultObservation>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+#[cfg(all(test, windows))]
+pub(crate) fn tool_result_observations() -> Vec<ToolResultObservation> {
+    TOOL_RESULT_OBSERVATIONS.with(|items| items.borrow().clone())
+}
+
 #[path = "dashboard.rs"]
 mod dashboard;
 #[path = "task_creation.rs"]
@@ -126,6 +146,15 @@ fn body_text(value: &Value) -> String {
         return "큰 본문은 상세 조회를 통해 불러옵니다.".into();
     }
     String::new()
+}
+fn scope_display_value(data:&Value)->&str {
+    // Scope planners keep canonical domains and networks in dedicated fields;
+    // value is reserved for URLs/keywords/ICP, not a universal display column.
+    text(data,match text(data,"kind") {
+        "domain"|"root_domain"|"subdomain"=>"domain",
+        "ip"|"cidr"=>"net",
+        _=>"value",
+    })
 }
 fn reference_token(collection: &str, id: &str, label: &str) -> Option<String> {
     let (prefix, kind) = match collection {
@@ -499,6 +528,12 @@ impl Default for Panes {
     }
 }
 impl Panes {
+    #[cfg(all(test,windows))]
+    pub(crate) fn seed_llm_record_filter_for_app_test(&mut self, task: &str) {
+        // A fixture supplies only the same filter input as the text box. The
+        // real tab, query, detail Body read and delete controls remain in use.
+        self.flow.logs_task = task.into();
+    }
     pub(crate) fn chat_minimum_height(&self) -> f32 {
         self.flow
             .composer_measurement
@@ -837,7 +872,13 @@ impl Panes {
                         );
                     }
                 }
-                self.pending_questions(ui, snapshot, run, effects);
+                // Question actions belong to this live run, including runs
+                // without a task, and never to a previous execution epoch.
+                if text(&run.data, "engine_epoch") == self.engine_epoch
+                    && matches!(text(&run.data, "state"), "running" | "waiting")
+                {
+                    self.pending_questions(ui, snapshot, run, effects);
+                }
             } else {
                 ui.label("실행을 선택하거나 작업의 대화 이력을 조회하세요.");
             }
@@ -992,7 +1033,7 @@ impl Panes {
                         return;
                     }
                     let payload = &question.data["payload"];
-                    let busy = self.approval_busy("user.answer", &qid);
+                    let busy = self.read_only || self.approval_busy("user.answer", &qid);
                     let mut submitted = None;
                     if question.data["kind"] == "plan_approval" || payload["type"] == "tool_approval" {
                         ui.label(if question.data["kind"] == "plan_approval" { "제안한 계획 이후 실행을 승인하시겠습니까?" } else { "이 도구 실행을 승인하시겠습니까?" });
@@ -1234,7 +1275,7 @@ impl Panes {
                         ui.label(format!(
                             "{} · {}",
                             text(&scope.data, "kind"),
-                            text(&scope.data, "value")
+                            scope_display_value(&scope.data)
                         ));
                         if ui.small_button("삭제").clicked() {
                             command(
@@ -1399,6 +1440,8 @@ impl Panes {
         task: Option<&str>,
         effects: &mut Vec<Effect>,
     ) {
+        #[cfg(all(test, windows))]
+        TOOL_RESULT_OBSERVATIONS.with(|items| items.borrow_mut().clear());
         // Center one shared reading column, including the composer and the new
         // conversation form. Narrow windows keep their full available width;
         // the original height measurement and scrolling still own vertical space.
@@ -1642,6 +1685,22 @@ impl Panes {
                         transcript(ui, entry);
                     }
                 }
+                // Keep questions inside the scrollable transcript so a small
+                // window retains its composer. The same owner/version-aware
+                // controls serve tasks and conversations; do not offer stale
+                // questions from a previous workspace execution epoch.
+                let epoch = self.engine_epoch.clone();
+                for run in snapshot.records("agent_runs").into_iter().filter(|run| {
+                    text(&run.data, "engine_epoch") == epoch
+                        && matches!(text(&run.data, "state"), "running" | "waiting")
+                        && if let Some(task_id) = task {
+                            run.data["task_id"] == task_id
+                        } else {
+                            selected.is_some_and(|c| run.data["conversation_id"] == c.header.id)
+                        }
+                }) {
+                    self.pending_questions(ui, snapshot, run, effects);
+                }
             });
         let mut composer_ui = ui.new_child(
             egui::UiBuilder::new()
@@ -1864,7 +1923,7 @@ impl Panes {
                 &["domain", "ip", "cidr", "icp", "keyword"],
             );
             for company in snapshot.records("companies") {
-                ui.collapsing(display_name(company),|ui|{for scope in snapshot.records("company_scope").into_iter().filter(|s|s.data["company_id"]==company.header.id){ui.label(format!("{} · {}",text(&scope.data,"kind"),text(&scope.data,"value")));}ui.text_edit_singleline(&mut self.scope_value);if ui.add_enabled(!self.scope_value.is_empty(),egui::Button::new("자산 범위 추가")).clicked(){command(effects,"ui.addCompanyScope",json!({"id":company.header.id,"scope":[{"kind":self.flow.company_kind,"value":self.scope_value}],"reason":self.scope_reason}),vec![expected(company)]);}});
+                ui.collapsing(display_name(company),|ui|{for scope in snapshot.records("company_scope").into_iter().filter(|s|s.data["company_id"]==company.header.id){ui.label(format!("{} · {}",text(&scope.data,"kind"),scope_display_value(&scope.data)));}ui.text_edit_singleline(&mut self.scope_value);if ui.add_enabled(!self.scope_value.is_empty(),egui::Button::new("자산 범위 추가")).clicked(){command(effects,"ui.addCompanyScope",json!({"id":company.header.id,"scope":[{"kind":self.flow.company_kind,"value":self.scope_value}],"reason":self.scope_reason}),vec![expected(company)]);}});
             }
         }
     }
@@ -2691,7 +2750,7 @@ fn message_ui(ui: &mut egui::Ui, id: &str, data: &Value, ts: &str) {
                                             },
                                             if *error { " · 오류" } else { "" }
                                         );
-                                        egui::CollapsingHeader::new(label)
+                                        let _rendered = egui::CollapsingHeader::new(label)
                                             .id_salt((id, index, "tool"))
                                             .default_open(*error)
                                             .show(ui, |ui| {
@@ -2716,6 +2775,15 @@ fn message_ui(ui: &mut egui::Ui, id: &str, data: &Value, ts: &str) {
                                                     },
                                                 );
                                             });
+                                        #[cfg(all(test, windows))]
+                                        if *result {
+                                            TOOL_RESULT_OBSERVATIONS.with(|items| items.borrow_mut().push(ToolResultObservation {
+                                                activity_id: id.into(), name: name.clone(),
+                                                header: _rendered.header_response.rect,
+                                                body: _rendered.body_response.as_ref().map(|response| response.rect),
+                                                clip: ui.clip_rect(),
+                                            }));
+                                        }
                                     }
                                 }
                             }
@@ -4267,6 +4335,47 @@ mod draft_lifecycle_tests {
         assert!(panes.flow.attachments[&conversation_id].is_empty());
         assert_eq!(snapshot, original);
     }
+    #[test]
+    fn readonly_question_widgets_never_submit_answers_or_approvals() {
+        for (kind, payload, label) in [
+            ("question", json!({"type":"tool_approval","name":"Write","input":{}}), "승인"),
+            ("plan_approval", json!({"plan":"local plan"}), "승인"),
+            ("question", json!({"questions":[{"question":"Local choice?","options":[{"label":"Keep"}]}]}), "답변 제출"),
+        ] {
+            let make = |collection: &str, prefix: &str, patch: Value| -> Record {
+                let id = artex_core::new_id(prefix);
+                let mut data = artex_core::default_data(collection).unwrap();
+                for (key,value) in patch.as_object().unwrap() { data[key] = value.clone(); }
+                serde_json::from_value(json!({"header":{"id":id,"collection":collection,"version":"1","commit_seq":"1",
+                    "created_at":"2026-11-24T00:00:00Z","updated_at":"2026-11-24T00:00:00Z","legacy_key":null},"data":data})).unwrap()
+            };
+            let run = make("agent_runs", "run", json!({"state":"waiting"}));
+            let question = make("user_questions", "question", json!({"run_id":run.header.id,"state":"pending",
+                "generation":"1","kind":kind,"payload":payload}));
+            let mut snapshot = Snapshot { workspace_id: artex_core::new_id("workspace"), commit_seq: 1, collections: BTreeMap::new() };
+            for row in [run.clone(),question] {
+                snapshot.collections.entry(row.header.collection.clone()).or_default().insert(row.header.id.clone(), row);
+            }
+            let original = snapshot.clone();
+            let ctx = egui::Context::default();
+            crate::app::configure(&ctx);
+            let mut panes = Panes::default();
+            panes.read_only = true;
+            let mut effects = Vec::new();
+            let mut render = |events| ctx.run(egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO,egui::vec2(800.,720.))), events, ..Default::default() }, |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| panes.pending_questions(ui,&snapshot,&run,&mut effects));
+            });
+            let output = render(vec![]);
+            let pos = output.shapes.iter().find_map(|s| match &s.shape {
+                egui::epaint::Shape::Text(t) if t.galley.text() == label => Some(t.visual_bounding_rect().center()), _ => None,
+            }).expect("Readonly view retains disabled question controls");
+            render(vec![egui::Event::PointerMoved(pos),egui::Event::PointerButton { pos,button:egui::PointerButton::Primary,pressed:true,modifiers:Default::default() }]);
+            render(vec![egui::Event::PointerButton { pos,button:egui::PointerButton::Primary,pressed:false,modifiers:Default::default() }]);
+            assert!(effects.is_empty(), "Readonly {kind} must never submit user.answer");
+            assert_eq!(snapshot, original);
+        }
+    }
+
     #[test]
     fn actual_approval_click_has_horizontal_actions_and_pending_feedback_for_both_methods() {
         fn record(collection: &str, prefix: &str, patch: Value) -> Record {

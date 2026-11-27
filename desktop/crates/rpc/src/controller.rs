@@ -16,6 +16,12 @@ use std::{
 #[path = "approval_tests.rs"]
 mod approval_tests;
 #[cfg(test)]
+#[path = "skill_receipt_tests.rs"]
+mod skill_receipt_tests;
+#[cfg(test)]
+#[path = "skill_delete_tests.rs"]
+mod skill_delete_tests;
+#[cfg(test)]
 #[path = "stability_parity_tests.rs"]
 mod stability_parity_tests;
 #[cfg(test)]
@@ -200,6 +206,30 @@ impl Router {
             conversation_id: r.data["conversation_id"].as_str().map(str::to_owned),
         })
     }
+    /// Delete only grants named by the confirmed Skill deletion. The same plan
+    /// supplies click-time CAS dependencies and the post-host commit, so a
+    /// stale or failed filesystem operation never silently changes visibility.
+    pub(super) fn skill_delete_visibility_plan(&self, params:&Value, snapshot:&Snapshot)->Result<CommandBatch> {
+        let name=artex_domain::required(params,"name")?;
+        let mut plan=Planner::new(snapshot,"ui.deleteSkill",params);
+        // Original DeleteSkillVisibility removes enabled and disabled grants
+        // for every agent; usage history and other skill names are retained.
+        for grant in snapshot.records("agent_skill_visibility").into_iter().filter(|r|r.data["skill_name"]==name) {
+            plan.delete("agent_skill_visibility",&grant.header.id);
+        }
+        Ok(plan.done(json!({"deleted":name})))
+    }
+    fn preflight_skill_delete(&self, request:&DispatchRequest)->Result<()> {
+        let snapshot=self.snapshot()?;
+        let plan=self.skill_delete_visibility_plan(&request.params,&snapshot)?;
+        for expected in plan.expected {
+            if !request.expected.iter().any(|supplied|supplied.collection==expected.collection&&supplied.id==expected.id&&supplied.version==expected.version) {
+                let mut error=Error::new("VERSION_CONFLICT","Skill visibility changed after deletion was prepared");
+                error.details=json!({"required":expected});return Err(error);
+            }
+        }
+        Ok(())
+    }
     pub(super) fn native_ui(
         &mut self,
         request: &DispatchRequest,
@@ -215,6 +245,11 @@ impl Router {
             if let Some(r) = self.repeated(request)? {
                 return Ok(r);
             }
+        }
+        if request.method=="ui.deleteSkill" {
+            // Check the pinned grants before irreversible host I/O. The normal
+            // prepared receipt also verifies all supplied versions at admission.
+            self.preflight_skill_delete(request)?;
         }
         let mut input = request.params.clone();
         for key in ["content"] {
@@ -422,11 +457,17 @@ impl Router {
                 let state = self.archive_statistics_view("ui.skills", self.snapshot()?)?;
                 result = artex_domain::skills_ui::decorate_skills(&result, state.as_ref())?;
             }
+            if request.method=="ui.deleteSkill"&&result["deleted"]!=request.params["name"] {
+                return Err(Error::new("EXTERNAL_FAILURE","Native Skill deletion result identifies a different resource"));
+            }
             let result = self.externalize_query(result)?;
             let mutation = ui_mutates(&request.method);
             if mutation {
                 let mut b = if request.method == "ui.refreshMcpServer" {
                     self.mcp_cache_plan(request, &result)?
+                } else if request.method=="ui.deleteSkill" {
+                    let snapshot=self.snapshot()?;
+                    self.skill_delete_visibility_plan(&request.params,&snapshot)?
                 } else {
                     artex_domain::empty_batch(&request.method, &request.params)
                 };
@@ -638,7 +679,48 @@ impl Router {
     ) -> Result<()> {
         let s = self.snapshot()?;
         let c = self.stored_run_context(&s, run)?;
+        let mut b = self.transcript_batch(&s, &c, run, kind, summary, message, usage, None)?;
+        if message.role == "assistant" {
+            self.decorate_stream_batch(run, &mut b)?;
+        }
+        self.internal_commit(b)?;
+        if message.role == "assistant" {
+            self.finalize_stream(run);
+        }
+        Ok(())
+    }
+
+    /// Build the normal transcript and audit updates against an authorized
+    /// active snapshot. A successful self-pause joins this batch to its pause
+    /// transaction, so cancellation never grants a later append capability.
+    pub(super) fn transcript_batch(
+        &self,
+        s: &Snapshot,
+        c: &Context,
+        run: &str,
+        kind: &str,
+        summary: &str,
+        message: &Message,
+        usage: Option<&Value>,
+        atomic_invocation: Option<&Value>,
+    ) -> Result<CommandBatch> {
         let mut envelope = json!({"run_id":run,"turn_id":new_id("turn"),"message":message});
+        if let Some(invocation) = atomic_invocation {
+            let owner = artex_domain::sdk::current_run(s, c)?;
+            let result = self.read_json_blob(&invocation["result_ref"])?;
+            let expected_message = Message {role:"user".into(),content:vec![json!({"type":"tool_result","tool_use_id":invocation["tool_use_id"],"content":self.tool_result_text(&result)?,"is_error":false})]};
+            if c.actor.engine_epoch != self.engine_epoch || owner.header.id != run
+                || owner.data["state"] != "running" || invocation["run_id"] != run
+                || invocation["name"] != "pause_task" || invocation["state"] != "completed"
+                || invocation["input"]["task_id"] != owner.data["task_id"]
+                || owner.data["task_id"].as_str() != c.task_id.as_deref()
+                || result["is_error"] != false || kind != "tool_result"
+                || message.role != expected_message.role || message.content != expected_message.content
+            {
+                return Err(Error::new("PERMISSION_DENIED", "Atomic self-pause receipt does not match its active owner and successful invocation"));
+            }
+            envelope["atomic_invocation"] = json!({"id":invocation["id"],"run_id":invocation["run_id"],"tool_use_id":invocation["tool_use_id"],"name":invocation["name"],"result_ref":invocation["result_ref"]});
+        }
         if message.role == "assistant" {
             if let Some(marker) = self.stream_marker(run) {
                 envelope["stream"] = marker;
@@ -646,22 +728,35 @@ impl Router {
         }
         let serialized = serde_json::to_string(&envelope)?;
         let mut b = artex_domain::conversation::append_activity(
-            &s,
-            &c,
+            s,
+            c,
             run,
             kind,
             summary,
             &body(&serialized),
             usage,
         )?;
+        if atomic_invocation.is_some() {
+            // Even this internal pre-cancel plan is unusable after its owner
+            // version changes. Joining it never creates a terminal write path.
+            for (collection,id) in [("agent_runs",Some(run)),("agents",c.actor.agent_id.as_deref()),("tasks",c.task_id.as_deref())] {
+                if let Some(record)=id.and_then(|id|s.get(collection,id)) {
+                    if !b.expected.iter().any(|e|e.collection==collection&&e.id==record.header.id) {
+                        b.expected.push(Expected {collection:collection.into(),id:record.header.id.clone(),version:record.header.version.clone()});
+                    }
+                }
+            }
+        }
         if let Some(block) = message.content.iter().find(|b| b["type"] == "tool_result") {
             let toolid = block["tool_use_id"].clone();
             let invocation = s
                 .records("tool_invocations")
                 .into_iter()
-                .find(|i| i.data["run_id"] == run && i.data["tool_use_id"] == toolid);
+                .find(|i| i.data["run_id"] == run && i.data["tool_use_id"] == toolid)
+                .map(|i| &i.data)
+                .or(atomic_invocation);
             let name = invocation
-                .map(|i| i.data["name"].clone())
+                .map(|i| i["name"].clone())
                 .or_else(|| {
                     s.records("activity")
                         .into_iter()
@@ -719,14 +814,36 @@ impl Router {
                 });
             }
         }
-        if message.role == "assistant" {
-            self.decorate_stream_batch(run, &mut b)?;
+        Ok(b)
+    }
+
+    /// A terminal actor may only acknowledge the receipt already committed in
+    /// its own successful self-pause transaction. This is a read-only duplicate
+    /// check, never a capability to append after cancellation.
+    pub(super) fn atomic_self_pause_receipt_present(&self, rid:&str, call:&ToolCall, value:&Value)->Result<bool> {
+        if call.name != "pause_task" {return Ok(false);}
+        let s=self.snapshot()?;
+        let Some(run)=s.get("agent_runs",rid) else {return Ok(false);};
+        let Some(invocation)=value["invocation_id"].as_str().and_then(|id|s.get("tool_invocations",id)) else {return Ok(false);};
+        let d=&invocation.data;
+        if run.data["engine_epoch"]!=self.engine_epoch || run.data["state"]!="cancelled"
+            || d["run_id"]!=rid || d["name"]!=call.name || d["tool_use_id"]!=call.id
+            || d["input"]!=call.input || d["input"]["task_id"]!=run.data["task_id"]
+            || d["state"]!="completed" || value["state"]!="completed" || d["result_ref"]!=value["result_ref"]
+        {return Ok(false);}
+        let result=self.read_json_blob(&d["result_ref"])?;
+        if result!=value["result"] || result["is_error"]!=false {return Ok(false);}
+        let expected=json!({"role":"user","content":[{"type":"tool_result","tool_use_id":call.id,"content":self.tool_result_text(&result)?,"is_error":false}]});
+        let identity=json!({"id":invocation.header.id,"run_id":rid,"tool_use_id":call.id,"name":call.name,"result_ref":d["result_ref"]});
+        let mut matches=0;
+        for activity in s.records("activity").into_iter().chain(s.records("conversation_activities")) {
+            if activity.header.commit_seq!=invocation.header.commit_seq || activity.data["kind"]!="tool_result" || activity.data["tool"]!=call.name || activity.data["tool_use_id"]!=call.id || activity.data["is_error"]!=false {continue;}
+            let text=self.body_text(&activity.data["detail"])?;
+            let envelope:Value=serde_json::from_str(&text).map_err(|_|Error::new("CORRUPT_STORE","Malformed self-pause transcript receipt"))?;
+            if envelope["run_id"]==rid && envelope["atomic_invocation"]==identity && envelope["message"]==expected {matches+=1;}
         }
-        self.internal_commit(b)?;
-        if message.role == "assistant" {
-            self.finalize_stream(run);
-        }
-        Ok(())
+        if matches>1 {return Err(Error::new("CORRUPT_STORE","Duplicate atomic self-pause receipt"));}
+        Ok(matches==1)
     }
     pub(super) fn finish_runtime(&mut self, run: &str, status: &str, detail: &str) -> Result<()> {
         self.finish_runtime_with_intent_state(run, status, detail, None)
@@ -949,7 +1066,7 @@ impl Router {
         }
         let mut messages = if run.data["conversation_id"].is_null() {
             if let Some(parent) = run.data["parent_run_id"].as_str() {
-                self.context_messages(parent)?
+                self.parent_context_messages(run, parent)?
             } else {
                 Vec::new()
             }
@@ -1576,7 +1693,9 @@ impl Router {
             Ok(value) => {
                 self.runtime.runs.get_mut(rid).unwrap().pending.pop_front();
                 let text = self.tool_result_text(&value["result"])?;
-                self.append_transcript(rid,"tool_result",&format!("{} completed",call.name),&Message{role:"user".into(),content:vec![json!({"type":"tool_result","tool_use_id":call.id,"content":text,"is_error":value["result"]["is_error"]})]},None)?;
+                if !self.atomic_self_pause_receipt_present(rid,&call,&value)? {
+                    self.append_transcript(rid,"tool_result",&format!("{} completed",call.name),&Message{role:"user".into(),content:vec![json!({"type":"tool_result","tool_use_id":call.id,"content":text,"is_error":value["result"]["is_error"]})]},None)?;
+                }
             }
             Err(e) => {
                 self.runtime.runs.get_mut(rid).unwrap().pending.pop_front();
@@ -1600,6 +1719,11 @@ impl Router {
     fn complete_host(&mut self, rid: &str, invocation: &str, result: Result<Value>) -> Result<()> {
         let s = self.snapshot()?;
         let i = record(&s, "tool_invocations", invocation)?;
+        // Result decoration and standing guidance must share the invocation's
+        // owner; a mismatched completion may not bind either to another run.
+        if i.data["run_id"] != rid {
+            return Err(Error::new("PERMISSION_DENIED", "Host completion belongs to another run"));
+        }
         let effect_error = result.as_ref().map_or(true, |v| {
             v["is_error"] == true
                 // MCP's wire flag is camelCase; keep it through the generic
@@ -1682,14 +1806,17 @@ impl Router {
                     json!({"type":"tool_result","tool_use_id":i.data["tool_use_id"],"content":content,"is_error":false}),
                 ],
             };
-            let detail = json!({"run_id":rid,"turn_id":new_id("turn"),"message":message});
-            let completed = artex_domain::conversation::append_activity(
+            // Keep the successful result and standing guidance atomic, while
+            // using the same execution identity and audit decoration as every
+            // other tool result. Raw activity insertion loses the named pair.
+            let completed = self.transcript_batch(
                 &s,
                 &context,
                 rid,
                 "tool_result",
                 "Skill completed",
-                &artex_core::body(&detail.to_string()),
+                &message,
+                None,
                 None,
             )?;
             p.batch.changes.extend(completed.changes);

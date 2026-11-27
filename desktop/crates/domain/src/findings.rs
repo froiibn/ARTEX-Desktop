@@ -3,6 +3,8 @@ use crate::*;
 // Preserve RecordFindingRetestResult's source byte limits and retry semantics.
 const RETEST_SUMMARY_LIMIT: usize = 16_000;
 const RETEST_EVIDENCE_LIMIT: usize = 128_000;
+// Original db.RecordFindingTx ranks confirmed findings at priority 9.
+const REPORTED_FINDING_PRIORITY: i64 = 9;
 
 fn matches_evidence(stored: &Value, evidence: &str) -> bool {
     use sha2::{Digest, Sha256};
@@ -170,7 +172,19 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
             for a in ids(p, "asset_ids") {
                 record(s, "assets", &a)?;
             }
-            let node=b.insert("exploration_nodes","node",json!({"exploration_id":exp,"kind":"finding","state":"confirmed","priority":5,"payload":{"vulnclass":vuln,"name":text(p,"name"),"severity":severity,"summary":summary,"evidence":text(p,"evidence")},"owner":c.actor.agent_id}))?;
+            // ToolSet's opaque worker label is the caller name in Go. Native
+            // activity already uses agent.key for that label; typed ownership
+            // remains separately in node.owner, never substituted for the name.
+            let worker = match c.actor.agent_id.as_deref() {
+                Some(id) => text(&record(s, "agents", id)?.data, "key"),
+                None => "",
+            };
+            let node=b.insert("exploration_nodes","node",json!({"exploration_id":exp,"kind":"finding","state":"confirmed","priority":REPORTED_FINDING_PRIORITY,"origin":worker,"payload":{"vulnclass":vuln,"name":text(p,"name"),"severity":severity,"summary":summary,"evidence":{"by":worker,"poc":text(p,"evidence")}},"owner":c.actor.agent_id}))?;
+            // RecordFindingTx writes affected assets and graph anchors in the
+            // same transaction. A row-only association loses follow-up scope.
+            for asset in ids(p,"asset_ids").into_iter().collect::<BTreeSet<_>>() {
+                b.insert("exploration_anchors","anchor",json!({"node_id":node,"asset_id":asset}))?;
+            }
             if let Some(intent) = intent {
                 b.insert(
                     "exploration_edges",
@@ -178,7 +192,7 @@ pub fn plan(m: &str, p: &Value, s: &Snapshot, c: &Context) -> Result<CommandBatc
                     json!({"exploration_id":exp,"src_id":intent,"dst_id":node,"rel":"yields"}),
                 )?;
             }
-            let fid=b.insert("findings","finding",json!({"task_id":task,"node_id":node,"vulnclass":vuln,"name":text(p,"name"),"severity":severity,"summary":summary,"evidence":artex_core::body(text(p,"evidence")),"worker":c.actor.agent_id.as_deref().unwrap_or(""),"asset_ids":ids(p,"asset_ids"),"status":"pending","report":artex_core::body(""),"evidence_version":"0","report_evidence_version":"0"}))?;
+            let fid=b.insert("findings","finding",json!({"task_id":task,"node_id":node,"vulnclass":vuln,"name":text(p,"name"),"severity":severity,"summary":summary,"evidence":artex_core::body(text(p,"evidence")),"worker":worker,"asset_ids":ids(p,"asset_ids"),"status":"pending","report":artex_core::body(""),"evidence_version":"0","report_evidence_version":"0"}))?;
             let mut refs = p["traffic_refs"].as_array().cloned().unwrap_or_default();
             let binding_enabled =
                 crate::setting_bool(s, "agent_traffic_binding", false) || c.actor.kind == "user";

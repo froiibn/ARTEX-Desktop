@@ -74,6 +74,36 @@ fn command(router: &mut Router, method: &str, params: Value) -> Value {
     let request = prepared(router, method, params);
     router.dispatch_request(&request, None).unwrap()
 }
+
+#[test]
+fn user_feature_opt_in_prepares_commits_and_cannot_be_enabled_by_an_agent() {
+    let (_dir, mut router, rid, _) = crate::regression::seeded();
+    let state = router.snapshot().unwrap();
+    let agent = state.get("agent_runs", &rid).unwrap().data["agent_id"].as_str().unwrap().to_owned();
+    let params = json!({"agent_id":agent,"questions":true,"plan_mode":false,"memory":false});
+    let request = prepared(&mut router, "agent.features.set", params.clone());
+    assert!(request.expected.iter().any(|e| e.collection == "agents" && e.id == agent));
+    router.dispatch_request(&request, None).unwrap();
+    let state = router.snapshot().unwrap();
+    let features = state.records("agent_features").into_iter().find(|r| r.data["agent_id"] == agent).unwrap();
+    assert_eq!(features.data["questions"], true);
+    let version = features.header.version.clone();
+    // A repeated receipt must not write a second feature version.
+    router.dispatch_request(&request, None).unwrap();
+    assert_eq!(router.snapshot().unwrap().get("agent_features", &features.header.id).unwrap().header.version, version);
+    let context = artex_agent::context_for_run(&state, &rid, &router.engine_epoch).unwrap();
+    let prepare = DispatchRequest { method: "command.prepare".into(), command_id: None,
+        params: json!({"method":"agent.features.set","params":params}), ..request };
+    let error = router.dispatch_request(&prepare, Some(&context)).unwrap_err();
+    assert_eq!(error.code, "PERMISSION_DENIED");
+    assert_eq!(router.snapshot().unwrap().get("agent_features", &features.header.id).unwrap().header.version, version);
+    let stale = prepared(&mut router, "agent.features.set", params.clone());
+    command(&mut router, "agent.features.set", json!({"agent_id":agent,"questions":false,"plan_mode":false,"memory":false}));
+    let error = router.dispatch_request(&stale, None).unwrap_err();
+    assert_eq!(error.code, "VERSION_CONFLICT");
+    assert_eq!(router.snapshot().unwrap().records("agent_features").into_iter()
+        .find(|r| r.data["agent_id"] == agent).unwrap().data["questions"], false);
+}
 fn seed_policy(router: &mut Router, action: &str) -> String {
     let s = router.snapshot().unwrap();
     let mut b = Planner::new(&s, "test.policy", &json!({}));

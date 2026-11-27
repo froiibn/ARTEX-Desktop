@@ -150,7 +150,7 @@ const ui = read('ui-dtos.v1.json');
 // Produce v1 wire DTOs from the frozen legacy DTOs. Never validate typed IDs
 // against the old frontend's number declarations.
 const wireDefs = {}, wireCache = new Map(), wireOverrides = [];
-const typeIds = {Task:'task',TaskCategory:'category',TaskTemplate:'template',TaskArchive:'archive',TaskGoal:'node',TaskConstraint:'constraint',TaskScopeRow:'scope',Asset:'asset',FindingAsset:'asset',Company:'company',ScopeRow:'companyscope',TaskNode:'node',Finding:'finding',FindingTrafficBinding:'binding',TrafficEvidenceSnapshot:'evidence',FindingRetest:'retest',ActiveFindingRetest:'retest',Conversation:'conversation',Agent:'agent',AgentTrigger:'trigger',PromptVersion:'prompt',PromptVar:'promptvar',LLMProfile:'profile',LLMAuditProfile:'profile',LLMPoolMember:'profile',MCPServer:'mcp',InterceptRule:'interceptrule',AssetInterceptRule:'assetrule',InterceptPending:'approval',InterceptApprovalRow:'approval',InterceptDetail:'approval',NotificationChannel:'notifychannel',NotificationDelivery:'notifydelivery',TrafficExchange:'traffic',CommandRecord:'activity',LLMRecordItem:'llmrecord',LLMRecordDetail:'llmrecord',SkillCall:'skillusage'};
+const typeIds = {Task:'task',TaskCategory:'category',TaskTemplate:'template',TaskArchive:'archive',TaskGoal:'node',TaskConstraint:'constraint',TaskScopeRow:'scope',Asset:'asset',FindingAsset:'asset',Company:'company',ScopeRow:'companyscope',TaskNode:'node',CoverageAssetRef:'node',Finding:'finding',FindingTrafficBinding:'binding',TrafficEvidenceSnapshot:'evidence',FindingRetest:'retest',ActiveFindingRetest:'retest',Conversation:'conversation',Agent:'agent',AgentTrigger:'trigger',PromptVersion:'prompt',PromptVar:'promptvar',LLMProfile:'profile',LLMAuditProfile:'profile',LLMPoolMember:'profile',MCPServer:'mcp',InterceptRule:'interceptrule',AssetInterceptRule:'assetrule',InterceptPending:'approval',InterceptApprovalRow:'approval',InterceptDetail:'approval',NotificationChannel:'notifychannel',NotificationDelivery:'notifydelivery',TrafficExchange:'traffic',CommandRecord:'activity',LLMRecordItem:'llmrecord',LLMRecordDetail:'llmrecord',SkillCall:'skillusage'};
 const pluralIds = {task_ids:'task',source_task_ids:'task',asset_ids:'asset',parent_ids:'node',llm_profile_ids:'profile',company_ids:'company',archive_ids:'archive',binding_ids:'binding',goal_ids:'node',profile_ids:'profile',mcp:'mcp'};
 const fieldIds = {...foreign,intent_id:'node',goal_id:'node',constraint_id:'constraint',binding_id:'binding',scope_id:'scope',context_task_id:'task',source_task_node_id:'node',finding_node_id:'node',traffic_id:'traffic'};
 const childIds = {tasks:'task',assets:'asset',findings:'finding',nodes:'node',companies:'company',llm_profiles:'profile',profiles:'profile',categories:'category',templates:'template',bindings:'binding',rules:'interceptrule',channels:'notifychannel',deliveries:'notifydelivery',conversations:'conversation'};
@@ -216,16 +216,23 @@ function wire(s,ctx,key='',typeName='') {
  if(k==='agents' && /resourceVisibility|skillVisibility/.test(ctx.method)) return array(id('agent'));
  let prefix=fieldIds[k];
  if(k==='task_id' && ['LLMRecordItem','LLMRecordDetail','LLMTask'].includes(typeName)) return {...s,'x-opaque-registry-key':true};
+ // ArchiveBatchItem keeps the original optional identity, represented by a native typed ID.
+ if(k==='archive_id' && ctx.role==='result' && typeName==='ArchiveBatchItem') prefix='archive';
  if(k==='rule_id' && /[Tt]askInterceptRule/.test(ctx.method)) prefix='taskrule';
  if(k==='id' || k==='ids') prefix = /^SS/.test(typeName)?null:ctx.prefix;
  if(k==='id' && /updateTaskLLMProfiles/.test(ctx.method)) prefix='task';
- if(k==='id' && ctx.role==='result' && ctx.method==='ui.controlIntent') prefix='node';
+ // Both endpoints return the target intent identity, including steering admission.
+ if(k==='id' && ctx.role==='result' && ['ui.controlIntent','ui.sendWorkerMessage'].includes(ctx.method)) prefix='node';
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteTaskCategory') prefix='category';
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteTaskTemplate') prefix='template';
  // Delete results identify the removed native object; they are not row counts.
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteLLMProfile') prefix='profile';
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteMcpServer') prefix='mcp';
  if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteInterceptRule') prefix='interceptrule';
+ // These Go handlers also return the deleted identity, never a row count.
+ if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteAssetInterceptRule') prefix='assetrule';
+ if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteTrigger') prefix='trigger';
+ if(k==='deleted' && ctx.role==='result' && ctx.method==='ui.deleteConversation') prefix='conversation';
  if(k==='id' && ctx.role==='params' && /[Tt]askInterceptRule/.test(ctx.method)) prefix='task';
  if(k==='id' && ctx.role==='params' && ctx.method==='ui.taskArchive') prefix='archive';
  if(k==='id' && ctx.role==='params' && ctx.method==='ui.chatUpload') {
@@ -395,6 +402,12 @@ const tools = read('tools-source.v1.json').map(t => {
   if (t.name === 'update_finding_report') { desktopSchema.properties.finding_node_id = desktopSchema.properties.finding_id; delete desktopSchema.properties.finding_id; desktopSchema.required = desktopSchema.required.map(x => x === 'finding_id' ? 'finding_node_id' : x); if (!desktopSchema.required.includes('evidence_version')) desktopSchema.required.push('evidence_version'); }
   if (t.name === 'AskUserQuestion') Object.assign(desktopSchema.properties.questions,{minItems:1,maxItems:4});
   if (t.name === 'RecordMemory') Object.assign(desktopSchema.properties.type,{enum:['user','feedback','project','reference'],default:'project'});
+  // norma TaskStop treats an explicit empty string like omission: stop only
+  // this run's background commands. Nonempty handles remain typed ExecutionIds.
+  if (t.name === 'TaskStop') {
+    const executionId = desktopSchema.properties.task_id;
+    desktopSchema.properties.task_id = {description:executionId.description,anyOf:[{const:''},executionId]};
+  }
   const seedAgents = [...t.default_agents];
   if (t.family === 'artex' && !seedAgents.length && t.name !== 'goal_met' && !t.name.startsWith('traffic_') && !t.name.includes('retest')) seedAgents.push('auto');
   if (['update_finding_report','get_task_node_detail','list_task_findings','get_task_worker_trace','list_task_worker_traces','search_task_worker_traces','get_task_graph'].includes(t.name)) seedAgents.push('reporter');

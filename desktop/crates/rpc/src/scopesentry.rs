@@ -32,8 +32,9 @@ impl ScopeClient {
             .deadline
             .saturating_duration_since(Instant::now())
             .min(Duration::from_secs(60));
-        let mut params = json!({"server":self.server,"command_id":self.command,"tool_name":tool,"arguments":args});
-        params["operation"] = json!(operation);
+        // The typed HostGateway argument owns routing. Native direct gateways
+        // reject an operation key supplied inside params as boundary spoofing.
+        let params = json!({"server":self.server,"command_id":self.command,"tool_name":tool,"arguments":args});
         let result =
             self.gateway
                 .request(&self.workspace, &self.context, operation, params, timeout)?;
@@ -355,11 +356,31 @@ impl Router {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    struct Fixture(AtomicUsize);
+    use std::sync::{Condvar, Mutex};
+    #[derive(Clone, Debug)]
+    struct StopObservation {
+        workspace: String,
+        engine_epoch: String,
+        params: Value,
+    }
+    #[derive(Default)]
+    struct Fixture {
+        calls: AtomicUsize,
+        stops: Mutex<Vec<StopObservation>>,
+        stop_observed: Condvar,
+    }
     impl HostGateway for Fixture {
-        fn request(&self, _: &str, c: &Context, op: &str, p: Value, _: Duration) -> Result<Value> {
+        fn request(&self, workspace: &str, c: &Context, op: &str, p: Value, _: Duration) -> Result<Value> {
             assert_eq!(c.actor.kind, "user");
-            self.0.fetch_add(1, Ordering::SeqCst);
+            assert!(p.get("operation").is_none(),"ScopeSentry must preserve the direct gateway routing boundary");
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if op == "ui.stop" {
+                let mut stops=self.stops.lock().unwrap();
+                stops.push(StopObservation {workspace:workspace.into(),engine_epoch:c.actor.engine_epoch.clone(),params:p});
+                drop(stops);
+                self.stop_observed.notify_one();
+                return Ok(json!({"accepted":true}));
+            }
             if op == "mcp.refresh" {
                 return Ok(json!([]));
             }
@@ -380,11 +401,12 @@ mod tests {
             Ok(json!({"content":[{"type":"text","text":value.to_string()}]}))
         }
     }
-    fn seed() -> (tempfile::TempDir, Router, Context) {
+    fn seed() -> (tempfile::TempDir, Router, Context, Arc<Fixture>) {
         let dir = tempfile::tempdir().unwrap();
         let mut router = Router::new(BTreeMap::new());
         router.store = Some(Store::create(&dir.path().join("w"), "SS fixture").unwrap());
-        router.gateway = Some(Arc::new(Fixture(AtomicUsize::new(0))));
+        let fixture=Arc::new(Fixture::default());
+        router.gateway = Some(fixture.clone());
         let context = Context {
             actor: Actor {
                 kind: "user".into(),
@@ -398,7 +420,7 @@ mod tests {
         };
         let b=artex_domain::sync_scopesentry::plan("ui.ssDatasource",&json!({"body":{"url":"https://example.test/mcp","api_key":{"secret_ref":"secret_00000000000000000000000000000001","hint":"configured"}}}),&router.snapshot().unwrap(),&context).unwrap();
         router.internal_commit(b).unwrap();
-        (dir, router, context)
+        (dir, router, context, fixture)
     }
     fn make_request(router: &Router, method: &str, params: Value) -> DispatchRequest {
         Request {
@@ -431,7 +453,7 @@ mod tests {
     }
     #[test]
     fn listings_project_only_source_fields_and_status_checks_native_mcp() {
-        let (_d, mut r, c) = seed();
+        let (_d, mut r, c, _fixture) = seed();
         for (method, params) in [
             ("ui.ssStatus", json!({})),
             ("ui.ssProjects", json!({})),
@@ -457,7 +479,7 @@ mod tests {
     }
     #[test]
     fn sync_collects_natively_then_commits_cas_and_cancelled_job_creates_no_assets() {
-        let (_d, mut r, c) = seed();
+        let (_d, mut r, c, _fixture) = seed();
         let p = json!({"body":{"dimension":"project","targets":["opaque-project"],"asset_types":["subdomain"],"create_company":true}});
         let mut request = make_request(&r, "ui.ssSync", p);
         request.expected = artex_domain::sync_scopesentry::plan(
@@ -480,7 +502,7 @@ mod tests {
                 .iter()
                 .any(|receipt| receipt.data["command_id"] == *request.command_id.as_ref().unwrap())
         );
-        let (_d, mut r, c) = seed();
+        let (_d, mut r, c, fixture) = seed();
         let mut req = make_request(&r, "ui.ssSync", request.params.clone());
         req.expected = artex_domain::sync_scopesentry::plan(
             "ui.ssSync",
@@ -493,6 +515,17 @@ mod tests {
         r.handle_scopesentry(&req, &c).unwrap();
         r.cancel_request(&req.id);
         let _ = completed(&mut r);
+        // Stop dispatch is asynchronous. Observe and correlate that control
+        // call before accepting cancellation; an unjoined fixture panic must
+        // not be hidden by the immediate cancelled response's outer PASS.
+        let (stops,_) = fixture.stop_observed.wait_timeout_while(
+            fixture.stops.lock().unwrap(),Duration::from_millis(req.timeout_ms),|stops|stops.is_empty(),
+        ).unwrap();
+        assert_eq!(stops.len(),1,"Expected one actual cancellation stop within the existing request budget");
+        assert_eq!(stops[0].workspace,req.workspace_id.as_deref().unwrap());
+        assert_eq!(stops[0].engine_epoch,req.engine_epoch.as_deref().unwrap());
+        assert_eq!(stops[0].params,json!({"command_id":req.command_id.as_ref().unwrap()}));
+        drop(stops);
         for _ in 0..20 {
             r.runtime_tick().unwrap();
             std::thread::sleep(Duration::from_millis(2));

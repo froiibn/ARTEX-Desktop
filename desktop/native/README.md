@@ -2,9 +2,9 @@
 
 LLM 연결·기본 모델·일반 설정·에이전트·도구/MCP·스킬 구성은 같은 앱 프로필의 모든 작업 공간에서 공통으로 사용한다. 첫 열기에서 최근 사용 기록의 모델도 읽기 전용으로 가져오며, 기록 밖의 공간은 직접 열어 이전한다. 기존 공통 값과 기본 모델은 유지한다. 좁은 화면에서도 중앙의 저장된 모델 선택기로 기존 연결을 확인할 수 있다. 설정 화면에 공유 범위를 표시한다. Bypass와 작업·대화 기록은 현재 작업 공간에 유지한다. [공통 설정 저장·이전·검증 안내](../../docs/shared-application-settings.md)를 참고한다.
 
-현재 개발 대상은 Rust로 작성한 네이티브 데스크톱 앱이다. 화면은 egui/eframe이며 `native-core`의 객체·파일 저장, LLM 실행, 권한 검사와 같은 프로세스에서 실행된다. React, JavaScript, WebView, HTTP UI 서버, 별도 `artex-engine` 프로세스를 사용하지 않는다.
+현재 개발 대상은 Rust로 작성한 네이티브 데스크톱 앱이다. 화면은 egui/eframe이며 `native-core`의 객체 ID·SQLite 저장, LLM 실행, 권한 검사와 같은 프로세스에서 실행된다. React, JavaScript, WebView, HTTP UI 서버, 별도 `artex-engine` 프로세스를 사용하지 않는다.
 
-소스 위치는 저장소 루트 기준 `desktop/native` (UI), `desktop/native-core` (앱 서비스)다. 이전 Tauri/React 구현은 현재 작업 트리에서 제거했다. 데이터 저장은 기존 Rust 파일 포맷과 객체 ID를 유지한다. 임의 사용자 공간을 테스트 데이터로 쓰지 않는다.
+소스 위치는 저장소 루트 기준 `desktop/native` (UI), `desktop/native-core` (앱 서비스)다. 이전 Tauri/React 구현은 현재 작업 트리에서 제거했다. 기본 업무 저장은 번들된 SQLite v2이며 객체 ID 참조를 유지한다. 기존 v1 파일은 검증·이전 입력으로 보존한다. 임의 사용자 공간을 테스트 데이터로 쓰지 않는다.
 
 ## 빌드와 실행
 

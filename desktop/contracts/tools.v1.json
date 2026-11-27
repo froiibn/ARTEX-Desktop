@@ -5346,10 +5346,18 @@
       "desktop_input_schema": {
         "properties": {
           "task_id": {
-            "type": "string",
-            "pattern": "^exec_[0-9a-f]{32}$",
             "description": "The id of the task to stop. Empty stops all running tasks.",
-            "x-legacy-type": "string"
+            "anyOf": [
+              {
+                "const": ""
+              },
+              {
+                "type": "string",
+                "pattern": "^exec_[0-9a-f]{32}$",
+                "description": "The id of the task to stop. Empty stops all running tasks.",
+                "x-legacy-type": "string"
+              }
+            ]
           }
         },
         "type": "object"

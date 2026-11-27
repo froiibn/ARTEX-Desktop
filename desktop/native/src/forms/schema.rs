@@ -58,6 +58,23 @@ pub(super) fn actual(schema: &Value, value: &Value) -> Value {
     }
     schema
 }
+/// A nullable identity needs the reference selector even while its value is
+/// None. Other null alternatives stay null until an explicit editor action.
+pub(super) fn for_editor(schema:&Value,value:&Value)->Value {
+    let actual=actual(schema,value);
+    if value.is_null() && actual["type"]=="null" {
+        let resolved=resolve(schema);
+        if let Some(identity)=resolved["anyOf"].as_array().or_else(||resolved["oneOf"].as_array())
+            .into_iter().flatten().map(resolve).find(|v|v["type"]=="string"
+                && v["pattern"].as_str().is_some_and(|p|p.contains("[0-9a-f]{32}"))) {return identity;}
+    }
+    actual
+}
+pub(super) fn nullable(schema:&Value)->bool {
+    let resolved=resolve(schema);
+    resolved["type"]=="null" || resolved["anyOf"].as_array().or_else(||resolved["oneOf"].as_array())
+        .into_iter().flatten().any(|v|resolve(v)["type"]=="null")
+}
 pub(super) fn empty(schema: &Value) -> Value {
     let options = choices(schema);
     if let Some(first) = options.first() {
